@@ -16,7 +16,6 @@ import {
   saveStoredOperationalResellerId,
   buildRegionResellerFilterParams,
   filterResellersByRegion,
-  hasOperationalWhatsAppSession,
 } from '../utils/operationalFilters';
 import { createXlsxBlob } from '../utils/excelExport';
 import { 

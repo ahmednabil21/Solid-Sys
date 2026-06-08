@@ -495,11 +495,6 @@ const DashboardPage: React.FC = () => {
     else navigate('/admin/subscribers?status=active');
   };
 
-  const handleExpiringWithin3DaysClick = () => {
-    if (isMainAgent) navigate('/admin/main-agent/sub-agents/subscribers');
-    else navigate('/admin/subscribers?status=expiring_soon');
-  };
-
   const handleExpiredClick = () => {
     if (isMainAgent) navigate('/admin/main-agent/sub-agents/subscribers');
     else navigate('/admin/subscribers?status=expired');

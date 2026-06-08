@@ -206,42 +206,6 @@ function SettingsPage() {
     return rawMessage;
   };
 
-  const pollWakeelWhatsAppStatus = (agentId: string) => {
-    clearWaStatusPoll();
-    setWaStatusLoading(true);
-    setWaError(null);
-    let ticks = 0;
-    let sawLoggedIn = false;
-    waStatusPollRef.current = setInterval(async () => {
-      ticks++;
-      try {
-        const s = await apiService.getAgentWhatsAppStatus(agentId);
-        setWaStatus(s);
-        if (s.isLoggedIn) {
-          sawLoggedIn = true;
-          clearWaStatusPoll();
-          setWaStatusLoading(false);
-          setWaSuccessInfo(
-            'تم ربط واتساب بنجاح. يمكنك إرسال رسائل التفعيل والتنبيه للمشتركين.'
-          );
-          showSuccess('واتساب', 'تم ربط واتساب بنجاح.');
-          return;
-        }
-      } catch {
-        // تجاهل أخطاء مؤقتة أثناء الاستطلاع
-      }
-      if (ticks >= WA_STATUS_POLL_MAX_TICKS) {
-        clearWaStatusPoll();
-        setWaStatusLoading(false);
-        if (!sawLoggedIn) {
-          setWaError(
-            'انتهت مهلة الانتظار دون إتمام الربط. تحقق من إدخال رمز الاقتران في الهاتف، أو اضغط «طلب رمز الاقتران» مجدداً.'
-          );
-        }
-      }
-    }, WA_STATUS_POLL_MS);
-  };
-
   const updateAgentSasMutation = useMutation({
     mutationFn: async (payload: {
       serviceType: ServiceType;
@@ -324,32 +288,6 @@ function SettingsPage() {
     }, WA_STATUS_POLL_MS);
   };
 
-
-  const updateAgentWhatsAppSessionMutation = useMutation({
-    mutationFn: async (sessionId: string) => {
-      if (!myAgent) throw new Error('لا يوجد وكيل');
-      const updatePayload: import('../types').AgentUpdateRequest = {
-        fullName: myAgent.fullName,
-        companyName: myAgent.companyName,
-        phone: myAgent.phone,
-        address: myAgent.address,
-        governorate: myAgent.governorate,
-        isActive: myAgent.isActive,
-        subscriptionType: myAgent.subscriptionType,
-        subscriptionStartDate: myAgent.subscriptionStartDate,
-        subscriptionEndDate: myAgent.subscriptionEndDate,
-        whatsAppSessionId: sessionId.trim() || undefined,
-      };
-      return apiService.updateAgent(myAgent.id, updatePayload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myAgent'] });
-      showSuccess('تم الحفظ', 'تم حفظ معرف جلسة واتساب بنجاح.');
-    },
-    onError: (err: any) => {
-      showError('خطأ', ApiService.showError(err));
-    },
-  });
 
   const updateAgentCompanyNameMutation = useMutation({
     mutationFn: async (newCompanyName: string) => {
