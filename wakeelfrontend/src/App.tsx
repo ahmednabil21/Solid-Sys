@@ -245,6 +245,7 @@ function App() {
                     </ProtectedRoute>
                   } />
                   
+                  {/* SEND SMS - Admin only */}
                   {/* SAS Sync - معطّل مؤقتاً
                   <Route path="sas-sync" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent]}>
