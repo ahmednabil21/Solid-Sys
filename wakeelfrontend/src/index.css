@@ -6,6 +6,8 @@
 /* Safe area for notched phones (iPhone X+, etc.) */
 :root {
   --ui-scale: 0.8;
+  --viewport-h: calc(100vh / var(--ui-scale));
+  --viewport-h: calc(100dvh / var(--ui-scale));
   --sat: env(safe-area-inset-top);
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
@@ -20,15 +22,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     zoom: var(--ui-scale);
-  }
-
-  @supports not (zoom: 1) {
-    html {
-      transform: scale(var(--ui-scale));
-      transform-origin: top right;
-      width: calc(100% / var(--ui-scale));
-      min-height: calc(100vh / var(--ui-scale));
-    }
+    @apply bg-gray-50 dark:bg-gray-900;
   }
 
   body {
@@ -36,18 +30,26 @@
     padding: 0;
     font-family: inherit;
     font-weight: 600;
-    @apply text-gray-900 dark:text-gray-100;
+    @apply text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900;
     direction: rtl;
     text-align: right;
     overflow-x: hidden;
-    min-height: 100vh;
-    min-height: 100dvh;
+    min-height: var(--viewport-h);
   }
 }
 
 #root {
   font-feature-settings: 'kern' 1;
-  min-height: 100%;
+  min-height: var(--viewport-h);
+}
+
+/* تعويض ارتفاع الشاشة عند zoom: 0.8 لتجنب الفراغ الأبيض أسفل الصفحة */
+.h-screen {
+  height: var(--viewport-h);
+}
+
+.min-h-screen {
+  min-height: var(--viewport-h);
 }
 
 /*
