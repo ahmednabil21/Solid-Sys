@@ -118,6 +118,7 @@ const MaterialsDisbursementPage: React.FC = () => {
   const [returnNotes, setReturnNotes] = useState('');
   const [selectedSubscriberIdForPos, setSelectedSubscriberIdForPos] = useState<string>('');
   const [cartItems, setCartItems] = useState<PosCartItem[]>([]);
+  const [posSaleSubmitting, setPosSaleSubmitting] = useState(false);
   const isSalesHistoryMode = location.pathname.endsWith('/sales-history');
   const isPosMode = !isSalesHistoryMode;
 
@@ -266,6 +267,7 @@ const MaterialsDisbursementPage: React.FC = () => {
         showError('خطأ', 'يرجى اختيار الوكيل');
         return;
       }
+      setPosSaleSubmitting(true);
       try {
         let lastCreated: MaterialDisbursement | null = null;
         for (const line of cartDetailedItems) {
@@ -308,6 +310,8 @@ const MaterialsDisbursementPage: React.FC = () => {
         showSuccess('تم الصرف', 'تم تسجيل عناصر الفاتورة بنجاح');
       } catch (err) {
         showError('خطأ في الصرف', ApiService.showError(err));
+      } finally {
+        setPosSaleSubmitting(false);
       }
       return;
     }
@@ -846,11 +850,20 @@ const MaterialsDisbursementPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void submitDisbursement()}
-                  disabled={disburseMutation.isPending || (isAdmin && !selectedAgentId) || cartDetailedItems.length === 0}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50"
+                  disabled={posSaleSubmitting || disburseMutation.isPending || (isAdmin && !selectedAgentId) || cartDetailedItems.length === 0}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ShoppingCart className="h-4 w-4" />
-                  {disburseMutation.isPending ? 'جاري الحفظ...' : 'تأكيد البيع'}
+                  {posSaleSubmitting || disburseMutation.isPending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      <span>جاري الحفظ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-4 w-4" />
+                      <span>تأكيد البيع</span>
+                    </>
+                  )}
                 </button>
               </div>
             ) : (

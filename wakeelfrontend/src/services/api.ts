@@ -114,6 +114,7 @@ import {
   SalarySheetListResponse,
   SyncUploadRequestDto,
   SyncUploadResponseDto,
+  SyncContextResponseDto,
   AppSettingsResponse,
   AppSettingsUpdateRequest,
   AgentAnnouncementDto,
@@ -1424,6 +1425,18 @@ class ApiService {
     await this.api.delete(`/subscribers/profiles/${id}`);
   }
 
+  private normalizeServiceFeesList(raw: unknown): ServiceFees[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((f: any) => ({
+        id: String(f?.id ?? f?.Id ?? ''),
+        agentId: String(f?.agentId ?? f?.AgentId ?? ''),
+        name: String(f?.name ?? f?.Name ?? ''),
+        price: Number(f?.price ?? f?.Price ?? 0) || 0,
+      }))
+      .filter((f) => f.id);
+  }
+
   private normalizeMaterial(m: any): Material {
     return {
       ...m,
@@ -1433,6 +1446,7 @@ class ApiService {
       quantity: Number(m?.quantity ?? m?.Quantity ?? 0) || 0,
       agentPrice: Number(m?.agentPrice ?? m?.AgentPrice ?? 0) || 0,
       subscriberPrice: Number(m?.subscriberPrice ?? m?.SubscriberPrice ?? 0) || 0,
+      totalAgentAmount: Number(m?.totalAgentAmount ?? m?.TotalAgentAmount ?? 0) || 0,
       notes: m?.notes ?? m?.Notes ?? null,
       agentId: m?.agentId ?? m?.AgentId,
       createdAt: m?.createdAt ?? m?.CreatedAt,
@@ -1607,7 +1621,11 @@ class ApiService {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    return response.data ?? {};
+    const data = response.data ?? {};
+    return {
+      ...data,
+      serviceFees: this.normalizeServiceFeesList(data.serviceFees ?? (data as any).ServiceFees),
+    };
   }
 
   /**
@@ -1656,7 +1674,11 @@ class ApiService {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    return response.data ?? {};
+    const data = response.data ?? {};
+    return {
+      ...data,
+      serviceFees: this.normalizeServiceFeesList(data.serviceFees ?? (data as any).ServiceFees),
+    };
   }
 
   /**
@@ -2406,6 +2428,18 @@ class ApiService {
     return response.data;
   }
 
+  /** سياق المزامنة دون اتصال — GET /Sync/context */
+  async getSyncContext(agentId?: string): Promise<SyncContextResponseDto> {
+    const response = await this.api.get<SyncContextResponseDto>('/Sync/context', {
+      params: agentId ? { agentId } : undefined,
+    });
+    const data = response.data ?? {};
+    return {
+      ...data,
+      serviceFees: this.normalizeServiceFeesList(data.serviceFees ?? (data as any).ServiceFees),
+    };
+  }
+
   // Utility method to get base URL
   getBaseURL(): string {
     return this.api.defaults.baseURL || '';
@@ -2990,7 +3024,12 @@ class ApiService {
       params: Object.keys(params).length ? params : undefined,
       timeout: ApiService.SAS_SYNC_TIMEOUT_MS,
     });
-    return response.data;
+    const data = response.data;
+    return {
+      ...data,
+      data: Array.isArray(data?.data) ? data.data : [],
+      serviceFees: this.normalizeServiceFeesList(data?.serviceFees ?? (data as any)?.ServiceFees),
+    };
   }
 
   /** POST /providers/sas/synchronizationFTTH — مزامنة FTTH لآخر أسبوع (شامل اليوم) */
@@ -3012,6 +3051,7 @@ class ApiService {
     return {
       ...body,
       data: Array.isArray(body?.data) ? body.data : [],
+      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? (body as any)?.ServiceFees),
     };
   }
 
@@ -3031,6 +3071,7 @@ class ApiService {
     return {
       ...body,
       data: Array.isArray(body?.data) ? body.data : [],
+      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? (body as any)?.ServiceFees),
     };
   }
 
@@ -3053,6 +3094,7 @@ class ApiService {
     return {
       ...body,
       data: Array.isArray(body?.data) ? body.data : [],
+      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? (body as any)?.ServiceFees),
     };
   }
 
@@ -3513,9 +3555,15 @@ class ApiService {
    * السلوك: يحدّث التاريخ فقط (تاريخ الانتهاء + تاريخ الاشتراك). لا إنشاء فاتورة ولا إيصال ولا خصم رصيد.
    * (التفعيل الكامل عبر update-subscription منفصل: خصم رصيد، فاتورة، ومعاملات التفعيل.)
    */
-  async saveSubscriberFromSync(request: SaveSubscriberFromSyncRequest, agentId?: string): Promise<{ message?: string }> {
+  async saveSubscriberFromSync(
+    request: SaveSubscriberFromSyncRequest,
+    options?: { agentId?: string; isFtth?: boolean }
+  ): Promise<{ message?: string }> {
+    const params: Record<string, string> = {};
+    if (options?.agentId) params.agentId = options.agentId;
+    if (options?.isFtth) params.isFtth = 'true';
     const response = await this.api.post<{ message?: string }>('/providers/sas/save-subscriber', request, {
-      params: agentId ? { agentId } : undefined,
+      params: Object.keys(params).length ? params : undefined,
       timeout: 30000,
     });
     return response.data ?? {};

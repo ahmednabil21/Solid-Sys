@@ -285,6 +285,7 @@ const MaterialsPage: React.FC = () => {
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">الاسم</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"> الكمية المتاحة</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">سعر الوكيل (د.ع)</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">المبلغ الكلي</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">سعر المشترك (د.ع)</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">ملاحظات</th>
                 {list.some((m) => m.createdAt) && (
@@ -296,7 +297,7 @@ const MaterialsPage: React.FC = () => {
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={list.some((m) => m.createdAt) ? 7 : 6} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={list.some((m) => m.createdAt) ? 8 : 7} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                     <Package className="mx-auto h-12 w-12 text-gray-400 mb-2" />
                     <p>لا توجد مواد</p>
                     <p className="text-sm mt-1">أضف مادة جديدة باستخدام الزر أعلاه</p>
@@ -308,6 +309,7 @@ const MaterialsPage: React.FC = () => {
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{m.name}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatNumber(m.quantity ?? 0)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatNumber(m.agentPrice ?? 0)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatNumber(m.totalAgentAmount ?? 0)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatNumber(m.subscriberPrice ?? 0)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white max-w-[200px] truncate" title={m.notes ?? ''}>{m.notes ?? '—'}</td>
                     {list.some((x) => x.createdAt) && (

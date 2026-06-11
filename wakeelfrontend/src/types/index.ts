@@ -203,6 +203,7 @@ export interface SyncSubscribersDataItem {
 export interface SyncSubscribersResponse {
   data: SyncSubscribersDataItem[];
   provider?: string;
+  serviceFees?: ServiceFees[];
 }
 
 /** معاملات (قائمة ثانية للمعاينة) — POST /api/providers/sas/sync-transactions (mode=transactions). النوع: PLAN_PURCHASE → شراء اشتراك، PLAN_RENEW → تجديد، TRIAL_PERIOD → اشتراك تجريبي */
@@ -403,6 +404,7 @@ export interface CashbackSynchronizationFtthResponse {
   };
   count?: number;
   data: CashbackSynchronizationFtthRow[];
+  serviceFees?: ServiceFees[];
 }
 
 /** جسم POST /api/providers/sas/cashback-transactions/fetch — مثل الكاش باك بدون data (السيرفر يجلب FTTH من اعتماديات الرسيلر) */
@@ -531,12 +533,17 @@ export interface UpdateSubscriptionResponse {
   renewalId?: string;
 }
 
-/** طلب POST /api/providers/sas/save-subscriber — يحدّث التاريخ فقط (انتهاء + اشتراك). لا فاتورة ولا خصم رصيد. الاستعلام: agentId اختياري. */
+/** طلب POST /api/providers/sas/save-subscriber — يحدّث التاريخ فقط (انتهاء + اشتراك). الاستعلام: agentId اختياري، isFtth=true لـ FTTH. */
 export interface SaveSubscriberFromSyncRequest {
-  customer_id?: string;
   username: string;
-  customer_name?: string;
+  customerName?: string;
   expiration: string;
+  profileName?: string;
+  serviceFeesId?: string;
+  serviceFeesAmountPaid?: number;
+  /** حقول إضافية اختيارية */
+  customer_id?: string;
+  customer_name?: string;
   profile_name?: string;
   zone?: string;
   type_ar?: string | null;
@@ -888,6 +895,7 @@ export interface FtthSubscribersExportResponse {
   mode?: string;
   includeAllStatuses?: boolean;
   error?: string;
+  serviceFees?: ServiceFees[];
 }
 
 /** رد POST /providers/sas/ftth-subscribers-import */
@@ -1319,6 +1327,7 @@ export interface Material {
   quantity: number;
   agentPrice: number;
   subscriberPrice: number;
+  totalAgentAmount?: number;
   notes?: string | null;
   agentId?: string;
   createdAt?: string;
@@ -2400,4 +2409,9 @@ export interface SyncUploadResponseDto {
 export interface SyncChangesResponseDto {
   renewals?: unknown[];
   debts?: Debt[];
+}
+
+/** استجابة GET /api/Sync/context — سياق المزامنة دون اتصال */
+export interface SyncContextResponseDto {
+  serviceFees?: ServiceFees[];
 }

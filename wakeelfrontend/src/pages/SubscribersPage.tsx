@@ -275,6 +275,10 @@ const SubscribersPage: React.FC = () => {
   const [unpaidDebtAmountInput, setUnpaidDebtAmountInput] = useState('');
   /** عند وجود أكثر من رسيلر: الرسيلر المختار للمزامنة (يُمرَّر كـ resellerId). */
   const [selectedSyncResellerId, setSelectedSyncResellerId] = useState<string | null>(null);
+  const [syncServiceFeesList, setSyncServiceFeesList] = useState<ServiceFees[]>([]);
+  const [syncSaveServiceFeesId, setSyncSaveServiceFeesId] = useState('');
+  const [syncSaveServiceFeesPrice, setSyncSaveServiceFeesPrice] = useState<number | undefined>(undefined);
+  const [syncSaveServiceFeesFullyPaid, setSyncSaveServiceFeesFullyPaid] = useState(true);
   const [selectedOperationalRegionId, setSelectedOperationalRegionId] = useState<string>('');
   const [selectedOperationalResellerId, setSelectedOperationalResellerId] = useState<string>('');
   /** بعد التفعيل أو التفعيل (دين): عرض مودال لاختيار إرسال واتساب أو إلغاء. */
@@ -446,6 +450,25 @@ const SubscribersPage: React.FC = () => {
   const activationServiceFeesPrice = selectedActivationServiceFee
     ? (renewalData.serviceFeesPrice ?? selectedActivationServiceFee.price ?? 0)
     : 0;
+
+  const effectiveSyncServiceFeesList = React.useMemo(
+    () => (syncServiceFeesList.length > 0 ? syncServiceFeesList : activationServiceFeesList),
+    [syncServiceFeesList, activationServiceFeesList]
+  );
+  const selectedSyncSaveServiceFee = React.useMemo(
+    () => effectiveSyncServiceFeesList.find((f) => f.id === syncSaveServiceFeesId) ?? null,
+    [effectiveSyncServiceFeesList, syncSaveServiceFeesId]
+  );
+  const syncSaveServiceFeesPriceValue = selectedSyncSaveServiceFee
+    ? (syncSaveServiceFeesPrice ?? selectedSyncSaveServiceFee.price ?? 0)
+    : 0;
+
+  const resetSyncServiceFeesState = () => {
+    setSyncServiceFeesList([]);
+    setSyncSaveServiceFeesId('');
+    setSyncSaveServiceFeesPrice(undefined);
+    setSyncSaveServiceFeesFullyPaid(true);
+  };
 
   useEffect(() => {
     if (Array.isArray(profiles) && profiles.length > 0) {
@@ -746,6 +769,10 @@ const SubscribersPage: React.FC = () => {
     },
     onSuccess: (data) => {
       setSyncSubscribersList(data.data ?? []);
+      setSyncServiceFeesList(data.serviceFees ?? []);
+      setSyncSaveServiceFeesId('');
+      setSyncSaveServiceFeesPrice(undefined);
+      setSyncSaveServiceFeesFullyPaid(true);
       setActivatedSubscriptionIds(new Set());
       setSasSyncStep('sync_subscribers_list');
       setSasPreviewError('');
@@ -915,8 +942,16 @@ const SubscribersPage: React.FC = () => {
   };
 
   const saveSubscriberFromSyncMutation = useMutation({
-    mutationFn: ({ body, agentId }: { rowId?: number; body: SaveSubscriberFromSyncRequest; agentId?: string }) =>
-      apiService.saveSubscriberFromSync(body, agentId),
+    mutationFn: ({
+      body,
+      agentId,
+      isFtth,
+    }: {
+      rowId?: number;
+      body: SaveSubscriberFromSyncRequest;
+      agentId?: string;
+      isFtth?: boolean;
+    }) => apiService.saveSubscriberFromSync(body, { agentId, isFtth }),
     onMutate: (variables) => {
       setSavingSubscriberRowId(variables.rowId ?? null);
     },
@@ -4060,9 +4095,84 @@ const SubscribersPage: React.FC = () => {
 
             {sasSyncStep === 'sync_subscribers_list' && syncSubscribersList && (
               <div className="p-4 flex flex-col flex-1 min-h-0">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  
-                </p>
+                {effectiveSyncServiceFeesList.length > 0 && (
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 mb-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة عند الحفظ (اختياري)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">نوع الخدمة</label>
+                        <select
+                          value={syncSaveServiceFeesId}
+                          onChange={(e) => {
+                            const feeId = e.target.value;
+                            setSyncSaveServiceFeesId(feeId);
+                            if (feeId) {
+                              const fee = effectiveSyncServiceFeesList.find((f) => f.id === feeId);
+                              setSyncSaveServiceFeesPrice(fee?.price ?? 0);
+                              setSyncSaveServiceFeesFullyPaid(true);
+                            } else {
+                              setSyncSaveServiceFeesPrice(undefined);
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                        >
+                          <option value="">بدون أجور خدمة</option>
+                          {effectiveSyncServiceFeesList.map((fee) => (
+                            <option key={fee.id} value={fee.id}>
+                              {fee.name} — {formatNumber(fee.price, { suffix: ' د.ع' })}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {selectedSyncSaveServiceFee && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">سعر الخدمة (د.ع)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={syncSaveServiceFeesPrice ?? ''}
+                              onChange={(e) => setSyncSaveServiceFeesPrice(Math.max(0, Number(e.target.value) || 0))}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">واصل</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {syncSaveServiceFeesFullyPaid ? 'المبلغ كامل — يُسجَّل مدفوعاً' : 'غير واصل — يُسجَّل كدين'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={syncSaveServiceFeesFullyPaid}
+                              aria-label="واصل أجور الخدمة"
+                              onClick={() => setSyncSaveServiceFeesFullyPaid((v) => !v)}
+                              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                syncSaveServiceFeesFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                              }`}
+                            >
+                              <span
+                                aria-hidden
+                                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  syncSaveServiceFeesFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                          <p className="md:col-span-2 text-sm text-gray-600 dark:text-gray-400">
+                            المبلغ عند الحفظ:{' '}
+                            <span className={`font-medium tabular-nums ${syncSaveServiceFeesFullyPaid ? 'text-gray-900 dark:text-white' : 'text-amber-700 dark:text-amber-300'}`}>
+                              {formatNumber(syncSaveServiceFeesFullyPaid ? syncSaveServiceFeesPriceValue : 0, { suffix: ' د.ع' })}
+                              {!syncSaveServiceFeesFullyPaid ? ' (دين)' : ''}
+                            </span>
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="wakeel-table-scroll flex-1 mb-4 min-h-0">
                   <table className="min-w-full text-right">
                     <thead className="sticky top-0 z-10">
@@ -4203,16 +4313,34 @@ const SubscribersPage: React.FC = () => {
                                       type="button"
                                       disabled={isUpdating || savingSubscriberRowId === row.id}
                                       onClick={() => {
+                                        const customerName =
+                                          row.customer_name?.trim() ||
+                                          [row.firstname, row.lastname].filter(Boolean).join(' ').trim() ||
+                                          undefined;
                                         const body: SaveSubscriberFromSyncRequest = {
-                                          customer_id: row.customer_id ?? undefined,
                                           username: row.username,
-                                          customer_name: row.customer_name ?? undefined,
+                                          customerName,
                                           expiration: row.expiration,
-                                          profile_name: row.profile_details?.name ?? undefined,
+                                          profileName: row.profile_details?.name ?? undefined,
+                                          customer_id: row.customer_id ?? undefined,
                                           zone: row.zone ?? undefined,
                                           type_ar: row.type_ar ?? undefined,
+                                          ...(syncSaveServiceFeesId
+                                            ? {
+                                                serviceFeesId: syncSaveServiceFeesId,
+                                                serviceFeesAmountPaid: syncSaveServiceFeesFullyPaid
+                                                  ? syncSaveServiceFeesPriceValue
+                                                  : 0,
+                                              }
+                                            : {}),
                                         };
-                                        saveSubscriberFromSyncMutation.mutate({ rowId: row.id, body, agentId: myAgent?.id });
+                                        const isFtth = autoSyncReseller?.serviceType === ServiceType.Ftth;
+                                        saveSubscriberFromSyncMutation.mutate({
+                                          rowId: row.id,
+                                          body,
+                                          agentId: myAgent?.id,
+                                          isFtth,
+                                        });
                                       }}
                                       className="inline-flex items-center gap-1 px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs disabled:opacity-50"
                                     >
@@ -4235,6 +4363,7 @@ const SubscribersPage: React.FC = () => {
                     onClick={() => {
                       setSasSyncStep('form');
                       setSyncSubscribersList(null);
+                      resetSyncServiceFeesState();
                       setActivatedSubscriptionIds(new Set());
                       setSavedSubscriberRowIds(new Set());
                       setUnpaidActivationRowId(null);
@@ -4251,6 +4380,7 @@ const SubscribersPage: React.FC = () => {
                       setShowSasCredentialsModal(false);
                       setSasSyncStep('form');
                       setSyncSubscribersList(null);
+                      resetSyncServiceFeesState();
                       setActivatedSubscriptionIds(new Set());
                       setSavedSubscriberRowIds(new Set());
                       setUnpaidActivationRowId(null);
