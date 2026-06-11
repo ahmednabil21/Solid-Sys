@@ -3504,57 +3504,69 @@ const SubscribersPage: React.FC = () => {
                 })()}
               </div>
 
-              {/* Debt Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Debt Amount */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    مبلغ الدين (د.ع) <span className="text-xs text-gray-500">(محسوب تلقائياً)</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="remainingAmount"
-                    value={renewalData.remainingAmount || 0}
-                    onChange={handleRenewalInputChange}
-                    min="0"
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-800 cursor-not-allowed dark:text-gray-300"
-                    placeholder="مبلغ الدين"
-                  />
-                </div>
-
-                {/* Debt Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      ملاحظات الدين
-                  </label>
-                  <input
-                    type="text"
-                    name="debtDescription"
-                    value={renewalData.debtDescription || ''}
-                    onChange={handleRenewalInputChange}
-                    disabled={renewalInfo?.availableProfiles?.find(p => p.id === renewalData.newProfileId)?.packageType === ProfilePackageType.Extension}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                      placeholder="ملاحظات الدين"
-                  />
-                </div>
-              </div>
-
-                {(renewalData.remainingAmount || 0) > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      تاريخ تسديد الدين *
-                    </label>
-                    <input
-                      type="date"
-                      name="debtDueDate"
-                      value={renewalData.debtDueDate || ''}
-                      onChange={handleRenewalInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
-                )}
+              {(() => {
+                const selectedProfileForDebt = renewalInfo?.availableProfiles?.find(
+                  (p) => p.id === renewalData.newProfileId
+                );
+                const isExtensionForDebt =
+                  selectedProfileForDebt?.packageType === ProfilePackageType.Extension;
+                if (
+                  !renewalData.newProfileId ||
+                  isExtensionForDebt ||
+                  renewalAmountFullyReceived
+                ) {
+                  return null;
+                }
+                return (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          مبلغ الدين (د.ع) <span className="text-xs text-gray-500">(محسوب تلقائياً)</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="remainingAmount"
+                          value={renewalData.remainingAmount || 0}
+                          onChange={handleRenewalInputChange}
+                          min="0"
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-800 cursor-not-allowed dark:text-gray-300"
+                          placeholder="مبلغ الدين"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          ملاحظات الدين
+                        </label>
+                        <input
+                          type="text"
+                          name="debtDescription"
+                          value={renewalData.debtDescription || ''}
+                          onChange={handleRenewalInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="ملاحظات الدين"
+                        />
+                      </div>
+                    </div>
+                    {(renewalData.remainingAmount || 0) > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          تاريخ تسديد الدين *
+                        </label>
+                        <input
+                          type="date"
+                          name="debtDueDate"
+                          value={renewalData.debtDueDate || ''}
+                          onChange={handleRenewalInputChange}
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        />
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* أجور الخدمة */}
               {activationServiceFeesList.length > 0 && (
