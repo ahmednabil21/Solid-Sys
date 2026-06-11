@@ -1425,6 +1425,61 @@ class ApiService {
     await this.api.delete(`/subscribers/profiles/${id}`);
   }
 
+  private normalizeSynchronizationDiffRow(r: any): import('../types').CashbackSynchronizationFtthRow {
+    return {
+      subscriberId: r?.subscriberId ?? r?.SubscriberId ?? null,
+      customerId: r?.customerId ?? r?.CustomerId ?? null,
+      customerName: r?.customerName ?? r?.CustomerName ?? r?.firstname ?? r?.Firstname ?? null,
+      deviceUsername: r?.deviceUsername ?? r?.DeviceUsername ?? r?.username ?? r?.Username ?? null,
+      subscriptionName:
+        r?.subscriptionName ?? r?.SubscriptionName ?? r?.profile_details?.name ?? r?.ProfileDetails?.name ?? null,
+      subscriptionEndsAt:
+        r?.subscriptionEndsAt ?? r?.SubscriptionEndsAt ?? r?.new_expiration ?? r?.NewExpiration ?? null,
+      localSubscriptionEndsAt: r?.localSubscriptionEndsAt ?? r?.LocalSubscriptionEndsAt ?? null,
+      zoneId: r?.zoneId ?? r?.ZoneId ?? null,
+      activationType: r?.activationType ?? r?.ActivationType ?? null,
+      firstname: r?.firstname ?? r?.Firstname ?? null,
+      profile_details: r?.profile_details ?? r?.ProfileDetails ?? null,
+      new_expiration: r?.new_expiration ?? r?.NewExpiration ?? null,
+      parent_username: r?.parent_username ?? r?.ParentUsername ?? null,
+      username: r?.username ?? r?.Username ?? null,
+      activation_method: r?.activation_method ?? r?.ActivationMethod ?? null,
+    };
+  }
+
+  private normalizeSynchronizationDiffResponse(body: any): CashbackSynchronizationFtthResponse {
+    const rawRows = body?.differences ?? body?.Differences ?? body?.data ?? body?.Data ?? [];
+    const data = Array.isArray(rawRows) ? rawRows.map((r) => this.normalizeSynchronizationDiffRow(r)) : [];
+    return {
+      ...body,
+      externalRowCount: body?.externalRowCount ?? body?.ExternalRowCount,
+      localSubscriberCount: body?.localSubscriberCount ?? body?.LocalSubscriberCount,
+      matchedPairCount: body?.matchedPairCount ?? body?.MatchedPairCount,
+      data,
+      count: data.length,
+      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? body?.ServiceFees),
+    };
+  }
+
+  private buildSynchronizationDiffSaveBody(
+    row: import('../types').CashbackSynchronizationFtthRow,
+    options?: { serviceFeesId?: string; serviceFeesAmountPaid?: number }
+  ): import('../types').SynchronizationDiffSaveRequest {
+    const body: import('../types').SynchronizationDiffSaveRequest = {
+      customerId: row.customerId ?? undefined,
+      customerName: (row.customerName ?? row.firstname ?? undefined) || undefined,
+      deviceUsername: (row.deviceUsername ?? row.username ?? undefined) || undefined,
+      subscriptionName: (row.subscriptionName ?? row.profile_details?.name ?? undefined) || undefined,
+      subscriptionEndsAt: (row.subscriptionEndsAt ?? row.new_expiration ?? undefined) || undefined,
+      zoneId: row.zoneId ?? undefined,
+    };
+    if (options?.serviceFeesId) {
+      body.serviceFeesId = options.serviceFeesId;
+      body.serviceFeesAmountPaid = options.serviceFeesAmountPaid ?? 0;
+    }
+    return body;
+  }
+
   private normalizeServiceFeesList(raw: unknown): ServiceFees[] {
     if (!Array.isArray(raw)) return [];
     return raw
@@ -3047,15 +3102,10 @@ class ApiService {
       {},
       { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );
-    const body = response.data;
-    return {
-      ...body,
-      data: Array.isArray(body?.data) ? body.data : [],
-      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? (body as any)?.ServiceFees),
-    };
+    return this.normalizeSynchronizationDiffResponse(response.data);
   }
 
-  /** GET /providers/sas/synchronizationFTTH/diff — alias للفرق (onlyDiff=true) */
+  /** GET /providers/sas/synchronizationFTTH/diff — مقارنة تاريخ انتهاء FTTH مع النظام */
   async synchronizationFTTHDiff(params?: {
     resellerId?: string;
     agentId?: string;
@@ -3067,64 +3117,69 @@ class ApiService {
       '/providers/sas/synchronizationFTTH/diff',
       { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );
-    const body = response.data;
-    return {
-      ...body,
-      data: Array.isArray(body?.data) ? body.data : [],
-      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? (body as any)?.ServiceFees),
-    };
+    return this.normalizeSynchronizationDiffResponse(response.data);
   }
 
-  /** POST /providers/sas/synchronizationSAS-diff — مزامنة SAS (الفرق فقط افتراضيا) */
+  /** GET /providers/sas/synchronizationSAS/diff — مقارنة تاريخ انتهاء SAS مع النظام */
   async synchronizationSASDiff(params?: {
     resellerId?: string;
     agentId?: string;
-    onlyDiff?: boolean;
   }): Promise<CashbackSynchronizationFtthResponse> {
     const query: Record<string, string> = {};
     if (params?.resellerId) query.resellerId = params.resellerId;
     if (params?.agentId) query.agentId = params.agentId;
-    query.onlyDiff = params?.onlyDiff === false ? 'false' : 'true';
-    const response = await this.api.post<CashbackSynchronizationFtthResponse>(
-      '/providers/sas/synchronizationSAS-diff',
-      {},
-      { params: query, timeout: 600_000 }
+    const response = await this.api.get<CashbackSynchronizationFtthResponse>(
+      '/providers/sas/synchronizationSAS/diff',
+      { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );
-    const body = response.data;
-    return {
-      ...body,
-      data: Array.isArray(body?.data) ? body.data : [],
-      serviceFees: this.normalizeServiceFeesList(body?.serviceFees ?? (body as any)?.ServiceFees),
-    };
+    return this.normalizeSynchronizationDiffResponse(response.data);
   }
 
-  /** POST /providers/sas/synchronizationSAS-diff/save — حفظ نتيجة SAS diff بدون خصم/فاتورة */
+  /** POST /providers/sas/synchronizationSAS/save — حفظ صف SAS diff بدون خصم/فاتورة */
   async synchronizationSASDiffSave(
     row: import('../types').CashbackSynchronizationFtthRow,
-    params?: { resellerId?: string; agentId?: string }
+    params?: {
+      resellerId?: string;
+      agentId?: string;
+      serviceFeesId?: string;
+      serviceFeesAmountPaid?: number;
+    }
   ): Promise<{ message?: string; subscriberId?: string }> {
     const query: Record<string, string> = {};
     if (params?.resellerId) query.resellerId = params.resellerId;
     if (params?.agentId) query.agentId = params.agentId;
+    const body = this.buildSynchronizationDiffSaveBody(row, {
+      serviceFeesId: params?.serviceFeesId,
+      serviceFeesAmountPaid: params?.serviceFeesAmountPaid,
+    });
     const response = await this.api.post<{ message?: string; subscriberId?: string }>(
-      '/providers/sas/synchronizationSAS-diff/save',
-      row,
+      '/providers/sas/synchronizationSAS/save',
+      body,
       { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );
     return response.data ?? {};
   }
 
-  /** POST /providers/sas/synchronizationFTTH/save — حفظ بيانات المشترك بدون خصم/فاتورة */
+  /** POST /providers/sas/synchronizationFTTH/save — حفظ صف FTTH diff بدون خصم/فاتورة */
   async synchronizationFTTHSave(
     row: import('../types').CashbackSynchronizationFtthRow,
-    params?: { resellerId?: string; agentId?: string }
+    params?: {
+      resellerId?: string;
+      agentId?: string;
+      serviceFeesId?: string;
+      serviceFeesAmountPaid?: number;
+    }
   ): Promise<{ message?: string; subscriberId?: string }> {
     const query: Record<string, string> = {};
     if (params?.resellerId) query.resellerId = params.resellerId;
     if (params?.agentId) query.agentId = params.agentId;
+    const body = this.buildSynchronizationDiffSaveBody(row, {
+      serviceFeesId: params?.serviceFeesId,
+      serviceFeesAmountPaid: params?.serviceFeesAmountPaid,
+    });
     const response = await this.api.post<{ message?: string; subscriberId?: string }>(
       '/providers/sas/synchronizationFTTH/save',
-      row,
+      body,
       { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );
     return response.data ?? {};

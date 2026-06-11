@@ -285,6 +285,9 @@ const SubscribersPage: React.FC = () => {
   const [postActivationWhatsApp, setPostActivationWhatsApp] = useState<{ subscriberId: string; mode: 'activation' | 'details' } | null>(null);
   const [showAutoSyncModal, setShowAutoSyncModal] = useState(false);
   const [autoSyncFtthResult, setAutoSyncFtthResult] = useState<CashbackSynchronizationFtthResponse | null>(null);
+  const [autoSyncSaveServiceFeesId, setAutoSyncSaveServiceFeesId] = useState('');
+  const [autoSyncSaveServiceFeesPrice, setAutoSyncSaveServiceFeesPrice] = useState<number | undefined>(undefined);
+  const [autoSyncSaveServiceFeesFullyPaid, setAutoSyncSaveServiceFeesFullyPaid] = useState(true);
   const [savingFtthRowIndex, setSavingFtthRowIndex] = useState<number | null>(null);
   const [savingAllSasRows, setSavingAllSasRows] = useState(false);
   const [openingRenewalFtthRowIndex, setOpeningRenewalFtthRowIndex] = useState<number | null>(null);
@@ -469,6 +472,32 @@ const SubscribersPage: React.FC = () => {
     setSyncSaveServiceFeesPrice(undefined);
     setSyncSaveServiceFeesFullyPaid(true);
   };
+
+  const effectiveAutoSyncServiceFeesList = React.useMemo(
+    () => (autoSyncFtthResult?.serviceFees?.length ? autoSyncFtthResult.serviceFees : activationServiceFeesList),
+    [autoSyncFtthResult?.serviceFees, activationServiceFeesList]
+  );
+  const selectedAutoSyncSaveServiceFee = React.useMemo(
+    () => effectiveAutoSyncServiceFeesList.find((f) => f.id === autoSyncSaveServiceFeesId) ?? null,
+    [effectiveAutoSyncServiceFeesList, autoSyncSaveServiceFeesId]
+  );
+  const autoSyncSaveServiceFeesPriceValue = selectedAutoSyncSaveServiceFee
+    ? (autoSyncSaveServiceFeesPrice ?? selectedAutoSyncSaveServiceFee.price ?? 0)
+    : 0;
+
+  const resetAutoSyncServiceFeesState = () => {
+    setAutoSyncSaveServiceFeesId('');
+    setAutoSyncSaveServiceFeesPrice(undefined);
+    setAutoSyncSaveServiceFeesFullyPaid(true);
+  };
+
+  const buildAutoSyncSaveServiceFeesParams = () =>
+    autoSyncSaveServiceFeesId
+      ? {
+          serviceFeesId: autoSyncSaveServiceFeesId,
+          serviceFeesAmountPaid: autoSyncSaveServiceFeesFullyPaid ? autoSyncSaveServiceFeesPriceValue : 0,
+        }
+      : {};
 
   useEffect(() => {
     if (Array.isArray(profiles) && profiles.length > 0) {
@@ -791,7 +820,6 @@ const SubscribersPage: React.FC = () => {
         ? apiService.synchronizationSASDiff({
             resellerId: targetReseller?.id || undefined,
             agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
-            onlyDiff: true,
           })
         : apiService.synchronizationFTTHDiff({
             resellerId: targetReseller?.id || undefined,
@@ -801,11 +829,12 @@ const SubscribersPage: React.FC = () => {
     onSuccess: (res) => {
       const filtered = filterAutoSyncFtthRowsWithDeviceUsername(res);
       setAutoSyncFtthResult(filtered);
+      resetAutoSyncServiceFeesState();
       setSavedFtthRowIndices(new Set());
       setActivatedFtthRowIndices(new Set());
       setPendingFtthRenewalRowIndex(null);
       setShowAutoSyncModal(true);
-      showSuccess('مزامنة تلقائيا', `تم جلب ${filtered.count ?? filtered.data?.length ?? 0} سجل بنجاح.`);
+      showSuccess('مزامنة تلقائيا', `تم جلب ${filtered.count ?? filtered.data?.length ?? 0} اختلافاً بنجاح.`);
     },
     onError: (err: unknown) => {
       showError('مزامنة تلقائيا', ApiService.showError(err));
@@ -821,16 +850,16 @@ const SubscribersPage: React.FC = () => {
   };
 
   const saveFtthSyncItemMutation = useMutation({
-    mutationFn: ({ row, rowIndex }: { row: CashbackSynchronizationFtthRow; rowIndex: number }) =>
-      (autoSyncReseller?.serviceType === ServiceType.Sas
-        ? apiService.synchronizationSASDiffSave(row, {
-            resellerId: autoSyncReseller?.id || undefined,
-            agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
-          })
-        : apiService.synchronizationFTTHSave(row, {
-            resellerId: autoSyncReseller?.id || undefined,
-            agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
-          })),
+    mutationFn: ({ row, rowIndex }: { row: CashbackSynchronizationFtthRow; rowIndex: number }) => {
+      const saveParams = {
+        resellerId: autoSyncReseller?.id || undefined,
+        agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
+        ...buildAutoSyncSaveServiceFeesParams(),
+      };
+      return autoSyncReseller?.serviceType === ServiceType.Sas
+        ? apiService.synchronizationSASDiffSave(row, saveParams)
+        : apiService.synchronizationFTTHSave(row, saveParams);
+    },
     onMutate: (variables) => {
       setSavingFtthRowIndex(variables.rowIndex);
     },
@@ -854,8 +883,11 @@ const SubscribersPage: React.FC = () => {
       const pendingRows = rows
         .map((row, idx) => ({ row, idx }))
         .filter(({ idx }) => !savedFtthRowIndices.has(idx) && !activatedFtthRowIndices.has(idx));
+      const serviceFeesParams = buildAutoSyncSaveServiceFeesParams();
       const settled = await Promise.allSettled(
-        pendingRows.map(({ row }) => apiService.synchronizationSASDiffSave(row, { resellerId, agentId }))
+        pendingRows.map(({ row }) =>
+          apiService.synchronizationSASDiffSave(row, { resellerId, agentId, ...serviceFeesParams })
+        )
       );
       return { settled, pendingRows };
     },
@@ -4485,10 +4517,27 @@ const SubscribersPage: React.FC = () => {
             </div>
 
             <div className="px-5 py-3 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-3">
-              <div>
-                عدد السجلات: <strong>{autoSyncFtthResult?.count ?? autoSyncFtthResult?.data?.length ?? 0}</strong>
+              <div className="space-y-0.5">
+                <div>
+                  اختلافات تاريخ الانتهاء:{' '}
+                  <strong>{autoSyncFtthResult?.count ?? autoSyncFtthResult?.data?.length ?? 0}</strong>
+                </div>
+                {(autoSyncFtthResult?.externalRowCount != null ||
+                  autoSyncFtthResult?.matchedPairCount != null) && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {autoSyncFtthResult?.externalRowCount != null && (
+                      <span>خارجي: {autoSyncFtthResult.externalRowCount}</span>
+                    )}
+                    {autoSyncFtthResult?.matchedPairCount != null && (
+                      <span className="mr-3">مطابقة: {autoSyncFtthResult.matchedPairCount}</span>
+                    )}
+                    {autoSyncFtthResult?.localSubscriberCount != null && (
+                      <span>محلي: {autoSyncFtthResult.localSubscriberCount}</span>
+                    )}
+                  </div>
+                )}
               </div>
-              {String(autoSyncFtthResult?.provider || '').toLowerCase() === 'sas' && (autoSyncFtthResult?.data?.length ?? 0) > 0 && (
+              {autoSyncReseller?.serviceType === ServiceType.Sas && (autoSyncFtthResult?.data?.length ?? 0) > 0 && (
                 <button
                   type="button"
                   onClick={() => saveAllSasSyncItemsMutation.mutate()}
@@ -4500,6 +4549,78 @@ const SubscribersPage: React.FC = () => {
                 </button>
               )}
             </div>
+
+            {effectiveAutoSyncServiceFeesList.length > 0 && (
+              <div className="mx-5 mt-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة عند الحفظ (اختياري)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">نوع الخدمة</label>
+                    <select
+                      value={autoSyncSaveServiceFeesId}
+                      onChange={(e) => {
+                        const feeId = e.target.value;
+                        setAutoSyncSaveServiceFeesId(feeId);
+                        if (feeId) {
+                          const fee = effectiveAutoSyncServiceFeesList.find((f) => f.id === feeId);
+                          setAutoSyncSaveServiceFeesPrice(fee?.price ?? 0);
+                          setAutoSyncSaveServiceFeesFullyPaid(true);
+                        } else {
+                          setAutoSyncSaveServiceFeesPrice(undefined);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                      <option value="">بدون أجور خدمة</option>
+                      {effectiveAutoSyncServiceFeesList.map((fee) => (
+                        <option key={fee.id} value={fee.id}>
+                          {fee.name} — {formatNumber(fee.price, { suffix: ' د.ع' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedAutoSyncSaveServiceFee && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">سعر الخدمة (د.ع)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={autoSyncSaveServiceFeesPrice ?? ''}
+                          onChange={(e) => setAutoSyncSaveServiceFeesPrice(Math.max(0, Number(e.target.value) || 0))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">واصل</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {autoSyncSaveServiceFeesFullyPaid ? 'المبلغ كامل — يُسجَّل مدفوعاً' : 'غير واصل — يُسجَّل كدين'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={autoSyncSaveServiceFeesFullyPaid}
+                          aria-label="واصل أجور الخدمة"
+                          onClick={() => setAutoSyncSaveServiceFeesFullyPaid((v) => !v)}
+                          className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                            autoSyncSaveServiceFeesFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            aria-hidden
+                            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              autoSyncSaveServiceFeesFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20">
               <table className="min-w-[980px] w-full text-sm text-right border-separate border-spacing-0">
@@ -4520,7 +4641,7 @@ const SubscribersPage: React.FC = () => {
                   {(autoSyncFtthResult?.data ?? []).length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
-                        لا توجد بيانات ضمن آخر أسبوع.
+                        لا توجد اختلافات في تاريخ انتهاء الاشتراك.
                       </td>
                     </tr>
                   ) : (

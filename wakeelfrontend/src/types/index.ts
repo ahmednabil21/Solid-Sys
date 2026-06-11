@@ -377,15 +377,18 @@ export interface CashbackSubscriberZonesResponse {
   zones: string[];
 }
 
-/** صف نتيجة POST /providers/sas/synchronizationFTTH */
+/** صف فرق المزامنة — GET .../synchronizationFTTH/diff أو .../synchronizationSAS/diff */
 export interface CashbackSynchronizationFtthRow {
+  subscriberId?: string | null;
+  customerId?: string | null;
   customerName?: string | null;
   subscriptionName?: string | null;
   subscriptionEndsAt?: string | null;
+  localSubscriptionEndsAt?: string | null;
   zoneId?: string | null;
   deviceUsername?: string | null;
   activationType?: string | null;
-  // SAS diff fields
+  /** حقول SAS القديمة */
   firstname?: string | null;
   profile_details?: { name?: string | null } | null;
   new_expiration?: string | null;
@@ -394,8 +397,27 @@ export interface CashbackSynchronizationFtthRow {
   activation_method?: string | null;
 }
 
-/** استجابة POST /providers/sas/synchronizationFTTH */
+/** جسم POST .../synchronizationFTTH/save أو .../synchronizationSAS/save */
+export interface SynchronizationDiffSaveRequest {
+  customerId?: string;
+  customerName?: string;
+  deviceUsername?: string;
+  subscriptionName?: string;
+  subscriptionEndsAt?: string;
+  zoneId?: string;
+  serviceFeesId?: string;
+  serviceFeesAmountPaid?: number;
+}
+
+/** استجابة GET .../synchronizationFTTH/diff أو .../synchronizationSAS/diff */
 export interface CashbackSynchronizationFtthResponse {
+  externalRowCount?: number;
+  localSubscriberCount?: number;
+  matchedPairCount?: number;
+  /** الصفوف ذات اختلاف تاريخ الانتهاء (من الباكند: differences) */
+  data: CashbackSynchronizationFtthRow[];
+  serviceFees?: ServiceFees[];
+  /** حقول قديمة */
   provider?: string;
   mode?: string;
   dateRange?: {
@@ -403,8 +425,6 @@ export interface CashbackSynchronizationFtthResponse {
     toDate?: string;
   };
   count?: number;
-  data: CashbackSynchronizationFtthRow[];
-  serviceFees?: ServiceFees[];
 }
 
 /** جسم POST /api/providers/sas/cashback-transactions/fetch — مثل الكاش باك بدون data (السيرفر يجلب FTTH من اعتماديات الرسيلر) */
