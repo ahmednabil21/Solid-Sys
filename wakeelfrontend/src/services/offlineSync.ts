@@ -305,6 +305,15 @@ export function buildCreateRenewalPayload(renewalData: RenewalData): Record<stri
     debtDescription: renewalData.debtDescription || '',
     currentExpirationDate: renewalData.currentExpirationDate ?? null,
     renewalPeriod: renewalData.renewalPeriod ?? null,
+    ...(renewalData.serviceFeesId
+      ? {
+          serviceFeesId: renewalData.serviceFeesId,
+          ...(renewalData.serviceFeesPrice != null && renewalData.serviceFeesPrice >= 0
+            ? { serviceFeesPrice: renewalData.serviceFeesPrice }
+            : {}),
+          serviceFeesAmountPaid: renewalData.serviceFeesAmountPaid ?? 0,
+        }
+      : {}),
   };
 }
 

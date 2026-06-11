@@ -168,6 +168,12 @@ function normalizeRenewalReceiptFromApi(raw: unknown): RenewalReceipt {
       alts.map((k) => r[k]).find((x) => x != null && x !== '');
     return v == null ? '' : String(v);
   };
+  const num = (camel: string, pascal: string) => {
+    const v = r[camel] ?? r[pascal];
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const serviceFeesIdRaw = r.serviceFeesId ?? r.ServiceFeesId;
   return {
     ...(r as unknown as RenewalReceipt),
     subscriberName: str('subscriberName', 'SubscriberName'),
@@ -181,6 +187,11 @@ function normalizeRenewalReceiptFromApi(raw: unknown): RenewalReceipt {
     subscriberWiFiCode:
       (r.subscriberWiFiCode ?? r.SubscriberWiFiCode ?? null) as string | null | undefined,
     subscriberId: str('subscriberId', 'SubscriberId'),
+    serviceFeesId: serviceFeesIdRaw == null || serviceFeesIdRaw === '' ? null : String(serviceFeesIdRaw),
+    serviceFeesName: (r.serviceFeesName ?? r.ServiceFeesName ?? null) as string | null | undefined,
+    serviceFeesPrice: num('serviceFeesPrice', 'ServiceFeesPrice'),
+    serviceFeesAmountPaid: num('serviceFeesAmountPaid', 'ServiceFeesAmountPaid'),
+    serviceFeesRemainingAmount: num('serviceFeesRemainingAmount', 'ServiceFeesRemainingAmount'),
   };
 }
 
@@ -1941,7 +1952,16 @@ class ApiService {
         debtDescription: renewalData.debtDescription || '',
         // إضافة معلومات إضافية لمساعدة الباكند على حساب التاريخ بشكل صحيح
         currentExpirationDate: renewalData.currentExpirationDate || null,
-        renewalPeriod: renewalData.renewalPeriod || null
+        renewalPeriod: renewalData.renewalPeriod || null,
+        ...(renewalData.serviceFeesId
+          ? {
+              serviceFeesId: renewalData.serviceFeesId,
+              ...(renewalData.serviceFeesPrice != null && renewalData.serviceFeesPrice >= 0
+                ? { serviceFeesPrice: renewalData.serviceFeesPrice }
+                : {}),
+              serviceFeesAmountPaid: renewalData.serviceFeesAmountPaid ?? 0,
+            }
+          : {}),
       };
       
       const response: AxiosResponse<any> = await this.api.post('/renewals', payload);
@@ -1950,7 +1970,7 @@ class ApiService {
       console.log('Backend response for renewal creation:', response.data);
       console.log('Receipt number from backend:', response.data?.receiptNumber);
       
-      return response.data;
+      return normalizeRenewalReceiptFromApi(response.data);
     } catch (error) {
       console.error('Error creating renewal:', error);
       throw error; // إعادة رمي الخطأ بدلاً من إرجاع بيانات وهمية

@@ -1776,6 +1776,11 @@ export interface RenewalReceipt {
   agentCompanyName: string;
   agentPhone?: string | null;
   agentAddress?: string | null;
+  serviceFeesId?: string | null;
+  serviceFeesName?: string | null;
+  serviceFeesPrice?: number;
+  serviceFeesAmountPaid?: number;
+  serviceFeesRemainingAmount?: number;
   /** الفاتورة المرتبطة بالتجديد إن وُجدت (من الباكند) */
   createdReceipt?: unknown | null;
 }
@@ -1838,6 +1843,11 @@ export interface RenewalHistory {
   newProfileOriginalPrice: number;
   newProfileSalePrice: number;
   agentCompanyName: string;
+  serviceFeesId?: string | null;
+  serviceFeesName?: string | null;
+  serviceFeesPrice?: number;
+  serviceFeesAmountPaid?: number;
+  serviceFeesRemainingAmount?: number;
 }
 
 export interface ProfitStats {
@@ -2001,6 +2011,12 @@ export interface RenewalData {
   // إضافة معلومات إضافية لمساعدة الباكند على حساب التاريخ بشكل صحيح
   currentExpirationDate?: string;
   renewalPeriod?: number;
+  /** أجور خدمة اختيارية — POST /Renewals */
+  serviceFeesId?: string;
+  /** السعر المُطبَّق لحظة التفعيل (قابل للتعديل) */
+  serviceFeesPrice?: number;
+  /** يُرسل فقط عند تفعيل خيار إضافة أجور الخدمة للفاتورة */
+  serviceFeesAmountPaid?: number;
 }
 
 export interface SubscriberRenewalInfo {

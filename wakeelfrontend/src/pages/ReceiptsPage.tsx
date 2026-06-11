@@ -475,9 +475,27 @@ const ReceiptsPage: React.FC = () => {
                 <span class="value" style="color: green;">${formatNumber(receipt.amountPaid || receipt.amount || 0, { suffix: ' د.ع' })}</span>
               </div>
               <div class="info-row">
-                <span class="label">مبلغ الدين:</span>
+                <span class="label">دين الاشتراك:</span>
                 <span class="value" style="color: red;">${formatNumber(receipt.remainingAmount || 0, { suffix: ' د.ع' })}</span>
               </div>
+              ${(receipt.serviceFeesName || receipt.serviceFeesId) ? `
+              <div class="info-row" style="margin-top: 1mm; padding-top: 1mm; border-top: 0.5px dashed #000;">
+                <span class="label">أجور الخدمة:</span>
+                <span class="value">${receipt.serviceFeesName || '—'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">سعر الخدمة:</span>
+                <span class="value">${formatNumber(receipt.serviceFeesPrice || 0, { suffix: ' د.ع' })}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">الواصل (خدمة):</span>
+                <span class="value" style="color: green;">${formatNumber(receipt.serviceFeesAmountPaid || 0, { suffix: ' د.ع' })}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">دين أجور الخدمة:</span>
+                <span class="value" style="color: red;">${formatNumber(receipt.serviceFeesRemainingAmount || 0, { suffix: ' د.ع' })}</span>
+              </div>
+              ` : ''}
             </div>
 
             ${receipt.notes ? `
@@ -842,6 +860,14 @@ const ReceiptsPage: React.FC = () => {
                           خصم: {formatNumber(receipt.discountAmount, { suffix: ' د.ع' })}
                         </div>
                       )}
+                      {(receipt.serviceFeesName || receipt.serviceFeesId) && (
+                        <div className="text-xs text-primary-600 dark:text-primary-400 mt-0.5">
+                          خدمة: {receipt.serviceFeesName}
+                          {(receipt.serviceFeesRemainingAmount ?? 0) > 0
+                            ? ` — دين ${formatNumber(receipt.serviceFeesRemainingAmount ?? 0, { suffix: ' د.ع' })}`
+                            : ''}
+                        </div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap">{getActivationTypeBadge(receipt.activationType)}</td>
                     <td className="whitespace-nowrap">
@@ -1013,9 +1039,29 @@ const ReceiptsPage: React.FC = () => {
                     <span className="text-green-600 dark:text-green-400">{formatNumber(selectedReceipt.amountPaid || selectedReceipt.finalPrice || 0, { suffix: ' د.ع' })}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">مبلغ الدين:</span>
+                    <span className="text-gray-600 dark:text-gray-400">دين الاشتراك:</span>
                     <span className="text-red-600 dark:text-red-400">{formatNumber(selectedReceipt.remainingAmount || 0, { suffix: ' د.ع' })}</span>
                   </div>
+                  {(selectedReceipt.serviceFeesName || selectedReceipt.serviceFeesId) && (
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2 space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">أجور الخدمة:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{selectedReceipt.serviceFeesName || '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">سعر الخدمة:</span>
+                        <span className="text-primary-600 dark:text-primary-400">{formatNumber(selectedReceipt.serviceFeesPrice || 0, { suffix: ' د.ع' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">الواصل (خدمة):</span>
+                        <span className="text-green-600 dark:text-green-400">{formatNumber(selectedReceipt.serviceFeesAmountPaid || 0, { suffix: ' د.ع' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">دين أجور الخدمة:</span>
+                        <span className="text-red-600 dark:text-red-400">{formatNumber(selectedReceipt.serviceFeesRemainingAmount || 0, { suffix: ' د.ع' })}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Renewal Details */}
