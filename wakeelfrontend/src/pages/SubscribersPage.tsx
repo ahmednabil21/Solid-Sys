@@ -18,7 +18,7 @@ import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -358,6 +358,7 @@ const SubscribersPage: React.FC = () => {
     serviceFeesId: '',
     serviceFeesPrice: undefined,
     serviceFeesAmountPaid: undefined,
+    activationPaymentMethod: ActivationPaymentMethod.Cash,
   });
   /** واصل أجور الخدمة — مفعّل: يُضاف المبلغ للفاتورة؛ غير مفعّل: دين على المشترك */
   const [serviceFeesFullyPaid, setServiceFeesFullyPaid] = useState(true);
@@ -960,6 +961,7 @@ const SubscribersPage: React.FC = () => {
         serviceFeesId: '',
         serviceFeesPrice: undefined,
         serviceFeesAmountPaid: undefined,
+        activationPaymentMethod: ActivationPaymentMethod.Cash,
       });
       setServiceFeesFullyPaid(true);
       setRenewalViaSasTab(false);
@@ -1110,6 +1112,7 @@ const SubscribersPage: React.FC = () => {
         serviceFeesId: '',
         serviceFeesPrice: undefined,
         serviceFeesAmountPaid: undefined,
+        activationPaymentMethod: ActivationPaymentMethod.Cash,
       });
       setServiceFeesFullyPaid(true);
     },
@@ -1563,6 +1566,9 @@ const SubscribersPage: React.FC = () => {
       serviceFeesId: serviceFeesId || undefined,
       serviceFeesPrice: serviceFeesId ? serviceFeesPrice : undefined,
       serviceFeesAmountPaid: serviceFeesId ? (serviceFeesFullyPaid ? serviceFeesPrice : 0) : undefined,
+      activationPaymentMethod: isExtension
+        ? ActivationPaymentMethod.Cash
+        : (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash),
     };
 
     // تم تعليق التفعيل عبر سكربت البايثون مؤقتاً.
@@ -3514,6 +3520,55 @@ const SubscribersPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {(() => {
+                  const selectedProfile = renewalInfo.availableProfiles?.find(
+                    (p) => p.id === renewalData.newProfileId
+                  );
+                  const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+                  if (isExtension || !renewalData.newProfileId) return null;
+                  return (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        طريقة الدفع *
+                      </label>
+                      <div className="flex flex-wrap gap-6">
+                        <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-900 dark:text-white">
+                          <input
+                            type="radio"
+                            name="activationPaymentMethod"
+                            value={ActivationPaymentMethod.Cash}
+                            checked={(renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) === ActivationPaymentMethod.Cash}
+                            onChange={() =>
+                              setRenewalData((prev) => ({
+                                ...prev,
+                                activationPaymentMethod: ActivationPaymentMethod.Cash,
+                              }))
+                            }
+                            className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+                          />
+                          كاش
+                        </label>
+                        <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-900 dark:text-white">
+                          <input
+                            type="radio"
+                            name="activationPaymentMethod"
+                            value={ActivationPaymentMethod.Master}
+                            checked={renewalData.activationPaymentMethod === ActivationPaymentMethod.Master}
+                            onChange={() =>
+                              setRenewalData((prev) => ({
+                                ...prev,
+                                activationPaymentMethod: ActivationPaymentMethod.Master,
+                              }))
+                            }
+                            className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+                          />
+                          ماستر
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {(() => {
                   const selectedProfile = renewalInfo.availableProfiles?.find(

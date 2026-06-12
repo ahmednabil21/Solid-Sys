@@ -11,6 +11,7 @@ import {
   Agent,
   AccountsLedgerEntry,
   AccountsResponse,
+  ActivationPaymentMethod,
   ProfilePackageType,
   User,
   UserRole,
@@ -84,7 +85,13 @@ function ledgerKindLabel(kind: string): string {
   return kind;
 }
 
-const LEDGER_TABLE_COLS = 16;
+function activationPaymentMethodLabel(pm?: number | null): string {
+  if (Number(pm) === ActivationPaymentMethod.Cash) return 'كاش';
+  if (Number(pm) === ActivationPaymentMethod.Master) return 'ماستر';
+  return '—';
+}
+
+const LEDGER_TABLE_COLS = 18;
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
   kind: 'Renewal';
@@ -92,6 +99,9 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   profileName?: string;
   receiptNumber?: string;
   activationProfit?: number;
+  paymentMethod?: number;
+  serviceFeesAmount?: number;
+  totalProfit?: number;
   returnPrice?: number;
   subscriberNoteType?: number | null;
   notes?: string | null;
@@ -679,7 +689,9 @@ const ReportsPage: React.FC = () => {
                         <th>النوع</th>
                         <th>الباقة</th>
                         <th>المبلغ</th>
-                        <th>الربح</th>
+                        <th>طريقة الدفع</th>
+                        <th>ربح الاجور</th>
+                        <th>الربح الكلي</th>
                         <th>مبلغ الكاشباك</th>
                         <th>نوع الباقة</th>
                         <th>تاريخ العملية</th>
@@ -733,9 +745,19 @@ const ReportsPage: React.FC = () => {
                                 {formatNumber(row.amount ?? 0, { suffix: ' د.ع' })}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.activationProfit != null
-                                  ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
+                                {renewal ? activationPaymentMethodLabel(renewal.paymentMethod) : '—'}
+                              </td>
+                              <td className="whitespace-nowrap">
+                                {renewal?.serviceFeesAmount != null
+                                  ? formatNumber(renewal.serviceFeesAmount, { suffix: ' د.ع' })
                                   : '—'}
+                              </td>
+                              <td className="whitespace-nowrap">
+                                {renewal?.totalProfit != null
+                                  ? formatNumber(renewal.totalProfit, { suffix: ' د.ع' })
+                                  : renewal?.activationProfit != null
+                                    ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
+                                    : '—'}
                               </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.returnPrice != null

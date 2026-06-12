@@ -36,6 +36,7 @@ import {
   RenewalHistory,
   RenewalData,
   PaymentStatus,
+  ActivationPaymentMethod,
   SubscriptionType,
   SubscriptionStatus,
   Debt,
@@ -2049,6 +2050,8 @@ class ApiService {
               serviceFeesAmountPaid: renewalData.serviceFeesAmountPaid ?? 0,
             }
           : {}),
+        activationPaymentMethod:
+          renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash,
       };
       
       const response: AxiosResponse<any> = await this.api.post('/renewals', payload);

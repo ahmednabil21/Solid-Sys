@@ -28,6 +28,12 @@ export enum PaymentStatus {
   Unknown = 0  // للقيم غير المعرفة من الباكند
 }
 
+/** طريقة الدفع عند التفعيل — POST /Renewals */
+export enum ActivationPaymentMethod {
+  Cash = 1,
+  Master = 2,
+}
+
 export enum SubscriberNoteType {
   NoResponse = 1,
   WillActivateSoon = 2,
@@ -2051,6 +2057,8 @@ export interface RenewalData {
   serviceFeesPrice?: number;
   /** يُرسل فقط عند تفعيل خيار إضافة أجور الخدمة للفاتورة */
   serviceFeesAmountPaid?: number;
+  /** طريقة الدفع عند التفعيل — 1 كاش، 2 ماستر */
+  activationPaymentMethod?: ActivationPaymentMethod;
 }
 
 export interface SubscriberRenewalInfo {
@@ -2227,6 +2235,12 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   agentResellerId?: string;
   receiptNumber?: string;
   activationProfit?: number;
+  /** طريقة الدفع — 1 كاش، 2 ماستر */
+  paymentMethod?: ActivationPaymentMethod | number;
+  /** ربح أجور الخدمة */
+  serviceFeesAmount?: number;
+  /** الربح الكلي */
+  totalProfit?: number;
   /** مبلغ الكاشباك */
   returnPrice?: number;
   notes?: string | null;
