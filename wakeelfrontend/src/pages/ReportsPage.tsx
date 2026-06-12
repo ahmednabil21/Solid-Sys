@@ -675,8 +675,8 @@ const ReportsPage: React.FC = () => {
                         <th>كلفة الاشتراك</th>
                         <th>ربح الاجور</th>
                         <th>الربح</th>
-                        <th>الربح الكلي</th>
                         <th>مبلغ الكاشباك</th>
+                        <th>الربح الكلي</th>
                         <th>تاريخ العملية</th>
                         <th>تاريخ الإنشاء</th>
                         <th>رقم الفاتورة</th>
@@ -733,13 +733,13 @@ const ReportsPage: React.FC = () => {
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.totalProfit != null
-                                  ? formatNumber(renewal.totalProfit, { suffix: ' د.ع' })
+                                {renewal?.returnPrice != null
+                                  ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.returnPrice != null
-                                  ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
+                                {renewal?.totalProfit != null
+                                  ? formatNumber(renewal.totalProfit, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">{formatDate(row.renewalDate)}</td>
