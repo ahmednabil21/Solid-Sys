@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,7 +122,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
     enabled: canLoadData,
   });
 
-  const upsertRequestInCache = (request: AgentSubscriberMaintenanceRequestDto) => {
+  const upsertRequestInCache = useCallback((request: AgentSubscriberMaintenanceRequestDto) => {
     queryClient.setQueriesData<AgentSubscriberMaintenanceRequestDto[]>(
       { queryKey: ['agent-subscriber-maintenance'] },
       (old) => {
@@ -141,7 +141,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         return [request, ...old];
       }
     );
-  };
+  }, [queryClient]);
 
   useEffect(() => {
     if (!effectiveAgentId) return;
@@ -218,7 +218,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         }
       })();
     };
-  }, [effectiveAgentId, queryClient]);
+  }, [effectiveAgentId, upsertRequestInCache]);
 
   const acceptMutation = useMutation({
     mutationFn: (id: string) => apiService.acceptSubscriberMaintenanceRequest(id),
