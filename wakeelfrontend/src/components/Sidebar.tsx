@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Agent, TenantPlanType, UserRole } from '../types';
 import { apiService } from '../services/api';
+import { useMaintenanceNotificationsOptional } from '../contexts/MaintenanceNotificationsContext';
 import { Clock } from 'lucide-react';
 import {
   LayoutDashboard,
@@ -43,6 +44,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClose, isMobileOverlay }) => {
   const { user, logout, hasAnyRole, hasFeature, globalAccess } = useAuth();
+  const maintenanceNotify = useMaintenanceNotificationsOptional();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [expandedByPath, setExpandedByPath] = useState<Record<string, boolean>>({});
@@ -549,7 +551,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                 }`}
               >
                 {(!isCollapsed || isMobileOverlay) && (
-                  <span className="text-sm font-medium flex-1 text-right">{item.name}</span>
+                  <span className="text-sm font-medium flex-1 text-right flex items-center justify-end gap-2">
+                    {item.name}
+                    {item.path === '/admin/maintenance-requests' &&
+                      maintenanceNotify?.hasUnread &&
+                      maintenanceNotify.pendingCount > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
+                      )}
+                  </span>
                 )}
                 <Icon className="h-5 w-5 flex-shrink-0" />
               </Link>

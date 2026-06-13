@@ -7,6 +7,7 @@ import { OfflineProvider } from './contexts/OfflineContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DigitsProvider } from './contexts/DigitsContext';
 import { ConfirmationProvider } from './contexts/ConfirmationContext';
+import { MaintenanceNotificationsProvider } from './contexts/MaintenanceNotificationsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureGuard } from './components/FeatureGuard';
 import Layout from './components/Layout';
@@ -159,7 +160,9 @@ function App() {
                 {/* Protected Routes */}
                 <Route path="/admin" element={
                   <ProtectedRoute>
-                    <Layout />
+                    <MaintenanceNotificationsProvider>
+                      <Layout />
+                    </MaintenanceNotificationsProvider>
                   </ProtectedRoute>
                 }>
                   <Route index element={<AdminIndexRedirect />} />

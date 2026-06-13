@@ -6,6 +6,7 @@ import { apiService } from '../services/api';
 import { UserRole } from '../types';
 import { MessageSquare, X } from 'lucide-react';
 import { useDigits } from '../contexts/DigitsContext';
+import MaintenanceNotificationBell from './MaintenanceNotificationBell';
 
 const Layout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -132,6 +133,7 @@ const Layout: React.FC = () => {
               </button>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
+              <MaintenanceNotificationBell />
               {/* Digits toggle: ١٢٣ / 123 */}
               <button
                 type="button"

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuth } from '../contexts/AuthContext';
+import { useMaintenanceNotifications } from '../contexts/MaintenanceNotificationsContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService } from '../services/api';
 import {
@@ -12,7 +12,6 @@ import {
 } from '../types';
 import { showError, showSuccess } from '../utils/notifications';
 import { CheckCircle2, Phone, RefreshCw, User, Wrench } from 'lucide-react';
-import notificationSound from '../sounds/universfield-new-notification-022-370046.mp3';
 
 const DASHBOARD_MAINTENANCE_AGENT_KEY = 'wakeel_maintenance_requests_agentId';
 
@@ -60,22 +59,21 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const { user } = useAuth();
   const { formatDate } = useDigits();
   const queryClient = useQueryClient();
+  const { markAsRead, refreshPendingCount } = useMaintenanceNotifications();
   const isAdmin = user?.role === UserRole.Admin;
 
   const [statusFilter, setStatusFilter] = useState<'' | SubscriberMaintenanceRequestStatusCode>('');
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const signalRConnectionRef = useRef<HubConnection | null>(null);
   const statusFilterRef = useRef(statusFilter);
   useEffect(() => {
     statusFilterRef.current = statusFilter;
   }, [statusFilter]);
 
   useEffect(() => {
-    audioRef.current = new Audio(notificationSound);
-  }, []);
+    markAsRead();
+  }, [markAsRead]);
 
   const { data: agentsResponse } = useQuery({
     queryKey: ['agents-for-maintenance', 1, 100],
@@ -143,88 +141,12 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
     );
   }, [queryClient]);
 
-  useEffect(() => {
-    if (!effectiveAgentId) return;
-
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const baseUrl = apiService.getBaseURL();
-    const hubUrl = `${baseUrl.replace(/\/api\/?$/, '')}/hubs/dashboard`;
-
-    const connection = new HubConnectionBuilder()
-      .withUrl(hubUrl, { accessTokenFactory: () => token })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
-
-    signalRConnectionRef.current = connection;
-
-    const playNotificationSound = () => {
-      try {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          const p = audioRef.current.play();
-          if (p && typeof (p as Promise<void>).catch === 'function') {
-            (p as Promise<void>).catch(() => {});
-          }
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    connection.on('subscriberMaintenanceRequestCreated', (payload: unknown) => {
-      const request = payload as AgentSubscriberMaintenanceRequestDto;
-      if (!request?.id) return;
-      playNotificationSound();
-      showSuccess(
-        'طلب صيانة جديد',
-        `طلب من ${request.subscriberFullName || request.subscriberUsername || 'مشترك'}`
-      );
-      upsertRequestInCache(request);
-    });
-
-    connection.on('subscriberMaintenanceRequestUpdated', (payload: unknown) => {
-      const request = payload as AgentSubscriberMaintenanceRequestDto;
-      if (!request?.id) return;
-      upsertRequestInCache(request);
-    });
-
-    const joinGroup = async () => {
-      try {
-        await connection.invoke('JoinAgentGroup', effectiveAgentId);
-      } catch {
-        // ignore
-      }
-    };
-
-    connection.onreconnected(joinGroup);
-
-    connection
-      .start()
-      .then(joinGroup)
-      .catch(() => {
-        // ignore
-      });
-
-    return () => {
-      signalRConnectionRef.current = null;
-      (async () => {
-        try {
-          await connection.stop();
-        } catch {
-          // ignore
-        }
-      })();
-    };
-  }, [effectiveAgentId, upsertRequestInCache]);
-
   const acceptMutation = useMutation({
     mutationFn: (id: string) => apiService.acceptSubscriberMaintenanceRequest(id),
     onMutate: (id) => setAcceptingId(id),
     onSuccess: (updated) => {
       upsertRequestInCache(updated);
+      refreshPendingCount();
       showSuccess('تم القبول', 'تم قبول طلب الصيانة وتحويله إلى قيد المعالجة');
     },
     onError: (err: Error) => {
