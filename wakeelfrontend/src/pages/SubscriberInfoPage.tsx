@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import {
@@ -6,6 +6,7 @@ import {
   SubscriberAppProblemType,
   SubscriberMaintenanceRequestDto,
   SubscriberAppRenewalDto,
+  AgentAnnouncementDto,
 } from '../types';
 import { useDigits } from '../contexts/DigitsContext';
 import waklogo from '../images/waklogo.png';
@@ -23,9 +24,19 @@ import {
   ChevronRight,
   Plus,
   MapPin,
+  Gauge,
 } from 'lucide-react';
 
 type AppTab = 'maintenance' | 'profile' | 'renewals';
+
+const AD_SLIDES = [
+  { title: 'خدماتنا', text: 'نقدم أفضل خدمات الإنترنت والاتصالات' },
+  { title: 'السرعة', text: 'سرعات عالية واتصال مستقر' },
+  { title: 'فروعنا', text: 'فروعنا منتشرة في جميع أنحاء العراق' },
+];
+
+const DEFAULT_GRADIENT_START = '#2962FF';
+const DEFAULT_GRADIENT_END = '#1E40AF';
 
 const PROBLEM_TYPE_OPTIONS: { value: SubscriberAppProblemType; label: string }[] = [
   { value: SubscriberAppProblemType.SubscriptionRenewal, label: 'تجديد اشتراك' },
@@ -77,6 +88,123 @@ const InfoRow: React.FC<{ label: string; value: React.ReactNode; icon?: React.Re
   </div>
 );
 
+const AnnouncementCarousel: React.FC<{
+  announcements: AgentAnnouncementDto[];
+  adIndex: number;
+  onSelectSlide: (index: number) => void;
+}> = ({ announcements, adIndex, onSelectSlide }) => {
+  const hasAnnouncements = announcements.length > 0;
+  const slideCount = hasAnnouncements ? announcements.length : AD_SLIDES.length;
+
+  const currentSlideGradientStart =
+    hasAnnouncements && announcements[adIndex]
+      ? announcements[adIndex].gradientStart?.trim() || DEFAULT_GRADIENT_START
+      : DEFAULT_GRADIENT_START;
+  const currentSlideGradientEnd =
+    hasAnnouncements && announcements[adIndex]
+      ? announcements[adIndex].gradientEnd?.trim() || DEFAULT_GRADIENT_END
+      : DEFAULT_GRADIENT_END;
+
+  return (
+    <div
+      className="relative mb-4 h-[172px] overflow-hidden rounded-2xl transition-colors duration-500 shadow-lg flex-shrink-0"
+      style={{ background: `linear-gradient(135deg, ${currentSlideGradientStart}, ${currentSlideGradientEnd})` }}
+    >
+      {hasAnnouncements
+        ? announcements.map((ann, i) => (
+            <div
+              key={ann.id}
+              className="absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out p-6"
+              style={{
+                opacity: adIndex === i ? 1 : 0,
+                transform: adIndex === i ? 'translateX(0)' : 'translateX(100%)',
+              }}
+            >
+              <div className="flex items-center gap-6 w-full max-w-md text-right">
+                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Wifi className="w-7 h-7 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3
+                    className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight drop-shadow-sm"
+                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}
+                  >
+                    {ann.mainTitle || '—'}
+                  </h3>
+                  {ann.subTitle ? (
+                    <p
+                      className="text-sm sm:text-base text-white/95 mb-1.5 leading-relaxed"
+                      style={{ textShadow: '0 1px 1px rgba(0,0,0,0.1)' }}
+                    >
+                      {ann.subTitle}
+                    </p>
+                  ) : null}
+                  {ann.phone ? (
+                    <div className="inline-flex items-center gap-2 mt-1.5 px-3 py-1.5 rounded-xl bg-white/25 backdrop-blur-sm">
+                      <Phone className="w-4 h-4 text-white/90 flex-shrink-0" />
+                      <span
+                        className="text-sm font-semibold text-white tabular-nums"
+                        style={{ textShadow: '0 1px 1px rgba(0,0,0,0.1)' }}
+                        dir="ltr"
+                      >
+                        {ann.phone}
+                      </span>
+                    </div>
+                  ) : null}
+                  {!ann.subTitle && !ann.phone ? <p className="text-white/80 text-sm">—</p> : null}
+                </div>
+              </div>
+            </div>
+          ))
+        : AD_SLIDES.map((slide, i) => (
+            <div
+              key={i}
+              className="absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out p-6"
+              style={{
+                opacity: adIndex === i ? 1 : 0,
+                transform: adIndex === i ? 'translateX(0)' : 'translateX(100%)',
+              }}
+            >
+              <div className="flex items-center gap-6 w-full max-w-md text-right">
+                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  {i === 0 && <Wifi className="w-7 h-7 text-white" />}
+                  {i === 1 && <Gauge className="w-7 h-7 text-white" />}
+                  {i === 2 && <MapPin className="w-7 h-7 text-white" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3
+                    className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight drop-shadow-sm"
+                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}
+                  >
+                    {slide.title}
+                  </h3>
+                  <p
+                    className="text-sm sm:text-base text-white/95 leading-relaxed"
+                    style={{ textShadow: '0 1px 1px rgba(0,0,0,0.1)' }}
+                  >
+                    {slide.text}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+        {Array.from({ length: slideCount }).map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelectSlide(i)}
+            className={`h-2 rounded-full transition-all duration-300 ${
+              adIndex === i ? 'w-6 bg-white' : 'w-2 bg-white/50 hover:bg-white/70'
+            }`}
+            aria-label={`Slide ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const SubscriberInfoPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatDate, formatNumber } = useDigits();
@@ -86,6 +214,7 @@ const SubscriberInfoPage: React.FC = () => {
   const [session, setSession] = useState<SubscriberAppLoginResponse | null>(storedSession);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(storedSession && localStorage.getItem(SUBSCRIBER_TOKEN_KEY)));
   const [activeTab, setActiveTab] = useState<AppTab>('profile');
+  const [adIndex, setAdIndex] = useState(0);
   const [renewalsPage, setRenewalsPage] = useState(1);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [maintenanceForm, setMaintenanceForm] = useState({
@@ -130,6 +259,21 @@ const SubscriberInfoPage: React.FC = () => {
   });
 
   const renewals = renewalsResponse?.data ?? [];
+
+  const announcements = subscriber?.announcements ?? [];
+  const slideCount = announcements.length > 0 ? announcements.length : AD_SLIDES.length;
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const t = setInterval(() => {
+      setAdIndex((i) => (i + 1) % Math.max(1, slideCount));
+    }, 3000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, slideCount]);
+
+  useEffect(() => {
+    setAdIndex(0);
+  }, [announcements.length]);
 
   const createMaintenanceMutation = useMutation({
     mutationFn: () =>
@@ -280,6 +424,15 @@ const SubscriberInfoPage: React.FC = () => {
       {/* Content */}
       <main className="flex-1 overflow-y-auto pb-24">
         <div className="max-w-lg mx-auto px-4 py-4">
+          {/* إعلانات دوارة — ثابتة في أعلى كل الصفحات */}
+          <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-2 bg-slate-100/95 backdrop-blur-sm">
+            <AnnouncementCarousel
+              announcements={announcements}
+              adIndex={adIndex}
+              onSelectSlide={setAdIndex}
+            />
+          </div>
+
           {/* ——— معلومات المشترك ——— */}
           {activeTab === 'profile' && (
             <div className="space-y-4">
