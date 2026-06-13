@@ -49,6 +49,7 @@ const MainAgentSubAgentRenewalsPage = lazy(() => import('./pages/MainAgentSubAge
 const MainAgentSubAgentDebtsPage = lazy(() => import('./pages/MainAgentSubAgentDebtsPage'));
 const MainAgentSubAgentDailyAccountPage = lazy(() => import('./pages/MainAgentSubAgentDailyAccountPage'));
 const CustomerInvoicesPage = lazy(() => import('./pages/CustomerInvoicesPage'));
+const SubscriberMaintenanceRequestsPage = lazy(() => import('./pages/SubscriberMaintenanceRequestsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,6 +180,11 @@ function App() {
                   <Route path="subscribers" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
                       <SubscribersPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="maintenance-requests" element={
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <SubscriberMaintenanceRequestsPage />
                     </ProtectedRoute>
                   } />
                   

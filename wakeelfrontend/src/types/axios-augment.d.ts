@@ -7,5 +7,7 @@ declare module 'axios' {
      * يُستخدم مثلاً لـ GET /me/features أثناء إكمال جلسة MainAgent حتى لا تُلغى الجلسة إذا رفض الباكند الطلب.
      */
     skipAuthRedirect?: boolean;
+    /** استخدام توكن تطبيق المشترك (subscriberToken) بدلاً من توكن لوحة التحكم */
+    useSubscriberAuth?: boolean;
   }
 }

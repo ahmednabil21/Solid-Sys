@@ -30,6 +30,10 @@ import {
   SubscriberCreateRequest,
   SubscriberUpdateRequest,
   SubscriberInfo,
+  SubscriberAppLoginResponse,
+  SubscriberMaintenanceRequestCreate,
+  SubscriberMaintenanceRequestDto,
+  AgentSubscriberMaintenanceRequestDto,
   DashboardStats,
   SubscribersDashboardStats,
   RenewalReceipt,
@@ -510,6 +514,14 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       (config) => {
+        const useSubscriberAuth = Boolean((config as { useSubscriberAuth?: boolean }).useSubscriberAuth);
+        if (useSubscriberAuth) {
+          const subscriberToken = localStorage.getItem('subscriberToken');
+          if (subscriberToken) {
+            config.headers.Authorization = `Bearer ${subscriberToken}`;
+          }
+          return config;
+        }
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -539,8 +551,11 @@ class ApiService {
         const isLoginRequest = /\/Auth\/login$/i.test(requestUrl);
         const onLoginPage =
           typeof window !== 'undefined' && /\/login\/?$/.test(window.location.pathname);
+        const onSubscriberPage =
+          typeof window !== 'undefined' && /\/subscriber-info/.test(window.location.pathname);
+        const isSubscriberAuthRequest = Boolean((error.config as { useSubscriberAuth?: boolean } | undefined)?.useSubscriberAuth);
 
-        if (error.response?.status === 401 && !skipRedirect && !isLoginRequest && !onLoginPage) {
+        if (error.response?.status === 401 && !skipRedirect && !isLoginRequest && !onLoginPage && !onSubscriberPage && !isSubscriberAuthRequest) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('meFeatures');
@@ -1974,6 +1989,99 @@ class ApiService {
   async getSubscriberInfo(username: string): Promise<SubscriberInfo> {
     const response: AxiosResponse<SubscriberInfo> = await this.api.get(`/subscribers/info/${username}`);
     return response.data;
+  }
+
+  /** تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login (مع fallback إلى POST /Subscribers/info) */
+  async subscriberAppLogin(username: string, password: string): Promise<SubscriberAppLoginResponse> {
+    const body = { username, password };
+    const opts = { skipAuthRedirect: true as const, useSubscriberAuth: false as const };
+    try {
+      const response = await this.api.post<SubscriberAppLoginResponse>('/SubscriberApp/login', body, opts);
+      return response.data;
+    } catch (err: unknown) {
+      const status = (err as { status?: number; response?: { status?: number } })?.status
+        ?? (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404 || status === 405) {
+        const response = await this.api.post<SubscriberAppLoginResponse>('/Subscribers/info', body, opts);
+        return response.data;
+      }
+      throw err;
+    }
+  }
+
+  /** معلومات المشترك بعد تسجيل الدخول — GET /subscribers/info/{username} مع توكن المشترك */
+  async getSubscriberInfoForApp(username: string): Promise<SubscriberInfo> {
+    const response: AxiosResponse<SubscriberInfo> = await this.api.get(`/subscribers/info/${encodeURIComponent(username)}`, {
+      useSubscriberAuth: true,
+      skipAuthRedirect: true,
+    });
+    return response.data;
+  }
+
+  /** إنشاء طلب صيانة — POST /SubscriberApp/maintenance-requests */
+  async createSubscriberMaintenanceRequest(data: SubscriberMaintenanceRequestCreate): Promise<SubscriberMaintenanceRequestDto> {
+    const response = await this.api.post<SubscriberMaintenanceRequestDto>('/SubscriberApp/maintenance-requests', data, {
+      useSubscriberAuth: true,
+      skipAuthRedirect: true,
+    });
+    return response.data;
+  }
+
+  /** جلب طلبات الصيانة — GET /SubscriberApp/maintenance-requests */
+  async getSubscriberMaintenanceRequests(): Promise<SubscriberMaintenanceRequestDto[]> {
+    const response = await this.api.get<SubscriberMaintenanceRequestDto[]>('/SubscriberApp/maintenance-requests', {
+      useSubscriberAuth: true,
+      skipAuthRedirect: true,
+    });
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
+  /** جلب طلبات صيانة المشتركين للوكيل — GET /SubscriberMaintenanceRequests/agent */
+  async getAgentSubscriberMaintenanceRequests(params?: {
+    status?: number;
+    agentId?: string;
+  }): Promise<AgentSubscriberMaintenanceRequestDto[]> {
+    const response = await this.api.get<unknown>('/SubscriberMaintenanceRequests/agent', { params });
+    const list = Array.isArray(response.data) ? response.data : [];
+    return list.map((item) => this.normalizeAgentSubscriberMaintenanceRequest(item));
+  }
+
+  /** قبول طلب صيانة — POST /SubscriberMaintenanceRequests/{id}/accept */
+  async acceptSubscriberMaintenanceRequest(id: string): Promise<AgentSubscriberMaintenanceRequestDto> {
+    const response = await this.api.post<unknown>(`/SubscriberMaintenanceRequests/${encodeURIComponent(id)}/accept`);
+    return this.normalizeAgentSubscriberMaintenanceRequest(response.data);
+  }
+
+  private normalizeAgentSubscriberMaintenanceRequest(raw: unknown): AgentSubscriberMaintenanceRequestDto {
+    if (raw == null || typeof raw !== 'object') {
+      return raw as AgentSubscriberMaintenanceRequestDto;
+    }
+    const r = raw as Record<string, unknown>;
+    const num = (camel: string, pascal: string) => {
+      const v = r[camel] ?? r[pascal];
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v as number);
+    };
+    const str = (camel: string, pascal: string) => {
+      const v = r[camel] ?? r[pascal];
+      return v == null || v === '' ? undefined : String(v);
+    };
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      subscriberId: str('subscriberId', 'SubscriberId'),
+      problemType: num('problemType', 'ProblemType'),
+      problemTypeLabel: str('problemTypeLabel', 'ProblemTypeLabel'),
+      description: str('description', 'Description'),
+      alternativePhoneNumber: str('alternativePhoneNumber', 'AlternativePhoneNumber'),
+      status: num('status', 'Status'),
+      statusLabel: str('statusLabel', 'StatusLabel'),
+      createdAt: str('createdAt', 'CreatedAt'),
+      updatedAt: str('updatedAt', 'UpdatedAt'),
+      acceptedAt: str('acceptedAt', 'AcceptedAt'),
+      subscriberFullName: str('subscriberFullName', 'SubscriberFullName'),
+      subscriberUsername: str('subscriberUsername', 'SubscriberUsername'),
+      subscriberPhoneNumber: str('subscriberPhoneNumber', 'SubscriberPhoneNumber'),
+    };
   }
 
   /** إعدادات تطبيق المشترك (طريقة الدفع، رقم البطاقة، عنوان المكتب) — GET /api/AppSettings */

@@ -73,6 +73,69 @@ export interface SubscriberInfo {
   totalRenewals: number;
 }
 
+/** استجابة تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login أو POST /Subscribers/info */
+export interface SubscriberAppLoginResponse {
+  token: string;
+  expiresInSeconds: number;
+  fullName: string;
+  username: string;
+  subscriberId: string;
+}
+
+/** أنواع مشاكل طلب الصيانة في تطبيق المشترك */
+export enum SubscriberAppProblemType {
+  SubscriptionRenewal = 1,
+  WeakInternet = 2,
+  NetworkPasswordChange = 3,
+  CableCut = 4,
+  Other = 5,
+}
+
+export type SubscriberMaintenanceRequestStatus = 'pending' | 'inProgress' | 'completed' | 'cancelled';
+
+export interface SubscriberMaintenanceRequestCreate {
+  problemType: SubscriberAppProblemType;
+  description?: string;
+  alternativePhoneNumber?: string;
+}
+
+export interface SubscriberMaintenanceRequestDto {
+  id: string;
+  problemType: SubscriberAppProblemType | number;
+  problemTypeLabel?: string;
+  description?: string;
+  alternativePhoneNumber?: string;
+  status: SubscriberMaintenanceRequestStatus;
+  statusLabel?: string;
+  createdAt?: string;
+}
+
+/** حالة طلب الصيانة (API الوكيل) — 1 قيد الانتظار، 2 قيد المعالجة، 3 مكتمل، 4 ملغي */
+export enum SubscriberMaintenanceRequestStatusCode {
+  Pending = 1,
+  InProgress = 2,
+  Completed = 3,
+  Cancelled = 4,
+}
+
+/** طلب صيانة مشترك — GET /SubscriberMaintenanceRequests/agent */
+export interface AgentSubscriberMaintenanceRequestDto {
+  id: string;
+  subscriberId?: string;
+  problemType: SubscriberAppProblemType | number;
+  problemTypeLabel?: string;
+  description?: string;
+  alternativePhoneNumber?: string;
+  status: SubscriberMaintenanceRequestStatusCode | number;
+  statusLabel?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  acceptedAt?: string;
+  subscriberFullName?: string;
+  subscriberUsername?: string;
+  subscriberPhoneNumber?: string;
+}
+
 export enum IraqGovernorates {
   Baghdad = 1,
   Basra = 2,
