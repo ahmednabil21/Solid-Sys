@@ -73,13 +73,21 @@ export interface SubscriberInfo {
   totalRenewals: number;
 }
 
-/** استجابة تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login أو POST /Subscribers/info */
+/** طلب تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login */
+export interface SubscriberAppLoginRequest {
+  fullName: string;
+  username: string;
+}
+
+/** استجابة تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login */
 export interface SubscriberAppLoginResponse {
   token: string;
   expiresInSeconds: number;
   fullName: string;
   username: string;
   subscriberId: string;
+  regionName?: string;
+  agentResellerName?: string;
 }
 
 /** أنواع مشاكل طلب الصيانة في تطبيق المشترك */
@@ -134,6 +142,8 @@ export interface AgentSubscriberMaintenanceRequestDto {
   subscriberFullName?: string;
   subscriberUsername?: string;
   subscriberPhoneNumber?: string;
+  regionName?: string;
+  agentResellerName?: string;
 }
 
 export enum IraqGovernorates {

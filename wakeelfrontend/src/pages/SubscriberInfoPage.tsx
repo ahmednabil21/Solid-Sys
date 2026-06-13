@@ -71,8 +71,8 @@ const SubscriberInfoPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatDate, formatNumber } = useDigits();
   const storedSession = readStoredSession();
+  const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [session, setSession] = useState<SubscriberAppLoginResponse | null>(storedSession);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(storedSession && localStorage.getItem(SUBSCRIBER_TOKEN_KEY)));
   const [adIndex, setAdIndex] = useState(0);
@@ -88,8 +88,8 @@ const SubscriberInfoPage: React.FC = () => {
   const [maintenanceError, setMaintenanceError] = useState('');
 
   const loginMutation = useMutation({
-    mutationFn: ({ user, pass }: { user: string; pass: string }) =>
-      apiService.subscriberAppLogin(user, pass),
+    mutationFn: ({ name, user }: { name: string; user: string }) =>
+      apiService.subscriberAppLogin(name, user),
     onSuccess: (data) => {
       localStorage.setItem(SUBSCRIBER_TOKEN_KEY, data.token);
       localStorage.setItem(SUBSCRIBER_SESSION_KEY, JSON.stringify(data));
@@ -153,15 +153,15 @@ const SubscriberInfoPage: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim() && password.trim()) {
-      loginMutation.mutate({ user: username.trim(), pass: password.trim() });
+    if (fullName.trim() && username.trim()) {
+      loginMutation.mutate({ name: fullName.trim(), user: username.trim() });
     }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    setFullName('');
     setUsername('');
-    setPassword('');
     setSession(null);
     setSpeedValue(0);
     localStorage.removeItem(SUBSCRIBER_TOKEN_KEY);
@@ -205,8 +205,10 @@ const SubscriberInfoPage: React.FC = () => {
       ? 'linear-gradient(90deg, #ffa726, #ff9800)'
       : 'linear-gradient(90deg, #66bb6a, #4caf50)';
 
-  const displayName = subscriberInfo?.fullName || session?.fullName || username;
+  const displayName = subscriberInfo?.fullName || session?.fullName || fullName;
   const displayPhone = (subscriberInfo as SubscriberInfoDisplay)?.phoneNumber || 'غير محدد';
+  const displayRegion = session?.regionName;
+  const displayReseller = session?.agentResellerName;
   const profileName = (subscriberInfo as SubscriberInfoDisplay)?.profileName || 'TCP-1';
   const salePrice = subscriberInfo?.salePrice ?? null;
   const companyName = subscriberInfo?.agentCompanyName || 'غير محدد';
@@ -248,17 +250,17 @@ const SubscriberInfoPage: React.FC = () => {
               <form onSubmit={handleLogin} className="space-y-4 mb-6">
                 <input
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="اسم المستخدم"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="الاسم الكامل"
                   required
                   className="w-full py-3.5 px-4 rounded-xl text-base text-right outline-none transition-all border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#2962FF] focus:ring-2 focus:ring-[#2962FF]/20 placeholder:text-slate-400"
                 />
                 <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="كلمة السر"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="اسم المستخدم"
                   required
                   className="w-full py-3.5 px-4 rounded-xl text-base text-right outline-none transition-all border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#2962FF] focus:ring-2 focus:ring-[#2962FF]/20 placeholder:text-slate-400"
                 />
@@ -311,6 +313,11 @@ const SubscriberInfoPage: React.FC = () => {
             <div className="flex-1 text-right min-w-0">
               <h3 className="text-slate-800 font-bold text-base truncate">{displayName}</h3>
               <p className="text-slate-500 text-sm truncate">{displayPhone}</p>
+              {(displayRegion || displayReseller) && (
+                <p className="text-slate-400 text-xs mt-0.5 truncate">
+                  {[displayRegion, displayReseller].filter(Boolean).join(' · ')}
+                </p>
+              )}
             </div>
           </div>
 

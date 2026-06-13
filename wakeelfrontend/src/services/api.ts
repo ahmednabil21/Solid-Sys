@@ -1991,9 +1991,9 @@ class ApiService {
     return response.data;
   }
 
-  /** تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login (مع fallback إلى POST /Subscribers/info) */
-  async subscriberAppLogin(username: string, password: string): Promise<SubscriberAppLoginResponse> {
-    const body = { username, password };
+  /** تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login */
+  async subscriberAppLogin(fullName: string, username: string): Promise<SubscriberAppLoginResponse> {
+    const body = { fullName, username };
     const opts = { skipAuthRedirect: true as const, useSubscriberAuth: false as const };
     try {
       const response = await this.api.post<SubscriberAppLoginResponse>('/SubscriberApp/login', body, opts);
@@ -2081,6 +2081,8 @@ class ApiService {
       subscriberFullName: str('subscriberFullName', 'SubscriberFullName'),
       subscriberUsername: str('subscriberUsername', 'SubscriberUsername'),
       subscriberPhoneNumber: str('subscriberPhoneNumber', 'SubscriberPhoneNumber'),
+      regionName: str('regionName', 'RegionName'),
+      agentResellerName: str('agentResellerName', 'AgentResellerName'),
     };
   }
 

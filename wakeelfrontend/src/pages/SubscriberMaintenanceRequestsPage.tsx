@@ -311,6 +311,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">المشترك</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">المنطقة / الرسيلر</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">نوع المشكلة</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">الوصف</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">الهاتف</th>
@@ -339,6 +340,12 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
                             </p>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                        <p className="truncate">{req.regionName || '—'}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                          {req.agentResellerName || '—'}
+                        </p>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                         {problemTypeLabel(req)}
