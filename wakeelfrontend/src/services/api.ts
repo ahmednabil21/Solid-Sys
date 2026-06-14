@@ -1759,13 +1759,16 @@ class ApiService {
    */
   async importSasSubscribers(
     payload: { data: unknown[] },
-    agentId?: string
+    params?: { agentId?: string; resellerId?: string }
   ): Promise<SasSubscribersImportResponse> {
+    const query: Record<string, string> = {};
+    if (params?.agentId) query.agentId = params.agentId;
+    if (params?.resellerId) query.resellerId = params.resellerId;
     const response = await this.api.post<SasSubscribersImportResponse>(
       '/providers/sas/sas-subscribers-import',
       payload,
       {
-        params: agentId ? { agentId } : undefined,
+        params: Object.keys(query).length ? query : undefined,
         timeout: 600_000,
         headers: { 'Content-Type': 'application/json' },
       }

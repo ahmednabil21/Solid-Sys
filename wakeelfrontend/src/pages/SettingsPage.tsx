@@ -20,6 +20,12 @@ import {
 import { showSuccess, showError } from '../utils/notifications';
 import { apiService, ApiService } from '../services/api';
 import {
+  sasBrowserLogin,
+  sasBrowserFetchAllUsers,
+  buildSasExportPayload,
+  normalizeSasBaseUrl,
+} from '../services/sasBrowserClient';
+import {
   UserRole,
   ServiceType,
   UpdateMyCredentialsRequest,
@@ -37,7 +43,6 @@ import {
   ServiceFeesCreateRequest,
   ServiceFeesUpdateRequest,
   FtthSubscribersExportBody,
-  SasSubscribersExportBody,
   WhatsAppDeviceStatusAdmin,
 } from '../types';
 import {
@@ -736,29 +741,84 @@ function SettingsPage() {
   } | null>(null);
   const [pullImportProgress, setPullImportProgress] = useState(0);
 
+  /** مودال تسجيل دخول SAS من المتصفح (عند سحب مشتركين) */
+  const [sasLoginModalOpen, setSasLoginModalOpen] = useState(false);
+  const [sasLoginReseller, setSasLoginReseller] = useState<AgentReseller | null>(null);
+  const [sasLoginBaseUrl, setSasLoginBaseUrl] = useState('https://ftth.jt.iq');
+  const [sasLoginUsername, setSasLoginUsername] = useState('');
+  const [sasLoginPassword, setSasLoginPassword] = useState('');
+  const [showSasLoginPassword, setShowSasLoginPassword] = useState(false);
+  const [sasBrowserFetchProgress, setSasBrowserFetchProgress] = useState('');
+
+  function openSasLoginModal(reseller: AgentReseller) {
+    setSasLoginReseller(reseller);
+    setSasLoginBaseUrl(normalizeSasBaseUrl(reseller.baseUrl?.trim() || 'https://ftth.jt.iq'));
+    setSasLoginUsername(reseller.username?.trim() || '');
+    setSasLoginPassword(reseller.password?.trim() || '');
+    setSasBrowserFetchProgress('');
+    setSasLoginModalOpen(true);
+  }
+
+  async function handleSasBrowserPull() {
+    if (!sasLoginReseller) return;
+    const username = sasLoginUsername.trim();
+    const password = sasLoginPassword;
+    const baseUrl = normalizeSasBaseUrl(sasLoginBaseUrl);
+    if (!baseUrl || !username || !password) {
+      showError('تسجيل SAS', 'أدخل رابط اللوحة واسم المستخدم وكلمة المرور.');
+      return;
+    }
+
+    setSasLoginModalOpen(false);
+    setPullPanelKind('sas');
+    setPullLoadingModalOpen(true);
+    setSasBrowserFetchProgress('جاري تسجيل الدخول إلى SAS...');
+
+    try {
+      const { token } = await sasBrowserLogin(baseUrl, username, password);
+      setSasBrowserFetchProgress('تم تسجيل الدخول — جاري جلب المشتركين...');
+      const rows = await sasBrowserFetchAllUsers(baseUrl, token, 100, (page, lastPage, loaded) => {
+        setSasBrowserFetchProgress(`جاري جلب الصفحة ${page} من ${lastPage} (${loaded} مشترك)...`);
+      });
+
+      setPullLoadingModalOpen(false);
+      setPullPanelKind(null);
+      setSasBrowserFetchProgress('');
+
+      if (!rows.length) {
+        showError('تصدير SAS', 'لم يُعثَر على مشتركين في استجابة SAS.');
+        return;
+      }
+
+      const fullPayload = buildSasExportPayload(rows);
+      setPullExportSnapshot({
+        kind: 'sas',
+        resellerId: sasLoginReseller.id,
+        resellerName: sasLoginReseller.name,
+        data: rows,
+        fullPayload,
+      });
+      setPullResultModalOpen(true);
+      setSasLoginReseller(null);
+    } catch (err: unknown) {
+      setPullLoadingModalOpen(false);
+      setPullPanelKind(null);
+      setSasBrowserFetchProgress('');
+      const msg = err instanceof Error ? err.message : 'فشل جلب المشتركين من SAS';
+      const hint = /Failed to fetch|CORS|blocked|NetworkError/i.test(msg)
+        ? ' — تأكد أن رابط اللوحة صحيح وأن المتصفح يصل إلى SAS (CORS).'
+        : '';
+      showError('فشل جلب SAS من المتصفح', msg + hint);
+      setSasLoginModalOpen(true);
+    }
+  }
+
   function buildFtthExportBody(r: AgentReseller): FtthSubscribersExportBody | Record<string, never> {
     const o: Record<string, string> = {};
     if (r.baseUrl?.trim()) o.baseUrl = r.baseUrl.trim();
     if (r.username?.trim()) o.username = r.username.trim();
     if (r.password?.trim()) o.password = r.password.trim();
     return Object.keys(o).length ? o : {};
-  }
-
-  function buildSasExportBody(r: AgentReseller): SasSubscribersExportBody | Record<string, never> {
-    const baseUrl = r.baseUrl?.trim();
-    const username = r.username?.trim();
-    const password = r.password?.trim();
-    const body: SasSubscribersExportBody = {};
-    if (baseUrl) body.baseUrl = baseUrl;
-    // دعم النمط التقليدي username/password
-    if (username) body.username = username;
-    if (password) body.password = password;
-    // دعم token-only: إذا لا يوجد username وموجود password اعتبره token
-    if (!username && password) {
-      body.token = password;
-      body.userPath = 'admin/api/index.php/api/index/user';
-    }
-    return Object.keys(body).length ? body : {};
   }
 
   const exportFtthSubscribersMutation = useMutation({
@@ -807,52 +867,6 @@ function SettingsPage() {
     },
   });
 
-  const exportSasSubscribersMutation = useMutation({
-    mutationFn: (reseller: AgentReseller) =>
-      apiService.exportSasSubscribers({ resellerId: reseller.id }, buildSasExportBody(reseller)),
-    onMutate: () => {
-      setPullPanelKind('sas');
-      setPullLoadingModalOpen(true);
-    },
-    onSuccess: (data, reseller) => {
-      setPullLoadingModalOpen(false);
-      setPullPanelKind(null);
-      const rows = data.data ?? [];
-      if (data.error) {
-        showError('تصدير SAS', String(data.error));
-        return;
-      }
-      setPullExportSnapshot({
-        kind: 'sas',
-        resellerId: reseller.id,
-        resellerName: reseller.name,
-        data: rows,
-        fullPayload: { ...data } as Record<string, unknown>,
-      });
-      setPullResultModalOpen(true);
-    },
-    onError: (err: unknown) => {
-      setPullLoadingModalOpen(false);
-      setPullPanelKind(null);
-      const e = err as {
-        response?: { status?: number; data?: { error?: string; message?: string; Message?: string } };
-      };
-      const status = e?.response?.status;
-      const bodyErr =
-        e?.response?.data?.error ?? e?.response?.data?.message ?? e?.response?.data?.Message;
-      let message =
-        bodyErr != null && String(bodyErr).trim() !== ''
-          ? String(bodyErr)
-          : ApiService.showError(err);
-      if (!bodyErr) {
-        if (status === 401) message = 'انتهت الجلسة أو التوكن غير صالح. يرجى تسجيل الدخول مجدداً.';
-        else if (status === 403) message = 'لا صلاحية لك لهذه العملية.';
-        else if (status === 400) message = 'طلب غير صالح أو اعتماديات خاطئة.';
-      }
-      showError('فشل تصدير مشتركي SAS', message);
-    },
-  });
-
   const downloadPullExportJson = () => {
     if (!pullExportSnapshot) return;
     try {
@@ -872,10 +886,13 @@ function SettingsPage() {
   };
 
   const importPullSubscribersMutation = useMutation({
-    mutationFn: (payload: { data: unknown[]; kind: 'ftth' | 'sas' }) =>
+    mutationFn: (payload: { data: unknown[]; kind: 'ftth' | 'sas'; resellerId?: string }) =>
       payload.kind === 'ftth'
         ? apiService.importFtthSubscribers({ data: payload.data })
-        : apiService.importSasSubscribers({ data: payload.data }),
+        : apiService.importSasSubscribers(
+            { data: payload.data },
+            payload.resellerId ? { resellerId: payload.resellerId } : undefined
+          ),
     onMutate: () => {
       setPullResultModalOpen(false);
       setPullImportModalOpen(true);
@@ -2323,12 +2340,12 @@ function SettingsPage() {
                                   {(r.serviceType === ServiceType.Sas || r.serviceType === ServiceType.Earthlink) && (
                                     <button
                                       type="button"
-                                      onClick={() => exportSasSubscribersMutation.mutate(r)}
+                                      onClick={() => openSasLoginModal(r)}
                                       disabled={
-                                        exportSasSubscribersMutation.isPending ||
                                         exportFtthSubscribersMutation.isPending ||
                                         pullLoadingModalOpen ||
-                                        pullImportModalOpen
+                                        pullImportModalOpen ||
+                                        sasLoginModalOpen
                                       }
                                       className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-md disabled:opacity-50 flex items-center gap-1"
                                     >
@@ -2342,9 +2359,9 @@ function SettingsPage() {
                                       onClick={() => exportFtthSubscribersMutation.mutate(r)}
                                       disabled={
                                         exportFtthSubscribersMutation.isPending ||
-                                        exportSasSubscribersMutation.isPending ||
                                         pullLoadingModalOpen ||
-                                        pullImportModalOpen
+                                        pullImportModalOpen ||
+                                        sasLoginModalOpen
                                       }
                                       className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 flex items-center gap-1"
                                     >
@@ -3796,6 +3813,110 @@ function SettingsPage() {
       </div>
     </div>
 
+    {/* مودال تسجيل دخول SAS — قبل سحب المشتركين من المتصفح */}
+    {sasLoginModalOpen && sasLoginReseller && (
+      <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl">
+          <div className="bg-gradient-to-l from-emerald-600 to-emerald-800 px-6 py-4 text-white">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-emerald-100/90">تسجيل دخول SAS</p>
+                <p className="text-lg font-bold">{sasLoginReseller.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSasLoginModalOpen(false);
+                  setSasLoginReseller(null);
+                }}
+                className="rounded-lg p-2 hover:bg-white/15 transition-colors"
+                aria-label="إغلاق"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+              يتم الاتصال مباشرةً بلوحة SAS من متصفحك (يتجاوز حظر Cloudflare على السيرفر). بعد تسجيل الدخول
+              يُجلب المشتركون ثم يمكنك استيرادهم إلى Wakeel.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                رابط لوحة SAS
+              </label>
+              <input
+                type="url"
+                value={sasLoginBaseUrl}
+                onChange={(e) => setSasLoginBaseUrl(e.target.value)}
+                placeholder="https://ftth.jt.iq"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                اسم المستخدم
+              </label>
+              <input
+                type="text"
+                value={sasLoginUsername}
+                onChange={(e) => setSasLoginUsername(e.target.value)}
+                placeholder="admin@mud"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                dir="ltr"
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                كلمة المرور
+              </label>
+              <div className="relative">
+                <input
+                  type={showSasLoginPassword ? 'text' : 'password'}
+                  value={sasLoginPassword}
+                  onChange={(e) => setSasLoginPassword(e.target.value)}
+                  className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                  dir="ltr"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSasLoginPassword((v) => !v)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                  tabIndex={-1}
+                >
+                  {showSasLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSasLoginModalOpen(false);
+                  setSasLoginReseller(null);
+                }}
+                className="flex-1 rounded-xl border border-gray-300 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/80"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSasBrowserPull()}
+                disabled={!sasLoginUsername.trim() || !sasLoginPassword || !sasLoginBaseUrl.trim()}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                <CloudDownload className="h-4 w-4" />
+                سحب المشتركين
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* سحب مشتركين (FTTH أو SAS): جاري التحميل — ألوان النظام */}
     {pullLoadingModalOpen && (
       <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -3813,7 +3934,7 @@ function SettingsPage() {
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
               {pullPanelKind === 'sas'
-                ? 'يتم جلب بيانات المشتركين من لوحة SAS عبر خادم Wakeel، يرجى الانتظار…'
+                ? sasBrowserFetchProgress || 'يتم جلب بيانات المشتركين من لوحة SAS مباشرةً عبر المتصفح، يرجى الانتظار…'
                 : 'لا تغلق النافذة لحين اكتمال التحميل الوقت حسب عدد مشتركيك'}
             </p>
             <div className="mt-8 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
@@ -3875,6 +3996,7 @@ function SettingsPage() {
                   importPullSubscribersMutation.mutate({
                     data: pullExportSnapshot.data,
                     kind: pullExportSnapshot.kind,
+                    resellerId: pullExportSnapshot.resellerId,
                   });
                 }}
                 disabled={!pullExportSnapshot.data.length || importPullSubscribersMutation.isPending}
