@@ -27,6 +27,7 @@ import {
   parseSasTokenFromPaste,
   isJtIqPanel,
 } from '../services/sasBrowserClient';
+import { readSasExportJsonFile } from '../utils/sasExportJson';
 import {
   UserRole,
   ServiceType,
@@ -75,6 +76,7 @@ import {
   Search,
   Activity,
   DollarSign,
+  Upload,
 } from 'lucide-react';
 
 /** نقاط تُعرض أثناء استيراد المشتركين — ألوان ومزايا النظام */
@@ -753,6 +755,43 @@ function SettingsPage() {
   const [sasLoginTokenPaste, setSasLoginTokenPaste] = useState('');
   const [sasLoginMode, setSasLoginMode] = useState<'token' | 'credentials'>('token');
   const [sasBrowserFetchProgress, setSasBrowserFetchProgress] = useState('');
+  const sasImportFileInputRef = useRef<HTMLInputElement>(null);
+  const sasImportFileResellerRef = useRef<AgentReseller | null>(null);
+
+  function openSasImportFromFile(reseller: AgentReseller) {
+    sasImportFileResellerRef.current = reseller;
+    if (sasImportFileInputRef.current) {
+      sasImportFileInputRef.current.value = '';
+      sasImportFileInputRef.current.click();
+    }
+  }
+
+  async function handleSasImportFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const reseller = sasImportFileResellerRef.current;
+    e.target.value = '';
+    if (!file || !reseller) return;
+
+    try {
+      const parsed = await readSasExportJsonFile(file);
+      setPullExportSnapshot({
+        kind: 'sas',
+        resellerId: reseller.id,
+        resellerName: reseller.name,
+        data: parsed.data,
+        fullPayload: parsed.fullPayload,
+      });
+      setPullResultModalOpen(true);
+      showSuccess('تم قراءة الملف', `وُجد ${parsed.count} مشتركاً — راجع ثم اضغط «استيراد الآن».`);
+    } catch (err: unknown) {
+      showError(
+        'ملف SAS غير صالح',
+        err instanceof Error ? err.message : 'تعذّر قراءة الملف'
+      );
+    } finally {
+      sasImportFileResellerRef.current = null;
+    }
+  }
 
   function openSasLoginModal(reseller: AgentReseller) {
     const base = normalizeSasBaseUrl(reseller.baseUrl?.trim() || 'https://ftth.jt.iq');
@@ -2373,6 +2412,9 @@ function SettingsPage() {
                     إضافة رسيلر
                   </button>
                 </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  لرسيلر SAS: شغّل محلياً <span className="font-mono text-xs">sas_fetch_users.py -o subscribers-export.json</span> ثم اضغط «من ملف» لرفع JSON والاستيراد.
+                </p>
                 {resellersLoading ? (
                   <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل الرسيلرز...</div>
                 ) : (
@@ -2403,20 +2445,39 @@ function SettingsPage() {
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap justify-end">
                                   {(r.serviceType === ServiceType.Sas || r.serviceType === ServiceType.Earthlink) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openSasLoginModal(r)}
-                                      disabled={
-                                        exportFtthSubscribersMutation.isPending ||
-                                        pullLoadingModalOpen ||
-                                        pullImportModalOpen ||
-                                        sasLoginModalOpen
-                                      }
-                                      className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-md disabled:opacity-50 flex items-center gap-1"
-                                    >
-                                      <CloudDownload className="h-3 w-3" />
-                                      <span>SAS</span>
-                                    </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => openSasLoginModal(r)}
+                                        disabled={
+                                          exportFtthSubscribersMutation.isPending ||
+                                          pullLoadingModalOpen ||
+                                          pullImportModalOpen ||
+                                          sasLoginModalOpen
+                                        }
+                                        className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-md disabled:opacity-50 flex items-center gap-1"
+                                        title="جلب من لوحة SAS عبر المتصفح"
+                                      >
+                                        <CloudDownload className="h-3 w-3" />
+                                        <span>SAS</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openSasImportFromFile(r)}
+                                        disabled={
+                                          exportFtthSubscribersMutation.isPending ||
+                                          pullLoadingModalOpen ||
+                                          pullImportModalOpen ||
+                                          sasLoginModalOpen ||
+                                          importPullSubscribersMutation.isPending
+                                        }
+                                        className="px-3 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-md disabled:opacity-50 flex items-center gap-1"
+                                        title="رفع subscribers-export.json من sas_fetch_users.py المحلي"
+                                      >
+                                        <Upload className="h-3 w-3" />
+                                        <span>من ملف</span>
+                                      </button>
+                                    </>
                                   )}
                                   {r.serviceType === ServiceType.Ftth && (
                                     <button
@@ -3879,6 +3940,15 @@ function SettingsPage() {
     </div>
 
     {/* مودال تسجيل دخول SAS — قبل سحب المشتركين من المتصفح */}
+    <input
+      ref={sasImportFileInputRef}
+      type="file"
+      accept=".json,application/json"
+      className="hidden"
+      aria-hidden
+      onChange={(e) => void handleSasImportFileSelected(e)}
+    />
+
     {sasLoginModalOpen && sasLoginReseller && (
       <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl">
