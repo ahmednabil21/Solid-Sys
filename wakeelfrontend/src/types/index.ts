@@ -1411,6 +1411,8 @@ export interface Profile {
   isActive: boolean;
   createdAt: string;
   agentCompanyName: string;
+  regionId?: string | null;
+  regionName?: string | null;
   agentResellerId?: string | null;
   agentResellerName?: string | null;
 }
@@ -1425,6 +1427,7 @@ export interface ProfileCreateRequest {
   includedMaterialIds?: string[];
   isActive?: boolean;
   agentResellerId?: string;
+  regionId?: string;
 }
 
 export interface ProfileUpdateRequest {
@@ -1437,6 +1440,7 @@ export interface ProfileUpdateRequest {
   includedMaterialIds?: string[];
   isActive: boolean;
   agentResellerId?: string;
+  regionId?: string;
 }
 
 export enum ProfilePackageType {
@@ -1570,6 +1574,7 @@ export interface ProfileListParams {
   sortBy?: string;
   sortDescending?: boolean;
   status?: number; // 1 نشط، 0 غير نشط، عدم الإرسال = الكل
+  regionId?: string;
   resellerId?: string;
 }
 

@@ -1409,6 +1409,7 @@ class ApiService {
         sortBy: params.sortBy || undefined,
         sortDescending: params.sortDescending,
         status: params.status,
+        regionId: params.regionId || undefined,
         resellerId: params.resellerId || undefined,
       } : undefined,
     });

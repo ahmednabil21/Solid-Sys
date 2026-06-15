@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiService } from '../services/api';
-import { Profile, ProfileCreateRequest, ProfileUpdateRequest, PaginatedResponse, AgentReseller, ProfilePackageType, Material } from '../types';
+import { apiService, ApiService } from '../services/api';
+import { Profile, ProfileCreateRequest, ProfileUpdateRequest, PaginatedResponse, AgentReseller, AgentRegion, ProfilePackageType, Material } from '../types';
 import { showSuccess, showError } from '../utils/notifications';
 import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchProfilesWithCache } from '../services/offlineSync';
+import { filterResellersByRegion } from '../utils/operationalFilters';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import Pagination from '../components/Pagination';
 import { 
@@ -35,7 +36,12 @@ const PackagesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<number | ''>(''); // '' = الكل، 1 = نشط، 0 = غير نشط
+  const [selectedRegionId, setSelectedRegionId] = useState<string>('');
   const [selectedResellerId, setSelectedResellerId] = useState<string>('');
+  const [formRegionId, setFormRegionId] = useState<string>('');
+  const [formResellerId, setFormResellerId] = useState<string>('');
+  const [editFormRegionId, setEditFormRegionId] = useState<string>('');
+  const [editFormResellerId, setEditFormResellerId] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPackage, setEditingPackage] = useState<Profile | null>(null);
@@ -65,14 +71,21 @@ const PackagesPage: React.FC = () => {
   });
 
   const { data: profilesResponse, error, isLoading } = useQuery<PaginatedResponse<Profile>>({
-    queryKey: ['profiles', currentPage, pageSize, appliedSearchTerm, statusFilter, selectedResellerId, online],
+    queryKey: ['profiles', currentPage, pageSize, appliedSearchTerm, statusFilter, selectedRegionId, selectedResellerId, online],
     queryFn: () => fetchProfilesWithCache(online, {
       page: currentPage,
       pageSize,
       searchTerm: appliedSearchTerm.trim() || undefined,
       status: statusFilter === '' ? undefined : statusFilter,
+      regionId: selectedRegionId || undefined,
       resellerId: selectedResellerId || undefined,
     }),
+  });
+
+  const { data: myRegions = [] } = useQuery<AgentRegion[]>({
+    queryKey: ['myRegions', 'packages'],
+    queryFn: () => apiService.getMyRegions(true),
+    enabled: user?.role !== undefined,
   });
 
   const { data: myResellers = [] } = useQuery<AgentReseller[]>({
@@ -80,6 +93,19 @@ const PackagesPage: React.FC = () => {
     queryFn: () => apiService.getMyResellers(),
     enabled: user?.role !== undefined,
   });
+
+  const filterResellers = useMemo(
+    () => filterResellersByRegion(myResellers, selectedRegionId),
+    [myResellers, selectedRegionId]
+  );
+  const formResellers = useMemo(
+    () => filterResellersByRegion(myResellers, formRegionId),
+    [myResellers, formRegionId]
+  );
+  const editFormResellers = useMemo(
+    () => filterResellersByRegion(myResellers, editFormRegionId),
+    [myResellers, editFormRegionId]
+  );
 
   const packages = profilesResponse?.data ?? [];
 
@@ -107,17 +133,18 @@ const PackagesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
       showSuccess('تم الحذف بنجاح', 'تم حذف الباقة بنجاح');
     },
-    onError: (error: any) => {
-      showError('خطأ في الحذف', 'حدث خطأ أثناء حذف الباقة');
+    onError: (error: unknown) => {
+      showError('خطأ في الحذف', ApiService.showError(error));
     },
   });
 
   const createPackageMutation = useMutation({
-    mutationFn: (profileData: ProfileCreateRequest) =>
-      apiService.createProfile({ ...profileData, agentResellerId: selectedResellerId || undefined }),
+    mutationFn: (profileData: ProfileCreateRequest) => apiService.createProfile(profileData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
       setShowAddModal(false);
+      setFormRegionId('');
+      setFormResellerId('');
       showSuccess('تم الإضافة بنجاح', 'تم إضافة الباقة الجديدة بنجاح');
       // Reset form
       setFormData({
@@ -131,18 +158,19 @@ const PackagesPage: React.FC = () => {
         isActive: true,
       });
     },
-    onError: (error: any) => {
-      showError('خطأ في الإضافة', 'حدث خطأ أثناء إضافة الباقة');
+    onError: (error: unknown) => {
+      showError('خطأ في الإضافة', ApiService.showError(error));
     },
   });
 
   const updatePackageMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ProfileUpdateRequest }) => 
-      apiService.updateProfile(id, { ...data, agentResellerId: selectedResellerId || undefined }),
+    mutationFn: ({ id, data }: { id: string; data: ProfileUpdateRequest }) => apiService.updateProfile(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
       setShowEditModal(false);
       setEditingPackage(null);
+      setEditFormRegionId('');
+      setEditFormResellerId('');
       showSuccess('تم التحديث بنجاح', 'تم تحديث الباقة بنجاح');
       // Reset edit form
       setEditFormData({
@@ -156,8 +184,8 @@ const PackagesPage: React.FC = () => {
         isActive: true
       });
     },
-    onError: (error: any) => {
-      showError('خطأ في التحديث', 'حدث خطأ أثناء تحديث الباقة');
+    onError: (error: unknown) => {
+      showError('خطأ في التحديث', ApiService.showError(error));
     },
   });
 
@@ -170,6 +198,7 @@ const PackagesPage: React.FC = () => {
   const handleClearSearch = () => {
     setSearchTerm('');
     setAppliedSearchTerm('');
+    setSelectedRegionId('');
     setSelectedResellerId('');
     setCurrentPage(1);
   };
@@ -183,8 +212,14 @@ const PackagesPage: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formRegionId || !formResellerId) {
+      showError('بيانات ناقصة', 'يجب تحديد المنطقة ثم الرسيلر قبل حفظ الباقة.');
+      return;
+    }
     const payload: ProfileCreateRequest = {
       ...formData,
+      regionId: formRegionId,
+      agentResellerId: formResellerId,
       includedMaterialIds:
         formData.packageType === ProfilePackageType.SpecialOffer
           ? formData.includedMaterialIds?.filter(Boolean) ?? []
@@ -230,7 +265,13 @@ const PackagesPage: React.FC = () => {
   };
 
   const handleEdit = (pkg: Profile) => {
+    const regionId =
+      pkg.regionId ??
+      myResellers.find((r) => r.id === pkg.agentResellerId)?.regionId ??
+      '';
     setEditingPackage(pkg);
+    setEditFormRegionId(regionId);
+    setEditFormResellerId(pkg.agentResellerId ?? '');
     setEditFormData({
       name: pkg.name,
       originalPrice: pkg.originalPrice,
@@ -246,9 +287,15 @@ const PackagesPage: React.FC = () => {
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editFormRegionId || !editFormResellerId) {
+      showError('بيانات ناقصة', 'يجب تحديد المنطقة ثم الرسيلر قبل حفظ التعديلات.');
+      return;
+    }
     if (editingPackage) {
       const data: ProfileUpdateRequest = {
         ...editFormData,
+        regionId: editFormRegionId,
+        agentResellerId: editFormResellerId,
         includedMaterialIds:
           editFormData.packageType === ProfilePackageType.SpecialOffer
             ? editFormData.includedMaterialIds?.filter(Boolean) ?? []
@@ -333,12 +380,30 @@ const PackagesPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة</label>
               <select
-                value={selectedResellerId}
-                onChange={(e) => { setSelectedResellerId(e.target.value); setCurrentPage(1); }}
-                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                value={selectedRegionId}
+                onChange={(e) => {
+                  setSelectedRegionId(e.target.value);
+                  setSelectedResellerId('');
+                  setCurrentPage(1);
+                }}
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm min-w-[160px]"
               >
                 <option value="">كل المناطق</option>
-                {myResellers.map((r) => (
+                {myRegions.map((region) => (
+                  <option key={region.id} value={region.id}>{region.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرسيلر</label>
+              <select
+                value={selectedResellerId}
+                onChange={(e) => { setSelectedResellerId(e.target.value); setCurrentPage(1); }}
+                disabled={!selectedRegionId}
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm min-w-[160px] disabled:opacity-60"
+              >
+                <option value="">{selectedRegionId ? 'كل رسيلرز المنطقة' : 'اختر المنطقة أولاً'}</option>
+                {filterResellers.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
@@ -400,7 +465,8 @@ const PackagesPage: React.FC = () => {
                       {pkg.name}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {pkg.agentResellerName ? `${pkg.agentCompanyName} - ${pkg.agentResellerName}` : (pkg.agentCompanyName || 'غير محدد')} - {packageTypeBadge(pkg.packageType)}
+                      {[pkg.regionName, pkg.agentResellerName].filter(Boolean).join(' — ') || pkg.agentCompanyName || 'غير محدد'}
+                      {' · '}{packageTypeBadge(pkg.packageType)}
                     </p>
                   </div>
                 </div>
@@ -513,6 +579,45 @@ const PackagesPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    المنطقة *
+                  </label>
+                  <select
+                    value={formRegionId}
+                    onChange={(e) => {
+                      setFormRegionId(e.target.value);
+                      setFormResellerId('');
+                    }}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">اختر المنطقة</option>
+                    {myRegions.map((region) => (
+                      <option key={region.id} value={region.id}>{region.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    الرسيلر *
+                  </label>
+                  <select
+                    value={formResellerId}
+                    onChange={(e) => setFormResellerId(e.target.value)}
+                    required
+                    disabled={!formRegionId}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-60"
+                  >
+                    <option value="">{formRegionId ? 'اختر الرسيلر' : 'اختر المنطقة أولاً'}</option>
+                    {formResellers.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Package Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -715,6 +820,45 @@ const PackagesPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    المنطقة *
+                  </label>
+                  <select
+                    value={editFormRegionId}
+                    onChange={(e) => {
+                      setEditFormRegionId(e.target.value);
+                      setEditFormResellerId('');
+                    }}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">اختر المنطقة</option>
+                    {myRegions.map((region) => (
+                      <option key={region.id} value={region.id}>{region.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    الرسيلر *
+                  </label>
+                  <select
+                    value={editFormResellerId}
+                    onChange={(e) => setEditFormResellerId(e.target.value)}
+                    required
+                    disabled={!editFormRegionId}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-60"
+                  >
+                    <option value="">{editFormRegionId ? 'اختر الرسيلر' : 'اختر المنطقة أولاً'}</option>
+                    {editFormResellers.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Package Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
