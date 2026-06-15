@@ -36,7 +36,6 @@ import {
   Search,
   SlidersHorizontal,
   Trash2,
-  TrendingUp,
   Wallet,
   X,
   Zap,
@@ -84,7 +83,7 @@ function activationPaymentMethodLabel(pm?: number | null): string {
   return '—';
 }
 
-const LEDGER_TABLE_COLS = 16;
+const LEDGER_TABLE_COLS = 15;
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
   kind: 'Renewal';
@@ -94,7 +93,6 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   paymentMethod?: number;
   serviceFeesAmount?: number;
   totalProfit?: number;
-  returnPrice?: number;
   nationalSubscriptionCost?: number;
   agentResellerId?: string;
 } {
@@ -455,8 +453,6 @@ const ReportsPage: React.FC = () => {
 
   const ledger = accounts?.ledger;
   const ledgerRows = ledger?.data ?? [];
-  const totalReturnPrice =
-    accounts?.totalReturnPrice ?? accounts?.ledger?.totalReturnPrice ?? 0;
 
   return (
     <div className="p-6">
@@ -594,7 +590,7 @@ const ReportsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
             <StatCard
               title="الوارد الكلي"
               value={accounts?.totalReceived ?? 0}
@@ -620,16 +616,8 @@ const ReportsPage: React.FC = () => {
               glass
             />
             <StatCard
-              title="وارد الربح"
-              value={accounts?.totalActivationProfit ?? 0}
-              icon={TrendingUp}
-              color="purple"
-              isAmount
-              glass
-            />
-            <StatCard
               title="وارد الكاشباك"
-              value={totalReturnPrice}
+              value={accounts?.totalActivationProfit ?? 0}
               icon={Coins}
               color="teal"
               isAmount
@@ -676,7 +664,6 @@ const ReportsPage: React.FC = () => {
                         <th>كلفة اشتراك الوكيل</th>
                         <th>كلفة اشتراك الوطني</th>
                         <th>ربح الاجور</th>
-                        <th>الربح</th>
                         <th>مبلغ الكاشباك</th>
                         <th>الربح الكلي</th>
                         <th>تاريخ العملية</th>
@@ -739,11 +726,6 @@ const ReportsPage: React.FC = () => {
                               <td className="whitespace-nowrap">
                                 {renewal?.activationProfit != null
                                   ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
-                                  : '—'}
-                              </td>
-                              <td className="whitespace-nowrap">
-                                {renewal?.returnPrice != null
-                                  ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
