@@ -641,7 +641,7 @@ const ReportsPage: React.FC = () => {
               isAmount
               glass
             />
-            <StatCard
+            <StatCard 
               title="ديون اشتراك غير واصلة"
               value={accounts?.totalUnpaidSubscriptionDebt ?? 0}
               icon={CreditCard}
