@@ -192,6 +192,30 @@ function formatPaymentMethodLabel(raw?: string | null): string {
   return v;
 }
 
+const FTTH_COMPARE_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+};
+
+function ftthComparePaymentBadgeClass(paymentType?: string | null): string {
+  const raw = String(paymentType ?? '').trim().toLowerCase();
+  const label = formatPaymentMethodLabel(paymentType);
+  if (raw === 'wallet' || label === 'محفظة الرصيد') {
+    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-200 ring-1 ring-emerald-400/50';
+  }
+  if (raw === 'card' || label === 'بطاقة دفع' || raw === 'customer') {
+    return 'bg-violet-100 text-violet-800 dark:bg-violet-900/45 dark:text-violet-200 ring-1 ring-violet-400/50';
+  }
+  if (raw.includes('cash') || raw.includes('كاش')) {
+    return 'bg-amber-100 text-amber-900 dark:bg-amber-900/45 dark:text-amber-200 ring-1 ring-amber-400/50';
+  }
+  if (raw.includes('master') || raw.includes('ماستر')) {
+    return 'bg-sky-100 text-sky-800 dark:bg-sky-900/45 dark:text-sky-200 ring-1 ring-sky-400/50';
+  }
+  return 'bg-orange-100 text-orange-800 dark:bg-orange-900/45 dark:text-orange-200 ring-1 ring-orange-400/40';
+}
+
 /** عمود طريقة الدفع — يعتمد على payment_method من استجابة sync-subscribers (Wallet / Card) */
 function formatSyncWalletOrPaymentDisplay(row: { payment_method?: string }): string {
   return formatPaymentMethodLabel(row.payment_method);
@@ -4759,8 +4783,8 @@ const SubscribersPage: React.FC = () => {
       )}
 
       {showFtthCompareModal && ftthCompareResult && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-7xl bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
+          <div className="w-[98vw] max-w-[1680px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[92vh] overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">مقارنة اشتراكات FTTH</h3>
@@ -4780,18 +4804,18 @@ const SubscribersPage: React.FC = () => {
             </div>
 
             <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1">
-              <table className="min-w-[1100px] w-full text-sm text-right border-separate border-spacing-0">
+              <table className="min-w-full w-full text-sm text-right border-separate border-spacing-0 table-fixed">
                 <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المشترك</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المستخدم</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">تفعيل FTTH</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">انتهاء FTTH</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">تفعيل محلي</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">انتهاء محلي</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">طريقة الدفع</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">أُنشئ بواسطة</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">الحالة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[26%] min-w-[260px]">اسم المشترك</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[11%]">اسم المستخدم</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">تفعيل FTTH</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">انتهاء FTTH</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">تفعيل محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">انتهاء محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[11%]">طريقة الدفع</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">أُنشئ بواسطة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[6%]">الحالة</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4812,8 +4836,10 @@ const SubscribersPage: React.FC = () => {
                             mismatch ? 'bg-amber-50/80 dark:bg-amber-900/15' : 'hover:bg-primary-50/50 dark:hover:bg-primary-900/15'
                           }`}
                         >
-                          <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{row.customerName || '—'}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 align-top whitespace-normal break-words leading-relaxed">
+                            {row.customerName || '—'}
+                          </td>
+                          <td className="px-4 py-3 align-top">
                             {username ? (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
                                 {username}
@@ -4822,20 +4848,30 @@ const SubscribersPage: React.FC = () => {
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">{row.ftthActivation ? formatDate(row.ftthActivation) : '—'}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{row.ftthExpiration ? formatDate(row.ftthExpiration) : '—'}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{row.localActivation ? formatDate(row.localActivation) : '—'}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{row.localExpiration ? formatDate(row.localExpiration) : '—'}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 whitespace-nowrap align-top">
+                            {row.ftthActivation ? formatDate(row.ftthActivation, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap align-top">
+                            {row.ftthExpiration ? formatDate(row.ftthExpiration, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap align-top">
+                            {row.localActivation ? formatDate(row.localActivation, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap align-top">
+                            {row.localExpiration ? formatDate(row.localExpiration, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 align-top">
                             {row.paymentType ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
-                                {row.paymentType}
+                              <span
+                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${ftthComparePaymentBadgeClass(row.paymentType)}`}
+                              >
+                                {formatPaymentMethodLabel(row.paymentType)}
                               </span>
                             ) : (
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{row.createdBy || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top whitespace-normal break-words">{row.createdBy || '—'}</td>
                           <td className="px-4 py-3">
                             {row.isNewSubscriber ? (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200">
