@@ -198,22 +198,55 @@ const FTTH_COMPARE_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   day: '2-digit',
 };
 
+const DEFAULT_FTTH_COMPARE_PARTNER_ID = '2864647';
+
+const FTTH_COMPARE_PAYMENT_BADGE_STYLES: Record<string, string> = {
+  'محفظة الوكيل':
+    'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-200 ring-1 ring-emerald-400/50',
+  'محفظة المشترك او تطبيق الوطني':
+    'bg-violet-100 text-violet-800 dark:bg-violet-900/45 dark:text-violet-200 ring-1 ring-violet-400/50',
+  'بطاقة دفع':
+    'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/45 dark:text-fuchsia-200 ring-1 ring-fuchsia-400/50',
+  'محفظة الرصيد':
+    'bg-teal-100 text-teal-800 dark:bg-teal-900/45 dark:text-teal-200 ring-1 ring-teal-400/50',
+  card: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/45 dark:text-fuchsia-200 ring-1 ring-fuchsia-400/50',
+  wallet: 'bg-teal-100 text-teal-800 dark:bg-teal-900/45 dark:text-teal-200 ring-1 ring-teal-400/50',
+};
+
+function resolveFtthComparePartnerId(resellers: AgentReseller[], resellerId: string): string {
+  const fromReseller = resolveFtthPartnerId(resellers, resellerId);
+  return fromReseller || DEFAULT_FTTH_COMPARE_PARTNER_ID;
+}
+
+function ftthComparePaymentLabel(paymentType?: string | null): string {
+  const raw = String(paymentType ?? '').trim();
+  if (!raw) return '—';
+  const mapped = formatPaymentMethodLabel(raw);
+  return mapped !== raw && mapped !== '—' ? mapped : raw;
+}
+
 function ftthComparePaymentBadgeClass(paymentType?: string | null): string {
-  const raw = String(paymentType ?? '').trim().toLowerCase();
-  const label = formatPaymentMethodLabel(paymentType);
-  if (raw === 'wallet' || label === 'محفظة الرصيد') {
-    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-200 ring-1 ring-emerald-400/50';
+  const key = String(paymentType ?? '').trim();
+  if (!key) {
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 ring-1 ring-slate-300/50';
   }
-  if (raw === 'card' || label === 'بطاقة دفع' || raw === 'customer') {
-    return 'bg-violet-100 text-violet-800 dark:bg-violet-900/45 dark:text-violet-200 ring-1 ring-violet-400/50';
+  if (FTTH_COMPARE_PAYMENT_BADGE_STYLES[key]) {
+    return FTTH_COMPARE_PAYMENT_BADGE_STYLES[key];
   }
-  if (raw.includes('cash') || raw.includes('كاش')) {
+  const lower = key.toLowerCase();
+  if (lower.includes('كاش') || lower.includes('cash')) {
     return 'bg-amber-100 text-amber-900 dark:bg-amber-900/45 dark:text-amber-200 ring-1 ring-amber-400/50';
   }
-  if (raw.includes('master') || raw.includes('ماستر')) {
+  if (lower.includes('ماستر') || lower.includes('master')) {
     return 'bg-sky-100 text-sky-800 dark:bg-sky-900/45 dark:text-sky-200 ring-1 ring-sky-400/50';
   }
-  return 'bg-orange-100 text-orange-800 dark:bg-orange-900/45 dark:text-orange-200 ring-1 ring-orange-400/40';
+  if (key.includes('محفظة الوكيل')) {
+    return FTTH_COMPARE_PAYMENT_BADGE_STYLES['محفظة الوكيل'];
+  }
+  if (key.includes('محفظة المشترك') || key.includes('تطبيق الوطني')) {
+    return FTTH_COMPARE_PAYMENT_BADGE_STYLES['محفظة المشترك او تطبيق الوطني'];
+  }
+  return `${pickRegionBadgeColor(key)} ring-1 ring-black/5 dark:ring-white/10`;
 }
 
 /** عمود طريقة الدفع — يعتمد على payment_method من استجابة sync-subscribers (Wallet / Card) */
@@ -336,7 +369,7 @@ const SubscribersPage: React.FC = () => {
   const [ftthCompareResult, setFtthCompareResult] = useState<FtthSubscriptionsCompareResponse | null>(null);
   const [ftthCompareRegionId, setFtthCompareRegionId] = useState('');
   const [ftthCompareResellerId, setFtthCompareResellerId] = useState('');
-  const [ftthComparePartnerId, setFtthComparePartnerId] = useState('');
+  const [ftthComparePartnerId, setFtthComparePartnerId] = useState(DEFAULT_FTTH_COMPARE_PARTNER_ID);
   const [ftthCompareDays, setFtthCompareDays] = useState(7);
   const [autoSyncSaveServiceFeesId, setAutoSyncSaveServiceFeesId] = useState('');
   const [autoSyncSaveServiceFeesPrice, setAutoSyncSaveServiceFeesPrice] = useState<number | undefined>(undefined);
@@ -962,7 +995,7 @@ const SubscribersPage: React.FC = () => {
         '');
     setFtthCompareRegionId(regionId);
     setFtthCompareResellerId(resellerId);
-    setFtthComparePartnerId(resolveFtthPartnerId(ftthResellersForCompare, resellerId));
+    setFtthComparePartnerId(resolveFtthComparePartnerId(ftthResellersForCompare, resellerId));
     setFtthCompareDays(7);
     setShowFtthCompareFormModal(true);
   };
@@ -4697,7 +4730,7 @@ const SubscribersPage: React.FC = () => {
                       const nextResellers = filterResellersByRegion(ftthResellersForCompare, nextRegion);
                       setFtthCompareResellerId((prev) => {
                         const nextId = nextResellers.some((r) => r.id === prev) ? prev : nextResellers[0]?.id ?? '';
-                        setFtthComparePartnerId(resolveFtthPartnerId(ftthResellersForCompare, nextId));
+                        setFtthComparePartnerId(resolveFtthComparePartnerId(ftthResellersForCompare, nextId));
                         return nextId;
                       });
                     }}
@@ -4719,7 +4752,7 @@ const SubscribersPage: React.FC = () => {
                   onChange={(e) => {
                     const nextId = e.target.value;
                     setFtthCompareResellerId(nextId);
-                    setFtthComparePartnerId(resolveFtthPartnerId(ftthResellersForCompare, nextId));
+                    setFtthComparePartnerId(resolveFtthComparePartnerId(ftthResellersForCompare, nextId));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 >
@@ -4741,7 +4774,7 @@ const SubscribersPage: React.FC = () => {
                   inputMode="numeric"
                   value={ftthComparePartnerId}
                   onChange={(e) => setFtthComparePartnerId(e.target.value)}
-                  placeholder="مثال: 2864647"
+                  placeholder={DEFAULT_FTTH_COMPARE_PARTNER_ID}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 />
               </div>
@@ -4865,7 +4898,7 @@ const SubscribersPage: React.FC = () => {
                               <span
                                 className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${ftthComparePaymentBadgeClass(row.paymentType)}`}
                               >
-                                {formatPaymentMethodLabel(row.paymentType)}
+                                {ftthComparePaymentLabel(row.paymentType)}
                               </span>
                             ) : (
                               '—'
