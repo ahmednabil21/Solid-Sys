@@ -519,6 +519,29 @@ export interface SynchronizationDiffSaveRequest {
   serviceFeesAmountPaid?: number;
 }
 
+/** صف مقارنة FTTH — POST /providers/sas/ftth-subscriptions/compare */
+export interface FtthSubscriptionsCompareItem {
+  createdBy?: string | null;
+  customerName?: string | null;
+  ftthActivation?: string | null;
+  ftthExpiration?: string | null;
+  isNewSubscriber?: boolean;
+  localActivation?: string | null;
+  localExpiration?: string | null;
+  paymentType?: string | null;
+  username?: string | null;
+}
+
+/** استجابة POST /providers/sas/ftth-subscriptions/compare */
+export interface FtthSubscriptionsCompareResponse {
+  success: boolean;
+  count: number;
+  items: FtthSubscriptionsCompareItem[];
+  error?: string | null;
+  zone?: string | null;
+  partnerId?: string | null;
+}
+
 /** استجابة GET .../synchronizationFTTH/diff أو .../synchronizationSAS/diff */
 export interface CashbackSynchronizationFtthResponse {
   externalRowCount?: number;

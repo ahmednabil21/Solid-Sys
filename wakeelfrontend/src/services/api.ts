@@ -3404,6 +3404,32 @@ class ApiService {
     return this.normalizeSynchronizationDiffResponse(response.data);
   }
 
+  /** POST /providers/sas/ftth-subscriptions/compare — مقارنة اشتراكات FTTH عبر سكربت Python */
+  async compareFtthSubscriptions(params: {
+    resellerId: string;
+    regionId?: string;
+    days?: number;
+    agentId?: string;
+  }): Promise<import('../types').FtthSubscriptionsCompareResponse> {
+    const query: Record<string, string> = {};
+    if (params.agentId) query.agentId = params.agentId;
+    const response = await this.api.post<import('../types').FtthSubscriptionsCompareResponse>(
+      '/providers/sas/ftth-subscriptions/compare',
+      {
+        resellerId: params.resellerId,
+        regionId: params.regionId || undefined,
+        days: params.days ?? 7,
+      },
+      { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
+    );
+    const data = response.data;
+    return {
+      ...data,
+      items: Array.isArray(data?.items) ? data.items : [],
+      count: data?.count ?? (Array.isArray(data?.items) ? data.items.length : 0),
+    };
+  }
+
   /** GET /providers/sas/synchronizationFTTH/diff — مقارنة تاريخ انتهاء FTTH مع النظام */
   async synchronizationFTTHDiff(params?: {
     resellerId?: string;
