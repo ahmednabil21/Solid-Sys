@@ -18,7 +18,7 @@ import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -79,6 +79,11 @@ function normalizeEarthlinkActivationUrl(url: string | undefined): string | unde
 function normalizeCompareDate(value: string | null | undefined): string {
   if (!value) return '';
   return value.split('T')[0] ?? value;
+}
+
+function ftthCompareDateToInput(date: string | null | undefined): string | undefined {
+  const norm = normalizeCompareDate(date);
+  return norm || undefined;
 }
 
 function ftthCompareRowHasMismatch(row: FtthSubscriptionsCompareItem): boolean {
@@ -377,9 +382,12 @@ const SubscribersPage: React.FC = () => {
   const [savingFtthRowIndex, setSavingFtthRowIndex] = useState<number | null>(null);
   const [savingAllSasRows, setSavingAllSasRows] = useState(false);
   const [openingRenewalFtthRowIndex, setOpeningRenewalFtthRowIndex] = useState<number | null>(null);
+  const [openingFtthCompareRowIndex, setOpeningFtthCompareRowIndex] = useState<number | null>(null);
   const [savedFtthRowIndices, setSavedFtthRowIndices] = useState<Set<number>>(new Set());
   const [activatedFtthRowIndices, setActivatedFtthRowIndices] = useState<Set<number>>(new Set());
+  const [activatedFtthCompareRowIndices, setActivatedFtthCompareRowIndices] = useState<Set<number>>(new Set());
   const [pendingFtthRenewalRowIndex, setPendingFtthRenewalRowIndex] = useState<number | null>(null);
+  const [pendingFtthCompareRowIndex, setPendingFtthCompareRowIndex] = useState<number | null>(null);
 
   const toggleColumnVisibility = (id: string) => {
     setVisibleColumns((prev) => {
@@ -445,6 +453,7 @@ const SubscribersPage: React.FC = () => {
     serviceFeesPrice: undefined,
     serviceFeesAmountPaid: undefined,
     activationPaymentMethod: ActivationPaymentMethod.Cash,
+    activationChannel: RenewalActivationChannel.Normal,
   });
   /** مفعّل = تُضاف أجور الخدمة للفاتورة (واصل) — افتراضي ON لكل البنود */
   const [activationServiceFeesEnabled, setActivationServiceFeesEnabled] = useState<Record<string, boolean>>({});
@@ -1122,6 +1131,7 @@ const SubscribersPage: React.FC = () => {
       }
 
       setSelectedSubscriberForRenewal(subscriberToRenew);
+      setRenewalAmountFullyReceived(true);
       setRenewalData({
         subscriberId: subscriberToRenew.id,
         newProfileId: '',
@@ -1136,6 +1146,9 @@ const SubscribersPage: React.FC = () => {
         serviceFeesPrice: undefined,
         serviceFeesAmountPaid: undefined,
         activationPaymentMethod: ActivationPaymentMethod.Cash,
+        activationChannel: RenewalActivationChannel.Normal,
+        renewalDate: ftthCompareDateToInput((row as { ftthActivation?: string }).ftthActivation),
+        newExpirationDate: ftthCompareDateToInput((row as { ftthExpiration?: string }).ftthExpiration),
       });
       setActivationServiceFeesEnabled({});
       setRenewalViaSasTab(false);
@@ -1146,6 +1159,65 @@ const SubscribersPage: React.FC = () => {
       showError('تفعيل المشترك', ApiService.showError(err));
     } finally {
       setOpeningRenewalFtthRowIndex(null);
+    }
+  };
+
+  const openRenewalModalForFtthCompareRow = async (row: FtthSubscriptionsCompareItem, rowIndex: number) => {
+    const username = (row.username ?? '').toString().trim();
+    if (!username) {
+      showError('مزامنة التفعيل', 'لا يمكن المزامنة لأن اسم المستخدم فارغ.');
+      return;
+    }
+    setOpeningFtthCompareRowIndex(rowIndex);
+    try {
+      let subscriberToRenew =
+        (subscribers ?? []).find((s) => (s.username ?? '').toString().trim().toLowerCase() === username.toLowerCase()) ?? null;
+
+      if (!subscriberToRenew) {
+        const searchRes = await apiService.getSubscribers({ page: 1, pageSize: 20, search: username });
+        subscriberToRenew =
+          (searchRes.data ?? []).find((s) => (s.username ?? '').toString().trim().toLowerCase() === username.toLowerCase()) ??
+          searchRes.data?.[0] ??
+          null;
+      }
+
+      if (!subscriberToRenew?.id) {
+        showError('مزامنة التفعيل', 'تعذر العثور على المشترك داخل النظام بهذا اسم المستخدم.');
+        return;
+      }
+
+      const syncActivationDate = ftthCompareDateToInput(row.ftthActivation || row.localActivation);
+      const syncExpirationDate = ftthCompareDateToInput(row.ftthExpiration || row.localExpiration);
+
+      setSelectedSubscriberForRenewal(subscriberToRenew);
+      setRenewalAmountFullyReceived(true);
+      setRenewalData({
+        subscriberId: subscriberToRenew.id,
+        newProfileId: '',
+        paymentStatus: PaymentStatus.Paid,
+        overrideSalePrice: 0,
+        amountPaid: 0,
+        notes: '',
+        remainingAmount: 0,
+        debtDescription: '',
+        debtDueDate: '',
+        serviceFeesId: '',
+        serviceFeesPrice: undefined,
+        serviceFeesAmountPaid: undefined,
+        activationPaymentMethod: ActivationPaymentMethod.Cash,
+        activationChannel: RenewalActivationChannel.Normal,
+        renewalDate: syncActivationDate,
+        newExpirationDate: syncExpirationDate,
+      });
+      setActivationServiceFeesEnabled({});
+      setRenewalViaSasTab(false);
+      setPendingFtthCompareRowIndex(rowIndex);
+      setShowFtthCompareModal(false);
+      setShowRenewalModal(true);
+    } catch (err: unknown) {
+      showError('مزامنة التفعيل', ApiService.showError(err));
+    } finally {
+      setOpeningFtthCompareRowIndex(null);
     }
   };
 
@@ -1273,6 +1345,11 @@ const SubscribersPage: React.FC = () => {
         setShowAutoSyncModal(true);
         setPendingFtthRenewalRowIndex(null);
       }
+      if (pendingFtthCompareRowIndex != null) {
+        setActivatedFtthCompareRowIndices((prev) => new Set(prev).add(pendingFtthCompareRowIndex));
+        setShowFtthCompareModal(true);
+        setPendingFtthCompareRowIndex(null);
+      }
       setRenewalData({
         subscriberId: '',
         newProfileId: '',
@@ -1287,6 +1364,7 @@ const SubscribersPage: React.FC = () => {
         serviceFeesPrice: undefined,
         serviceFeesAmountPaid: undefined,
         activationPaymentMethod: ActivationPaymentMethod.Cash,
+        activationChannel: RenewalActivationChannel.Normal,
       });
       setActivationServiceFeesEnabled({});
     },
@@ -1307,6 +1385,9 @@ const SubscribersPage: React.FC = () => {
       }
       if (pendingFtthRenewalRowIndex != null) {
         setShowAutoSyncModal(true);
+      }
+      if (pendingFtthCompareRowIndex != null) {
+        setShowFtthCompareModal(true);
       }
     }
   });
@@ -1612,6 +1693,46 @@ const SubscribersPage: React.FC = () => {
     }));
   };
 
+  const handleActivationChannelChange = (channel: RenewalActivationChannel) => {
+    const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
+    const salePrice = selectedProfile?.salePrice || 0;
+    if (channel === RenewalActivationChannel.CustomerWallet) {
+      setRenewalAmountFullyReceived(true);
+      setRenewalData((prev) => ({
+        ...prev,
+        activationChannel: channel,
+        activationPaymentMethod: ActivationPaymentMethod.CustomerWallet,
+        overrideSalePrice: salePrice,
+        amountPaid: 0,
+        remainingAmount: 0,
+        debtDescription: '',
+        debtDueDate: '',
+        paymentStatus: PaymentStatus.Paid,
+      }));
+      return;
+    }
+    setRenewalData((prev) => ({
+      ...prev,
+      activationChannel: RenewalActivationChannel.Normal,
+      activationPaymentMethod: ActivationPaymentMethod.Cash,
+      ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+    }));
+  };
+
+  const applyDeferredActivationPayment = () => {
+    const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
+    if (!selectedProfile) return;
+    const salePrice = selectedProfile.salePrice || 0;
+    setRenewalAmountFullyReceived(false);
+    setActivationServiceFeesEnabled({});
+    setRenewalData((prev) => ({
+      ...prev,
+      activationChannel: RenewalActivationChannel.Normal,
+      activationPaymentMethod: ActivationPaymentMethod.Deferred,
+      ...applyRenewalAmountsForProfile(salePrice, false, false),
+    }));
+  };
+
   const handleRenewalInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     
@@ -1696,8 +1817,11 @@ const SubscribersPage: React.FC = () => {
     e.preventDefault();
     const selectedProfile = renewalInfo?.availableProfiles?.find(p => p.id === renewalData.newProfileId);
     const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+    const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+    const isCustomerWallet =
+      (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
 
-    if (!isExtension && (renewalData.remainingAmount || 0) > 0) {
+    if (!isExtension && !isCustomerWallet && (renewalData.remainingAmount || 0) > 0) {
       const due = (renewalData.debtDueDate || '').toString().trim();
       if (!due) {
         showError('خطأ', 'يرجى اختيار تاريخ تسديد الدين عند وجود مبلغ متبقي.');
@@ -1705,14 +1829,16 @@ const SubscribersPage: React.FC = () => {
       }
     }
 
-    const serviceFeesItems = enabledActivationServiceFees.map((fee) => {
-      const price = fee.price ?? 0;
-      return {
-        serviceFeesId: fee.id,
-        serviceFeesPrice: price,
-        serviceFeesAmountPaid: price,
-      };
-    });
+    const serviceFeesItems = isDeferred
+      ? []
+      : enabledActivationServiceFees.map((fee) => {
+          const price = fee.price ?? 0;
+          return {
+            serviceFeesId: fee.id,
+            serviceFeesPrice: price,
+            serviceFeesAmountPaid: price,
+          };
+        });
     const firstServiceFee = serviceFeesItems[0];
 
     const enhancedRenewalData: RenewalData = {
@@ -1720,23 +1846,32 @@ const SubscribersPage: React.FC = () => {
       notes: '',
       paymentStatus: isExtension
         ? PaymentStatus.Paid
-        : renewalAmountFullyReceived
+        : isCustomerWallet
           ? PaymentStatus.Paid
-          : renewalData.paymentStatus,
+          : isDeferred
+            ? PaymentStatus.Unpaid
+            : renewalAmountFullyReceived
+              ? PaymentStatus.Paid
+              : renewalData.paymentStatus,
       overrideSalePrice: isExtension ? 0 : renewalData.overrideSalePrice || selectedProfile?.salePrice || 0,
-      amountPaid: isExtension ? 0 : renewalData.amountPaid,
-      remainingAmount: isExtension ? 0 : renewalData.remainingAmount,
-      debtDescription: isExtension ? '' : renewalData.debtDescription,
-      debtDueDate: isExtension ? '' : renewalData.debtDueDate,
+      amountPaid: isExtension || isDeferred || isCustomerWallet ? 0 : renewalData.amountPaid,
+      remainingAmount: isExtension || isCustomerWallet ? 0 : renewalData.remainingAmount,
+      debtDescription: isExtension || isCustomerWallet ? '' : renewalData.debtDescription,
+      debtDueDate: isExtension || isCustomerWallet ? '' : renewalData.debtDueDate,
       currentExpirationDate: renewalInfo?.expirationDate,
       renewalPeriod: selectedProfile?.renewalPeriod || 30,
       serviceFeesItems: serviceFeesItems.length > 0 ? serviceFeesItems : undefined,
       serviceFeesId: firstServiceFee?.serviceFeesId,
       serviceFeesPrice: firstServiceFee?.serviceFeesPrice,
       serviceFeesAmountPaid: firstServiceFee?.serviceFeesAmountPaid,
+      activationChannel: isExtension ? RenewalActivationChannel.Normal : (renewalData.activationChannel ?? RenewalActivationChannel.Normal),
       activationPaymentMethod: isExtension
         ? ActivationPaymentMethod.Cash
-        : (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash),
+        : isCustomerWallet
+          ? ActivationPaymentMethod.CustomerWallet
+          : (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash),
+      renewalDate: renewalData.renewalDate,
+      newExpirationDate: renewalData.newExpirationDate,
     };
 
     // تم تعليق التفعيل عبر سكربت البايثون مؤقتاً.
@@ -3720,48 +3855,103 @@ const SubscribersPage: React.FC = () => {
                     (p) => p.id === renewalData.newProfileId
                   );
                   const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+                  const activationChannel = renewalData.activationChannel ?? RenewalActivationChannel.Normal;
+                  const isCustomerWalletChannel = activationChannel === RenewalActivationChannel.CustomerWallet;
+                  const isDeferredPayment =
+                    renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
                   if (isExtension || !renewalData.newProfileId) return null;
                   return (
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        طريقة الدفع *
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setRenewalData((prev) => ({
-                              ...prev,
-                              activationPaymentMethod: ActivationPaymentMethod.Cash,
-                            }))
-                          }
-                          className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
-                            (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) ===
-                            ActivationPaymentMethod.Cash
-                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
-                          }`}
-                        >
-                          كاش
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setRenewalData((prev) => ({
-                              ...prev,
-                              activationPaymentMethod: ActivationPaymentMethod.Master,
-                            }))
-                          }
-                          className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
-                            renewalData.activationPaymentMethod === ActivationPaymentMethod.Master
-                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
-                          }`}
-                        >
-                          ماستر
-                        </button>
+                    <>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          طريقة التفعيل *
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleActivationChannelChange(RenewalActivationChannel.Normal)}
+                            className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                              activationChannel === RenewalActivationChannel.Normal
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-indigo-300 dark:hover:border-indigo-500'
+                            }`}
+                          >
+                            اعتيادي
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleActivationChannelChange(RenewalActivationChannel.CustomerWallet)}
+                            className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                              isCustomerWalletChannel
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-indigo-300 dark:hover:border-indigo-500'
+                            }`}
+                          >
+                            محفظة الزبون
+                          </button>
+                        </div>
                       </div>
-                    </div>
+
+                      {activationChannel === RenewalActivationChannel.Normal && (
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            طريقة الدفع *
+                          </label>
+                          <div className="grid grid-cols-3 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const salePrice = selectedProfile?.salePrice || 0;
+                                setRenewalData((prev) => ({
+                                  ...prev,
+                                  activationChannel: RenewalActivationChannel.Normal,
+                                  activationPaymentMethod: ActivationPaymentMethod.Cash,
+                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+                                }));
+                              }}
+                              className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                                (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) ===
+                                  ActivationPaymentMethod.Cash && !isDeferredPayment
+                                  ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                              }`}
+                            >
+                              كاش
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const salePrice = selectedProfile?.salePrice || 0;
+                                setRenewalData((prev) => ({
+                                  ...prev,
+                                  activationChannel: RenewalActivationChannel.Normal,
+                                  activationPaymentMethod: ActivationPaymentMethod.Master,
+                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+                                }));
+                              }}
+                              className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                                renewalData.activationPaymentMethod === ActivationPaymentMethod.Master
+                                  ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                              }`}
+                            >
+                              ماستر
+                            </button>
+                            <button
+                              type="button"
+                              onClick={applyDeferredActivationPayment}
+                              className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                                isDeferredPayment
+                                  ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                              }`}
+                            >
+                              آجل
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
 
@@ -3770,7 +3960,13 @@ const SubscribersPage: React.FC = () => {
                     (p) => p.id === renewalData.newProfileId
                   );
                   const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
-                  if (isExtension || !renewalData.newProfileId) return null;
+                  const isCustomerWalletChannel =
+                    (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                    RenewalActivationChannel.CustomerWallet;
+                  const isDeferredPayment =
+                    renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+                  if (isExtension || !renewalData.newProfileId || isCustomerWalletChannel || isDeferredPayment)
+                    return null;
                   return (
                     <>
                       <div className="md:col-span-2 flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 px-4 py-3">
@@ -3827,10 +4023,16 @@ const SubscribersPage: React.FC = () => {
                 );
                 const isExtensionForDebt =
                   selectedProfileForDebt?.packageType === ProfilePackageType.Extension;
+                const isDeferredPayment =
+                  renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+                const isCustomerWalletChannel =
+                  (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                  RenewalActivationChannel.CustomerWallet;
                 if (
                   !renewalData.newProfileId ||
                   isExtensionForDebt ||
-                  renewalAmountFullyReceived
+                  isCustomerWalletChannel ||
+                  (renewalAmountFullyReceived && !isDeferredPayment)
                 ) {
                   return null;
                 }
@@ -3886,7 +4088,8 @@ const SubscribersPage: React.FC = () => {
               })()}
 
               {/* أجور الخدمة */}
-              {activationServiceFeesList.length > 0 && (
+              {activationServiceFeesList.length > 0 &&
+                renewalData.activationPaymentMethod !== ActivationPaymentMethod.Deferred && (
                 <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة</h3>
                   <div className="space-y-2">
@@ -4849,12 +5052,13 @@ const SubscribersPage: React.FC = () => {
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[11%]">طريقة الدفع</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">أُنشئ بواسطة</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[6%]">الحالة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%] min-w-[100px]">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(ftthCompareResult.items ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={10} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
                         لا توجد نتائج للعرض.
                       </td>
                     </tr>
@@ -4862,6 +5066,8 @@ const SubscribersPage: React.FC = () => {
                     (ftthCompareResult.items ?? []).map((row, idx) => {
                       const mismatch = ftthCompareRowHasMismatch(row);
                       const username = (row.username ?? '').trim();
+                      const isOpeningSync = openingFtthCompareRowIndex === idx;
+                      const isSynced = activatedFtthCompareRowIndices.has(idx);
                       return (
                         <tr
                           key={`${username || row.customerName || 'r'}-${idx}`}
@@ -4919,6 +5125,25 @@ const SubscribersPage: React.FC = () => {
                                 متطابق
                               </span>
                             )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="inline-flex flex-col items-stretch gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isOpeningSync || !username}
+                                onClick={() => openRenewalModalForFtthCompareRow(row, idx)}
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
+                              >
+                                {isOpeningSync ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                                مزامنة
+                              </button>
+                              {isSynced && (
+                                <span className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                  <Check className="h-3 w-3" />
+                                  تمت المزامنة
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

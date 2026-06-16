@@ -26,6 +26,10 @@ import {
 
 const PAGE_SIZE_OPTIONS = [6, 12, 24, 48];
 
+function computeReturnPrice(originalPrice: number, salePrice: number): number {
+  return Math.round((Number(originalPrice) - Number(salePrice)) * 100) / 100;
+}
+
 const PackagesPage: React.FC = () => {
   const { user } = useAuth();
   const { confirmDelete } = useConfirmation();
@@ -218,6 +222,7 @@ const PackagesPage: React.FC = () => {
     }
     const payload: ProfileCreateRequest = {
       ...formData,
+      returnPrice: computeReturnPrice(formData.originalPrice, formData.salePrice),
       regionId: formRegionId,
       agentResellerId: formResellerId,
       includedMaterialIds:
@@ -294,6 +299,7 @@ const PackagesPage: React.FC = () => {
     if (editingPackage) {
       const data: ProfileUpdateRequest = {
         ...editFormData,
+        returnPrice: computeReturnPrice(editFormData.originalPrice, editFormData.salePrice),
         regionId: editFormRegionId,
         agentResellerId: editFormResellerId,
         includedMaterialIds:
@@ -693,16 +699,12 @@ const PackagesPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الكاشباك (د.ع)
                 </label>
-                <input
-                  type="number"
-                  name="returnPrice"
-                  value={formData.returnPrice ?? 0}
-                  onChange={handleInputChange}
-                  min="0"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="مبلغ الكاشباك"
-                />
+                <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white text-sm">
+                  {formatNumber(computeReturnPrice(formData.originalPrice, formData.salePrice), { suffix: ' د.ع' })}
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  يُحسب تلقائياً: السعر على الوكيل − السعر على المشترك
+                </p>
               </div>
 
               {formData.packageType === ProfilePackageType.SpecialOffer && (
@@ -934,16 +936,12 @@ const PackagesPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الكاشباك (د.ع)
                 </label>
-                <input
-                  type="number"
-                  name="returnPrice"
-                  value={editFormData.returnPrice ?? 0}
-                  onChange={handleEditInputChange}
-                  min="0"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="مبلغ الكاشباك"
-                />
+                <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white text-sm">
+                  {formatNumber(computeReturnPrice(editFormData.originalPrice, editFormData.salePrice), { suffix: ' د.ع' })}
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  يُحسب تلقائياً: السعر على الوكيل − السعر على المشترك
+                </p>
               </div>
 
               {editFormData.packageType === ProfilePackageType.SpecialOffer && (

@@ -16,7 +16,7 @@ import type {
   DebtsListResponse,
   SubscribersDashboardStats,
 } from '../types';
-import { SubscriptionStatus, ActivationPaymentMethod } from '../types';
+import { SubscriptionStatus, ActivationPaymentMethod, RenewalActivationChannel } from '../types';
 
 const DASHBOARD_STATS_CACHE_KEY = 'wakeel_dashboard_stats';
 
@@ -322,6 +322,9 @@ export function buildCreateRenewalPayload(renewalData: RenewalData): Record<stri
           }
         : {}),
     activationPaymentMethod: renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash,
+    activationChannel: renewalData.activationChannel ?? RenewalActivationChannel.Normal,
+    renewalDate: renewalData.renewalDate ? `${renewalData.renewalDate}T00:00:00` : null,
+    newExpirationDate: renewalData.newExpirationDate ? `${renewalData.newExpirationDate}T00:00:00` : null,
   };
 }
 

@@ -32,6 +32,14 @@ export enum PaymentStatus {
 export enum ActivationPaymentMethod {
   Cash = 1,
   Master = 2,
+  Deferred = 3,
+  CustomerWallet = 4,
+}
+
+/** قناة التفعيل — POST /Renewals */
+export enum RenewalActivationChannel {
+  Normal = 1,
+  CustomerWallet = 2,
 }
 
 export enum SubscriberNoteType {
@@ -2195,8 +2203,14 @@ export interface RenewalData {
   serviceFeesAmountPaid?: number;
   /** عدة أجور خدمة مفعّلة — POST /Renewals */
   serviceFeesItems?: RenewalServiceFeeLineItem[];
-  /** طريقة الدفع عند التفعيل — 1 كاش، 2 ماستر */
+  /** طريقة الدفع عند التفعيل — 1 كاش، 2 ماستر، 3 آجل، 4 محفظة زبون */
   activationPaymentMethod?: ActivationPaymentMethod;
+  /** قناة التفعيل — 1 اعتيادي، 2 محفظة الزبون */
+  activationChannel?: RenewalActivationChannel;
+  /** تاريخ التفعيل المحاسبي (يوم تقويمي عراق) — من مزامنة FTTH */
+  renewalDate?: string;
+  /** تاريخ انتهاء الاشتراك من المصدر الخارجي */
+  newExpirationDate?: string;
 }
 
 export interface RenewalServiceFeeLineItem {

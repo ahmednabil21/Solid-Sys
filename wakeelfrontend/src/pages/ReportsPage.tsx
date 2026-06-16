@@ -80,6 +80,8 @@ function ledgerKindLabel(kind: string): string {
 function activationPaymentMethodLabel(pm?: number | null): string {
   if (Number(pm) === ActivationPaymentMethod.Cash) return 'كاش';
   if (Number(pm) === ActivationPaymentMethod.Master) return 'ماستر';
+  if (Number(pm) === ActivationPaymentMethod.Deferred) return 'آجل';
+  if (Number(pm) === ActivationPaymentMethod.CustomerWallet) return 'محفظة زبون';
   return '—';
 }
 
