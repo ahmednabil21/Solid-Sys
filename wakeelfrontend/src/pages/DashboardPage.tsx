@@ -389,10 +389,10 @@ const DashboardPage: React.FC = () => {
   }, [selectedOperationalResellerId, selectedOperationalRegionId, myResellers, myRegions]);
 
   const transferProfitEstimate = useMemo(() => {
-    const totalReceived = accountsSummary?.totalReceived ?? 0;
     const amountPaid = accountsSummary?.amountPaid ?? 0;
     const activationProfit = accountsSummary?.totalActivationProfit ?? 0;
-    const debtPaid = accountsSummary?.subscriberTotalDebt ?? 0;
+    const debtPaid = accountsSummary?.totalDebtIncome ?? 0;
+    const totalReceived = amountPaid + debtPaid;
     return Math.max(0, totalReceived - amountPaid - activationProfit - debtPaid);
   }, [accountsSummary]);
 

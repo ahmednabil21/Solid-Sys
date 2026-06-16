@@ -635,7 +635,7 @@ const ReportsPage: React.FC = () => {
             />
             <StatCard
               title="وارد الديون"
-              value={accounts?.subscriberTotalDebt ?? 0}
+              value={accounts?.totalDebtIncome ?? 0}
               icon={CreditCard}
               color="purple"
               isAmount

@@ -2420,8 +2420,6 @@ export type AccountsLedgerEntry = AccountsLedgerRenewalEntry | AccountsLedgerDeb
 
 export interface AccountsLedgerPage {
   data: AccountsLedgerEntry[];
-  /** مجموع الكاشباك لكل التفعيلات ضمن الفلتر (وليس الصفحة الحالية فقط) */
-  totalReturnPrice?: number;
   currentPage: number;
   pageSize: number;
   totalItems: number;
@@ -2439,11 +2437,9 @@ export interface AccountsSubscriberNoteTypeOption {
 export interface AccountsResponse {
   amountPaid: number;
   extension: { count: number };
-  subscriberTotalDebt: number;
-  totalReceived: number;
+  /** مجموع وارد تسديد الديون ضمن الفترة */
+  totalDebtIncome?: number;
   totalActivationProfit: number;
-  /** مجموع مبالغ الكاشباك ضمن الفترة والفلاتر */
-  totalReturnPrice?: number;
   /** مجموع الوارد الكلي = مبلغ الباقة + الأجور + تسديد الديون */
   totalGeneralIncome?: number;
   /** مجموع وارد الباقات (كلفة اشتراك الوطني) */
