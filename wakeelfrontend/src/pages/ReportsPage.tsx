@@ -102,15 +102,12 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   return row.kind === 'Renewal';
 }
 
-/** تمييز سجل تفعيل فيه دين اشتراك أو أجور (وارد عام 0 أو أجور غير واصلة). */
+/** تمييز سجل تفعيل فيه دين: وارد عام = 0 أو مبلغ الأجور = 0 */
 function isUnpaidLedgerRenewalRow(row: AccountsLedgerEntry): boolean {
   if (!isRenewalEntry(row)) return false;
-  const serviceFeesPaid = row.serviceFeesAmount ?? 0;
+  const serviceFeesAmount = row.serviceFeesAmount ?? 0;
   const generalIncome = row.generalIncome ?? 0;
-  const hasSubscription = (row.nationalSubscriptionCost ?? 0) > 0;
-  const hasServiceFeesDebt = (row.serviceFeesDebtAmount ?? 0) > 0;
-  if (!hasSubscription && !hasServiceFeesDebt) return false;
-  return serviceFeesPaid === 0 || generalIncome === 0;
+  return serviceFeesAmount === 0 || generalIncome === 0;
 }
 
 const ReportsPage: React.FC = () => {
@@ -738,11 +735,7 @@ const ReportsPage: React.FC = () => {
                           return (
                             <tr
                               key={`${row.kind}-${row.id}`}
-                              className={
-                                isUnpaidLedgerRenewalRow(row)
-                                  ? 'bg-red-500/10 dark:bg-red-500/15'
-                                  : undefined
-                              }
+                              className={isUnpaidLedgerRenewalRow(row) ? 'wakeel-table-row-unpaid' : undefined}
                             >
                               <td>{resellerName}</td>
                               <td className="whitespace-nowrap">
