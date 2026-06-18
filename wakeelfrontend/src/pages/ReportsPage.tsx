@@ -94,11 +94,23 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   returnPrice?: number;
   paymentMethod?: number;
   serviceFeesAmount?: number;
+  serviceFeesDebtAmount?: number;
   totalProfit?: number;
   nationalSubscriptionCost?: number;
   agentResellerId?: string;
 } {
   return row.kind === 'Renewal';
+}
+
+/** تمييز سجل تفعيل فيه دين اشتراك أو أجور (وارد عام 0 أو أجور غير واصلة). */
+function isUnpaidLedgerRenewalRow(row: AccountsLedgerEntry): boolean {
+  if (!isRenewalEntry(row)) return false;
+  const serviceFeesPaid = row.serviceFeesAmount ?? 0;
+  const generalIncome = row.generalIncome ?? 0;
+  const hasSubscription = (row.nationalSubscriptionCost ?? 0) > 0;
+  const hasServiceFeesDebt = (row.serviceFeesDebtAmount ?? 0) > 0;
+  if (!hasSubscription && !hasServiceFeesDebt) return false;
+  return serviceFeesPaid === 0 || generalIncome === 0;
 }
 
 const ReportsPage: React.FC = () => {
@@ -724,7 +736,14 @@ const ReportsPage: React.FC = () => {
                               : '—';
 
                           return (
-                            <tr key={`${row.kind}-${row.id}`}>
+                            <tr
+                              key={`${row.kind}-${row.id}`}
+                              className={
+                                isUnpaidLedgerRenewalRow(row)
+                                  ? 'bg-red-500/10 dark:bg-red-500/15'
+                                  : undefined
+                              }
+                            >
                               <td>{resellerName}</td>
                               <td className="whitespace-nowrap">
                                 <span
@@ -757,10 +776,7 @@ const ReportsPage: React.FC = () => {
                                 {row.generalIncome != null
                                   ? formatNumber(row.generalIncome, { suffix: ' د.ع' })
                                   : renewal
-                                    ? formatNumber(
-                                        (renewal.nationalSubscriptionCost ?? 0) + (renewal.serviceFeesAmount ?? 0),
-                                        { suffix: ' د.ع' }
-                                      )
+                                    ? formatNumber(0, { suffix: ' د.ع' })
                                     : '—'}
                               </td>
                               <td className="whitespace-nowrap">

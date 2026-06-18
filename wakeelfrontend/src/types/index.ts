@@ -2438,6 +2438,8 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   paymentMethod?: ActivationPaymentMethod | number;
   /** ربح أجور الخدمة */
   serviceFeesAmount?: number;
+  /** دين أجور الخدمة غير المسدّد */
+  serviceFeesDebtAmount?: number;
   /** الربح الكلي */
   totalProfit?: number;
   /** مبلغ الكاشباك */
