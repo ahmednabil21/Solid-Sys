@@ -527,6 +527,23 @@ export interface SynchronizationDiffSaveRequest {
   serviceFeesAmountPaid?: number;
 }
 
+/** فترة تفعيل واحدة ضمن مزامنة FTTH (شهر/فاتورة) */
+export interface FtthSyncPeriodDraft {
+  label: string;
+  renewalDate?: string;
+  newExpirationDate?: string;
+}
+
+/** سياق صف مزامنة FTTH عند فتح مودال التفعيل */
+export interface FtthCompareSyncContext {
+  row: FtthSubscriptionsCompareItem;
+  rowIndex: number;
+  isNewSubscriber: boolean;
+  resellerId: string;
+  zone?: string | null;
+  periodCount: number;
+}
+
 /** صف مقارنة FTTH — POST /providers/sas/ftth-subscriptions/compare */
 export interface FtthSubscriptionsCompareItem {
   basePlanRenewalCount?: number | null;

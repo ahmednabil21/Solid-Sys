@@ -18,7 +18,7 @@ import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -87,10 +87,116 @@ function ftthCompareDateToInput(date: string | null | undefined): string | undef
 }
 
 function ftthCompareRowHasMismatch(row: FtthSubscriptionsCompareItem): boolean {
+  if (row.isNewSubscriber) return true;
   if (!row.localExpiration) return true;
   const localExp = normalizeCompareDate(row.localExpiration);
   const ftthExp = normalizeCompareDate(row.ftthExpiration);
   return !!(localExp && ftthExp && localExp !== ftthExp);
+}
+
+function resolveFtthRenewalPeriodCount(row: FtthSubscriptionsCompareItem): number {
+  const base = Number(row.basePlanRenewalCount ?? 0);
+  const sameDay = Number(row.sameDayBasePlanRenewalCount ?? 0);
+  if (base > 1) return base;
+  if (sameDay > 1) return sameDay;
+  return 1;
+}
+
+function ftthDateInputToUtcNoon(date?: string): Date | null {
+  const norm = normalizeCompareDate(date);
+  if (!norm) return null;
+  return new Date(`${norm}T12:00:00`);
+}
+
+function daysBetweenFtthDates(start?: string, end?: string): number {
+  const a = ftthDateInputToUtcNoon(start);
+  const b = ftthDateInputToUtcNoon(end);
+  if (!a || !b) return 30;
+  return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000));
+}
+
+function addDaysToFtthDateInput(date: string, days: number): string {
+  const d = ftthDateInputToUtcNoon(date);
+  if (!d) return date;
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0] ?? date;
+}
+
+function buildFtthSyncPeriods(row: FtthSubscriptionsCompareItem, periodCount: number): FtthSyncPeriodDraft[] {
+  const count = Math.max(1, periodCount);
+  const latestActivation = ftthCompareDateToInput(row.ftthActivation || row.localActivation);
+  const latestExpiration = ftthCompareDateToInput(row.ftthExpiration || row.localExpiration);
+  if (!latestActivation || !latestExpiration || count <= 1) {
+    return [{
+      label: 'الفترة 1',
+      renewalDate: latestActivation,
+      newExpirationDate: latestExpiration,
+    }];
+  }
+  const periodDays = daysBetweenFtthDates(latestActivation, latestExpiration);
+  const periods: FtthSyncPeriodDraft[] = [];
+  let nextActivation = latestActivation;
+  let nextExpiration = latestExpiration;
+  for (let i = count; i >= 1; i -= 1) {
+    if (i === count) {
+      periods.unshift({
+        label: `الشهر ${i}`,
+        renewalDate: nextActivation,
+        newExpirationDate: nextExpiration,
+      });
+    } else {
+      const exp = nextActivation;
+      const act = addDaysToFtthDateInput(exp, -periodDays);
+      periods.unshift({
+        label: `الشهر ${i}`,
+        renewalDate: act,
+        newExpirationDate: exp,
+      });
+      nextActivation = act;
+      nextExpiration = exp;
+    }
+  }
+  return periods;
+}
+
+function splitFtthCustomerName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: '—', lastName: '—' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '—' };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+function buildSyntheticSubscriberFromFtthRow(
+  row: FtthSubscriptionsCompareItem,
+  resellerId: string,
+  zone?: string | null,
+  periods?: FtthSyncPeriodDraft[],
+): Subscriber {
+  const { firstName, lastName } = splitFtthCustomerName(row.customerName ?? row.username ?? '');
+  const firstPeriod = periods?.[0];
+  const lastPeriod = periods?.[periods.length - 1];
+  const username = (row.username ?? '').trim() || 'ftth-user';
+  return {
+    id: '',
+    username,
+    firstName,
+    lastName,
+    fullName: row.customerName?.trim() || username,
+    phoneNumber: (row.createdBy ?? '').trim() || '07000000000',
+    isActive: true,
+    activationDate: firstPeriod?.renewalDate ?? new Date().toISOString().split('T')[0],
+    expirationDate: lastPeriod?.newExpirationDate ?? firstPeriod?.newExpirationDate,
+    subscriptionType: SubscriptionType.Paid,
+    status: SubscriptionStatus.Active,
+    paymentStatus: PaymentStatus.Paid,
+    daysUntilExpiry: 0,
+    createdAt: new Date().toISOString(),
+    profileName: row.packageName?.trim() || '—',
+    profilePrice: 0,
+    agentCompanyName: '',
+    agentResellerId: resellerId,
+    zone: zone ?? undefined,
+  };
 }
 
 function resolveFtthPartnerId(resellers: AgentReseller[], resellerId: string): string {
@@ -387,6 +493,9 @@ const SubscribersPage: React.FC = () => {
   const [activatedFtthCompareRowIndices, setActivatedFtthCompareRowIndices] = useState<Set<number>>(new Set());
   const [pendingFtthRenewalRowIndex, setPendingFtthRenewalRowIndex] = useState<number | null>(null);
   const [pendingFtthCompareRowIndex, setPendingFtthCompareRowIndex] = useState<number | null>(null);
+  const [ftthCompareSyncContext, setFtthCompareSyncContext] = useState<FtthCompareSyncContext | null>(null);
+  const [ftthSyncPeriods, setFtthSyncPeriods] = useState<FtthSyncPeriodDraft[]>([]);
+  const [ftthSyncSubmitting, setFtthSyncSubmitting] = useState(false);
 
   const toggleColumnVisibility = (id: string) => {
     setVisibleColumns((prev) => {
@@ -513,9 +622,23 @@ const SubscribersPage: React.FC = () => {
   });
 
   const subscribers = subscribersResponse?.data || [];
-  const selectedSubscriber =
-    selectedSubscriberForRenewal ?? subscribers?.find((s) => s.id === renewalData.subscriberId) ?? null;
-  const renewalResellerIdForQuery = (selectedSubscriber?.agentResellerId ?? '').trim() || undefined;
+  const renewalResellerIdForQuery =
+    (selectedSubscriberForRenewal?.agentResellerId ?? '').trim() ||
+    ftthCompareSyncContext?.resellerId ||
+    undefined;
+  const selectedSubscriber = React.useMemo(() => {
+    if (selectedSubscriberForRenewal) return selectedSubscriberForRenewal;
+    if (ftthCompareSyncContext) {
+      return buildSyntheticSubscriberFromFtthRow(
+        ftthCompareSyncContext.row,
+        ftthCompareSyncContext.resellerId,
+        ftthCompareSyncContext.zone,
+        ftthSyncPeriods,
+      );
+    }
+    return subscribers?.find((s) => s.id === renewalData.subscriberId) ?? null;
+  }, [selectedSubscriberForRenewal, ftthCompareSyncContext, ftthSyncPeriods, subscribers, renewalData.subscriberId]);
+  const renewalResellerIdForProfiles = renewalResellerIdForQuery;
 
   const { data: profilesResponse } = useQuery({
     queryKey: ['profiles', 'all', online, selectedOperationalResellerId],
@@ -531,9 +654,9 @@ const SubscribersPage: React.FC = () => {
     [profiles]
   );
   const { data: renewalProfiles = [] } = useQuery<Profile[]>({
-    queryKey: ['renewal-profiles', renewalResellerIdForQuery ?? '__no_reseller__'],
-    queryFn: () => apiService.getRenewalProfiles(renewalResellerIdForQuery),
-    enabled: showRenewalModal && !!selectedSubscriber,
+    queryKey: ['renewal-profiles', renewalResellerIdForProfiles ?? '__no_reseller__'],
+    queryFn: () => apiService.getRenewalProfiles(renewalResellerIdForProfiles!),
+    enabled: showRenewalModal && !!renewalResellerIdForProfiles,
   });
 
   const { data: activationServiceFeesList = [] } = useQuery<ServiceFees[]>({
@@ -843,7 +966,7 @@ const SubscribersPage: React.FC = () => {
   }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice]);
 
   const renewalInvoiceTotalWithServiceFees =
-    renewalSubscriptionPrice + activationServiceFeesTotal;
+    renewalSubscriptionPrice * Math.max(1, ftthSyncPeriods.length || 1) + activationServiceFeesTotal;
 
   useEffect(() => {
     if (!showRenewalModal || activationServiceFeesList.length === 0) return;
@@ -895,10 +1018,34 @@ const SubscribersPage: React.FC = () => {
       renewalProfileIdForAmountSyncRef.current = '';
       setActivationServiceFeesEnabled({});
       setActivationServiceFeesFullyPaid({});
+      setFtthCompareSyncContext(null);
+      setFtthSyncPeriods([]);
     } else {
       setRenewalAmountFullyReceived(true);
     }
   }, [showRenewalModal]);
+
+  useEffect(() => {
+    if (!ftthCompareSyncContext || !renewalInfo?.availableProfiles?.length || renewalData.newProfileId) return;
+    const pkg = (ftthCompareSyncContext.row.packageName ?? '').trim().toLowerCase();
+    if (!pkg) return;
+    const match = renewalInfo.availableProfiles.find(
+      (p) => (p.name ?? '').trim().toLowerCase() === pkg,
+    );
+    if (!match) return;
+    const salePrice = match.salePrice || 0;
+    const isExtension = match.packageType === ProfilePackageType.Extension;
+    setRenewalData((prev) => ({
+      ...prev,
+      newProfileId: match.id,
+      overrideSalePrice: isExtension ? 0 : salePrice,
+      amountPaid: isExtension ? 0 : salePrice,
+      remainingAmount: 0,
+      debtDescription: '',
+      debtDueDate: '',
+      paymentStatus: PaymentStatus.Paid,
+    }));
+  }, [ftthCompareSyncContext, renewalInfo?.availableProfiles, renewalData.newProfileId]);
 
   useEffect(() => {
     if (!renewalData.newProfileId || !renewalInfo?.availableProfiles) return;
@@ -1196,31 +1343,45 @@ const SubscribersPage: React.FC = () => {
       showError('مزامنة التفعيل', 'لا يمكن المزامنة لأن اسم المستخدم فارغ.');
       return;
     }
+    if (!ftthCompareResellerId) {
+      showError('مزامنة التفعيل', 'يرجى اختيار الرسيلر في نموذج المقارنة أولاً.');
+      return;
+    }
     setOpeningFtthCompareRowIndex(rowIndex);
     try {
+      const isNewSubscriber = !!row.isNewSubscriber;
       let subscriberToRenew =
         (subscribers ?? []).find((s) => (s.username ?? '').toString().trim().toLowerCase() === username.toLowerCase()) ?? null;
 
-      if (!subscriberToRenew) {
+      if (!subscriberToRenew && !isNewSubscriber) {
         const searchRes = await apiService.getSubscribers({ page: 1, pageSize: 20, search: username });
         subscriberToRenew =
           (searchRes.data ?? []).find((s) => (s.username ?? '').toString().trim().toLowerCase() === username.toLowerCase()) ??
-          searchRes.data?.[0] ??
           null;
       }
 
-      if (!subscriberToRenew?.id) {
+      if (!subscriberToRenew && !isNewSubscriber) {
         showError('مزامنة التفعيل', 'تعذر العثور على المشترك داخل النظام بهذا اسم المستخدم.');
         return;
       }
 
-      const syncActivationDate = ftthCompareDateToInput(row.ftthActivation || row.localActivation);
-      const syncExpirationDate = ftthCompareDateToInput(row.ftthExpiration || row.localExpiration);
+      const periodCount = resolveFtthRenewalPeriodCount(row);
+      const periods = buildFtthSyncPeriods(row, periodCount);
+      const syncContext: FtthCompareSyncContext = {
+        row,
+        rowIndex,
+        isNewSubscriber,
+        resellerId: ftthCompareResellerId,
+        zone: ftthCompareResult?.zone,
+        periodCount,
+      };
 
+      setFtthCompareSyncContext(syncContext);
+      setFtthSyncPeriods(periods);
       setSelectedSubscriberForRenewal(subscriberToRenew);
       setRenewalAmountFullyReceived(true);
       setRenewalData({
-        subscriberId: subscriberToRenew.id,
+        subscriberId: subscriberToRenew?.id ?? '',
         newProfileId: '',
         paymentStatus: PaymentStatus.Paid,
         overrideSalePrice: 0,
@@ -1234,8 +1395,8 @@ const SubscribersPage: React.FC = () => {
         serviceFeesAmountPaid: undefined,
         activationPaymentMethod: ActivationPaymentMethod.Cash,
         activationChannel: RenewalActivationChannel.Normal,
-        renewalDate: syncActivationDate,
-        newExpirationDate: syncExpirationDate,
+        renewalDate: periods[0]?.renewalDate,
+        newExpirationDate: periods[periods.length - 1]?.newExpirationDate ?? periods[0]?.newExpirationDate,
       });
       setActivationServiceFeesEnabled({});
       setRenewalViaSasTab(false);
@@ -1329,6 +1490,142 @@ const SubscribersPage: React.FC = () => {
     }
   });
 
+  const completeRenewalSuccessFlow = async (receiptData: any, renewalData: RenewalData) => {
+    const isOfflineQueued = receiptData?.receiptNumber === '(معلق للمزامنة)';
+    if (isOfflineQueued) {
+      showSuccess('تم الحفظ محلياً', 'سيتم رفع التجديد عند عودة الاتصال');
+      await refreshPendingCount();
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['subscribers'] });
+    queryClient.invalidateQueries({ queryKey: ['renewal-receipts'] });
+    queryClient.invalidateQueries({ queryKey: ['debts'] });
+    queryClient.invalidateQueries({ queryKey: ['subscribers-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
+    setShowRenewalModal(false);
+    setRenewalViaSasTab(false);
+    setSelectedIds([]);
+
+    const normalizedReceipt = {
+      ...receiptData,
+      subscriberId: receiptData.subscriberId ?? renewalData.subscriberId,
+    };
+
+    setLastReceipt(normalizedReceipt);
+    setShowReceiptModal(true);
+    setSelectedSubscriberForRenewal(null);
+    setShowRenewalModal(false);
+
+    if (pendingFtthRenewalRowIndex != null) {
+      setActivatedFtthRowIndices((prev) => new Set(prev).add(pendingFtthRenewalRowIndex));
+      setShowAutoSyncModal(true);
+      setPendingFtthRenewalRowIndex(null);
+    }
+    if (pendingFtthCompareRowIndex != null) {
+      setActivatedFtthCompareRowIndices((prev) => new Set(prev).add(pendingFtthCompareRowIndex));
+      setShowFtthCompareModal(true);
+      setPendingFtthCompareRowIndex(null);
+    }
+
+    setRenewalData({
+      subscriberId: '',
+      newProfileId: '',
+      paymentStatus: PaymentStatus.Paid,
+      overrideSalePrice: 0,
+      amountPaid: 0,
+      notes: '',
+      remainingAmount: 0,
+      debtDescription: '',
+      debtDueDate: '',
+      serviceFeesId: '',
+      serviceFeesPrice: undefined,
+      serviceFeesAmountPaid: undefined,
+      activationPaymentMethod: ActivationPaymentMethod.Cash,
+      activationChannel: RenewalActivationChannel.Normal,
+    });
+    setActivationServiceFeesEnabled({});
+    setFtthCompareSyncContext(null);
+    setFtthSyncPeriods([]);
+  };
+
+  const submitFtthCompareSyncFlow = async (baseRenewal: RenewalData) => {
+    if (!ftthCompareSyncContext) return;
+    setFtthSyncSubmitting(true);
+    try {
+      const row = ftthCompareSyncContext.row;
+      const username = (row.username ?? '').trim();
+      if (!username) throw new Error('اسم المستخدم فارغ.');
+      if (!baseRenewal.newProfileId) throw new Error('يرجى اختيار الباقة.');
+
+      const periods =
+        ftthSyncPeriods.length > 0
+          ? ftthSyncPeriods
+          : [{
+              label: 'الفترة 1',
+              renewalDate: baseRenewal.renewalDate,
+              newExpirationDate: baseRenewal.newExpirationDate,
+            }];
+
+      for (const period of periods) {
+        if (!period.renewalDate || !period.newExpirationDate) {
+          throw new Error(`يرجى إدخال تاريخ التفعيل وتاريخ الانتهاء لـ ${period.label}.`);
+        }
+      }
+
+      let subscriberId = baseRenewal.subscriberId?.trim() ?? '';
+      if (ftthCompareSyncContext.isNewSubscriber || !subscriberId) {
+        const { firstName, lastName } = splitFtthCustomerName(row.customerName ?? username);
+        const created = await apiService.createSubscriber({
+          username,
+          password: username,
+          firstName,
+          lastName,
+          phoneNumber: (row.createdBy ?? '').trim() || '07000000000',
+          profileId: baseRenewal.newProfileId,
+          activationDate: periods[0]!.renewalDate!,
+          expirationDate: periods[periods.length - 1]!.newExpirationDate!,
+          subscriptionType: SubscriptionType.Paid,
+          zone: ftthCompareSyncContext.zone ?? undefined,
+          agentResellerId: ftthCompareSyncContext.resellerId,
+        });
+        subscriberId = created.id;
+      }
+
+      let lastReceipt: any = null;
+      for (let i = 0; i < periods.length; i += 1) {
+        const period = periods[i]!;
+        const isLast = i === periods.length - 1;
+        const periodPayload: RenewalData = {
+          ...baseRenewal,
+          subscriberId,
+          renewalDate: period.renewalDate,
+          newExpirationDate: period.newExpirationDate,
+          serviceFeesItems: isLast ? baseRenewal.serviceFeesItems : undefined,
+          serviceFeesId: isLast ? baseRenewal.serviceFeesId : undefined,
+          serviceFeesPrice: isLast ? baseRenewal.serviceFeesPrice : undefined,
+          serviceFeesAmountPaid: isLast ? baseRenewal.serviceFeesAmountPaid : undefined,
+        };
+        if (!online) {
+          await queueOperation('CreateRenewal', buildCreateRenewalPayload(periodPayload));
+          lastReceipt = { receiptNumber: '(معلق للمزامنة)', subscriberId };
+        } else {
+          lastReceipt = await apiService.createRenewal(periodPayload);
+        }
+      }
+
+      if (periods.length > 1) {
+        showSuccess(
+          'تمت المزامنة',
+          `تم حفظ ${periods.length} فواتير تفعيل بتواريخ FTTH في سجل الحسابات والتفعيل.`,
+        );
+      }
+
+      await completeRenewalSuccessFlow(lastReceipt, { ...baseRenewal, subscriberId });
+    } finally {
+      setFtthSyncSubmitting(false);
+    }
+  };
+
   const createRenewalMutation = useMutation({
     mutationFn: async (renewalData: RenewalData) => {
       if (!online) {
@@ -1338,63 +1635,7 @@ const SubscribersPage: React.FC = () => {
       return await apiService.createRenewal(renewalData);
     },
     onSuccess: async (receiptData, renewalData) => {
-      const isOfflineQueued = receiptData?.receiptNumber === '(معلق للمزامنة)';
-      if (isOfflineQueued) {
-        showSuccess('تم الحفظ محلياً', 'سيتم رفع التجديد عند عودة الاتصال');
-        await refreshPendingCount();
-      }
-      console.log('Receipt data received from backend:', receiptData);
-      console.log('Receipt number in received data:', receiptData?.receiptNumber);
-
-      queryClient.invalidateQueries({ queryKey: ['subscribers'] });
-      queryClient.invalidateQueries({ queryKey: ['renewal-receipts'] });
-      queryClient.invalidateQueries({ queryKey: ['debts'] });
-      queryClient.invalidateQueries({ queryKey: ['subscribers-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
-      setShowRenewalModal(false);
-      setRenewalViaSasTab(false);
-      setSelectedIds([]);
-
-      const normalizedReceipt = {
-        ...receiptData,
-        subscriberId: receiptData.subscriberId ?? renewalData.subscriberId,
-      };
-
-      console.log('Final receipt data to display:', normalizedReceipt);
-      console.log('Final receipt number:', normalizedReceipt?.receiptNumber);
-
-      setLastReceipt(normalizedReceipt);
-      setShowReceiptModal(true);
-      
-      setSelectedSubscriberForRenewal(null);
-      setShowRenewalModal(false);
-      if (pendingFtthRenewalRowIndex != null) {
-        setActivatedFtthRowIndices((prev) => new Set(prev).add(pendingFtthRenewalRowIndex));
-        setShowAutoSyncModal(true);
-        setPendingFtthRenewalRowIndex(null);
-      }
-      if (pendingFtthCompareRowIndex != null) {
-        setActivatedFtthCompareRowIndices((prev) => new Set(prev).add(pendingFtthCompareRowIndex));
-        setShowFtthCompareModal(true);
-        setPendingFtthCompareRowIndex(null);
-      }
-      setRenewalData({
-        subscriberId: '',
-        newProfileId: '',
-        paymentStatus: PaymentStatus.Paid,
-        overrideSalePrice: 0,
-        amountPaid: 0,
-        notes: '',
-        remainingAmount: 0,
-        debtDescription: '',
-        debtDueDate: '',
-        serviceFeesId: '',
-        serviceFeesPrice: undefined,
-        serviceFeesAmountPaid: undefined,
-        activationPaymentMethod: ActivationPaymentMethod.Cash,
-        activationChannel: RenewalActivationChannel.Normal,
-      });
-      setActivationServiceFeesEnabled({});
+      await completeRenewalSuccessFlow(receiptData, renewalData);
     },
     onError: (error: any) => {
       console.error('Error creating renewal:', error);
@@ -1887,11 +2128,25 @@ const SubscribersPage: React.FC = () => {
         : isCustomerWallet
           ? ActivationPaymentMethod.CustomerWallet
           : (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash),
-      renewalDate: renewalData.renewalDate,
-      newExpirationDate: renewalData.newExpirationDate,
+      renewalDate: ftthCompareSyncContext && ftthSyncPeriods.length === 1
+        ? ftthSyncPeriods[0]?.renewalDate
+        : renewalData.renewalDate,
+      newExpirationDate: ftthCompareSyncContext && ftthSyncPeriods.length === 1
+        ? ftthSyncPeriods[0]?.newExpirationDate
+        : renewalData.newExpirationDate,
     };
 
-    // تم تعليق التفعيل عبر سكربت البايثون مؤقتاً.
+    if (ftthCompareSyncContext && pendingFtthCompareRowIndex != null) {
+      try {
+        await submitFtthCompareSyncFlow(enhancedRenewalData);
+      } catch (error: any) {
+        const errorMessage = ApiService.showError(error);
+        showError('خطأ في مزامنة التفعيل', errorMessage);
+        setShowFtthCompareModal(true);
+      }
+      return;
+    }
+
     createRenewalMutation.mutate(enhancedRenewalData);
   };
 
@@ -3829,6 +4084,101 @@ const SubscribersPage: React.FC = () => {
                   </select>
                 </div>
 
+                {ftthCompareSyncContext && (
+                  <div className="md:col-span-2 space-y-3">
+                    {ftthCompareSyncContext.isNewSubscriber && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+                        مشترك جديد — سيتم إضافته للنظام عند إتمام المزامنة بتواريخ FTTH المحددة أدناه.
+                      </div>
+                    )}
+                    {ftthSyncPeriods.length > 1 ? (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          فترات التفعيل ({ftthSyncPeriods.length} فواتير منفصلة)
+                        </p>
+                        {ftthSyncPeriods.map((period, periodIndex) => (
+                          <div
+                            key={`${period.label}-${periodIndex}`}
+                            className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                          >
+                            <p className="md:col-span-2 text-sm font-medium text-gray-800 dark:text-gray-100">
+                              {period.label}
+                            </p>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                تاريخ التفعيل
+                              </label>
+                              <input
+                                type="date"
+                                value={period.renewalDate ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFtthSyncPeriods((prev) =>
+                                    prev.map((p, i) => (i === periodIndex ? { ...p, renewalDate: value } : p)),
+                                  );
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                تاريخ الانتهاء
+                              </label>
+                              <input
+                                type="date"
+                                value={period.newExpirationDate ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setFtthSyncPeriods((prev) =>
+                                    prev.map((p, i) => (i === periodIndex ? { ...p, newExpirationDate: value } : p)),
+                                  );
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            تاريخ التفعيل (FTTH)
+                          </label>
+                          <input
+                            type="date"
+                            value={ftthSyncPeriods[0]?.renewalDate ?? renewalData.renewalDate ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFtthSyncPeriods([{ label: 'الفترة 1', renewalDate: value, newExpirationDate: ftthSyncPeriods[0]?.newExpirationDate }]);
+                              setRenewalData((prev) => ({ ...prev, renewalDate: value }));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            تاريخ الانتهاء (FTTH)
+                          </label>
+                          <input
+                            type="date"
+                            value={ftthSyncPeriods[0]?.newExpirationDate ?? renewalData.newExpirationDate ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setFtthSyncPeriods([{ label: 'الفترة 1', renewalDate: ftthSyncPeriods[0]?.renewalDate, newExpirationDate: value }]);
+                              setRenewalData((prev) => ({ ...prev, newExpirationDate: value }));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      تُحفظ سجلات التفعيل والحسابات بتاريخ التفعيل المحدد (وليس تاريخ اليوم).
+                    </p>
+                  </div>
+                )}
+
                 {/* Renewal Period Info — أيقونة فقط؛ النص في تلميح عند التمرير أو التركيز */}
                 {renewalData.newProfileId && (
                   <div className="flex items-start justify-end pt-1">
@@ -4222,8 +4572,15 @@ const SubscribersPage: React.FC = () => {
                   {enabledActivationServiceFees.length > 0 && (
                     <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">سعر الاشتراك:</span>
-                        <span className="font-medium tabular-nums">{formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}</span>
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {ftthSyncPeriods.length > 1 ? 'مجموع الاشتراكات:' : 'سعر الاشتراك:'}
+                        </span>
+                        <span className="font-medium tabular-nums">
+                          {formatNumber(
+                            renewalSubscriptionPrice * Math.max(1, ftthSyncPeriods.length || 1),
+                            { suffix: ' د.ع' },
+                          )}
+                        </span>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <span className="text-gray-600 dark:text-gray-400">مجموع أجور الخدمة:</span>
@@ -4264,10 +4621,10 @@ const SubscribersPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={createRenewalMutation.isPending}
+                  disabled={createRenewalMutation.isPending || ftthSyncSubmitting}
                   className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {(createRenewalMutation.isPending) ? (
+                  {(createRenewalMutation.isPending || ftthSyncSubmitting) ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>جاري التفعيل...</span>
@@ -5164,7 +5521,7 @@ const SubscribersPage: React.FC = () => {
                     (ftthCompareResult.items ?? []).map((row, idx) => {
                       const mismatch = ftthCompareRowHasMismatch(row);
                       const username = (row.username ?? '').trim();
-                      const renewalCount = Number(row.sameDayBasePlanRenewalCount ?? 0);
+                      const renewalCount = resolveFtthRenewalPeriodCount(row);
                       const isOpeningSync = openingFtthCompareRowIndex === idx;
                       const isSynced = activatedFtthCompareRowIndices.has(idx);
                       return (
