@@ -38,8 +38,13 @@ import {
   Trash2,
   Wallet,
   X,
-  Zap,
 } from 'lucide-react';
+
+const LEDGER_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+};
 
 const PACKAGE_TYPE_OPTIONS = [
   { value: ProfilePackageType.Subscription, label: 'اشتراك' },
@@ -91,7 +96,7 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   kind: 'Renewal';
   profileName?: string;
   receiptNumber?: string;
-  returnPrice?: number;
+  activationProfit?: number;
   paymentMethod?: number;
   serviceFeesAmount?: number;
   serviceFeesDebtAmount?: number;
@@ -666,13 +671,6 @@ const ReportsPage: React.FC = () => {
               isAmount
               glass
             />
-            <StatCard
-              title="عدد التمديدات"
-              value={accounts?.extension?.count ?? 0}
-              icon={Zap}
-              color="indigo"
-              glass
-            />
           </div>
 
           {isLoading ? (
@@ -778,8 +776,8 @@ const ReportsPage: React.FC = () => {
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.returnPrice != null
-                                  ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
+                                {renewal?.activationProfit != null
+                                  ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
@@ -787,8 +785,12 @@ const ReportsPage: React.FC = () => {
                                   ? formatNumber(renewal.totalProfit, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
-                              <td className="whitespace-nowrap">{formatDate(row.renewalDate)}</td>
-                              <td className="whitespace-nowrap">{formatDate(row.createdAt)}</td>
+                              <td className="whitespace-nowrap font-bold">
+                                {formatDate(row.renewalDate, LEDGER_DATE_OPTIONS)}
+                              </td>
+                              <td className="whitespace-nowrap font-bold">
+                                {formatDate(row.createdAt, LEDGER_DATE_OPTIONS)}
+                              </td>
                               <td className="whitespace-nowrap text-xs">{renewal?.receiptNumber || '—'}</td>
                               <td className="whitespace-nowrap">{row.executedByFullName || '—'}</td>
                               {canDeleteLedger && (
