@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDigits } from '../contexts/DigitsContext';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import SubscriberPhonesUpdateSection from '../components/SubscriberPhonesUpdateSection';
+import SubscriberExcelImportSection from '../components/SubscriberExcelImportSection';
 import {
   getActivationMessageSettings,
   setActivationMessageSettings,
@@ -487,7 +488,8 @@ function SettingsPage() {
     | 'adminWhatsAppSessions'
     | 'subscriberApp'
     | 'subscriberAnnouncement'
-    | 'subscriberPhones';
+    | 'subscriberPhones'
+    | 'subscriberExcelImport';
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
 
   const {
@@ -2285,6 +2287,10 @@ function SettingsPage() {
             <SubscriberPhonesUpdateSection isAdmin={isAdmin} />
           )}
 
+          {isAgentOrSubAgent && activeSection === 'subscriberExcelImport' && (
+            <SubscriberExcelImportSection />
+          )}
+
           {/* قالب رسالة خاصة — للوكيل/الموظف، يُرسل كما هو لأي مشترك بدون مكانات */}
           {isAgentOrSubAgent && activeSection === 'customMessage' && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -3866,6 +3872,20 @@ function SettingsPage() {
                 >
                   <Phone className="h-5 w-5 flex-shrink-0" />
                   <span>تحديث أرقام المشتركين</span>
+                </button>
+              )}
+              {isAgentOrSubAgent && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('subscriberExcelImport')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                    activeSection === 'subscriberExcelImport'
+                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Upload className="h-5 w-5 flex-shrink-0" />
+                  <span>استيراد مشتركين Excel</span>
                 </button>
               )}
               {isAgentOrSubAgent && (

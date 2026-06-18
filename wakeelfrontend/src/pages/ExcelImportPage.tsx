@@ -33,7 +33,7 @@ const ExcelImportPage: React.FC = () => {
   // Import mutation
   const importMutation = useMutation({
     mutationFn: ({ agentId, file }: { agentId: string; file: File }) => 
-      apiService.importSubscribersFromExcel(agentId, file),
+      apiService.importSubscribersFromExcel(file, { agentId }),
     onSuccess: (data) => {
       // إيقاف المؤقتات
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);

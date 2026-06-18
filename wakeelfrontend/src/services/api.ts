@@ -3087,16 +3087,32 @@ class ApiService {
     return response.data;
   }
 
-  async importSubscribersFromExcel(agentId: string, file: File): Promise<ExcelImportResponse> {
+  async importSubscribersFromExcel(
+    file: File,
+    options?: { agentId?: string; resellerId?: string },
+  ): Promise<ExcelImportResponse> {
     const formData = new FormData();
     formData.append('file', file);
-    
-    // Send agentId as query parameter since FormData doesn't work
-    const response: AxiosResponse<ExcelImportResponse> = await this.api.post(`/ExcelImport/subscribers?agentId=${agentId}`, formData, {
+
+    const params = new URLSearchParams();
+    if (options?.agentId) params.set('agentId', options.agentId);
+    if (options?.resellerId) params.set('resellerId', options.resellerId);
+    const query = params.toString();
+    const url = `/ExcelImport/subscribers${query ? `?${query}` : ''}`;
+
+    const response: AxiosResponse<ExcelImportResponse> = await this.api.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 600000, // up to 10 minutes (Excel import can be slow)
+      timeout: 600000,
+    });
+    return response.data;
+  }
+
+  async downloadSubscriberExcelTemplate(agentId?: string): Promise<Blob> {
+    const response = await this.api.get('/ExcelImport/template', {
+      params: agentId ? { agentId } : undefined,
+      responseType: 'blob',
     });
     return response.data;
   }
