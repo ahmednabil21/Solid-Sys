@@ -122,16 +122,30 @@ function addDaysToFtthDateInput(date: string, days: number): string {
   return d.toISOString().split('T')[0] ?? date;
 }
 
+function createFtthSyncPeriodDraft(
+  label: string,
+  renewalDate?: string,
+  newExpirationDate?: string,
+): FtthSyncPeriodDraft {
+  return {
+    label,
+    renewalDate,
+    newExpirationDate,
+    subscriptionFullyPaid: true,
+    amountPaid: 0,
+    remainingAmount: 0,
+    debtDescription: '',
+    serviceFeesEnabled: {},
+    serviceFeesFullyPaid: {},
+  };
+}
+
 function buildFtthSyncPeriods(row: FtthSubscriptionsCompareItem, periodCount: number): FtthSyncPeriodDraft[] {
   const count = Math.max(1, periodCount);
   const latestActivation = ftthCompareDateToInput(row.ftthActivation || row.localActivation);
   const latestExpiration = ftthCompareDateToInput(row.ftthExpiration || row.localExpiration);
   if (!latestActivation || !latestExpiration || count <= 1) {
-    return [{
-      label: 'الفترة 1',
-      renewalDate: latestActivation,
-      newExpirationDate: latestExpiration,
-    }];
+    return [createFtthSyncPeriodDraft('الفترة 1', latestActivation, latestExpiration)];
   }
   const periodDays = daysBetweenFtthDates(latestActivation, latestExpiration);
   const periods: FtthSyncPeriodDraft[] = [];
@@ -139,19 +153,11 @@ function buildFtthSyncPeriods(row: FtthSubscriptionsCompareItem, periodCount: nu
   let nextExpiration = latestExpiration;
   for (let i = count; i >= 1; i -= 1) {
     if (i === count) {
-      periods.unshift({
-        label: `الشهر ${i}`,
-        renewalDate: nextActivation,
-        newExpirationDate: nextExpiration,
-      });
+      periods.unshift(createFtthSyncPeriodDraft(`الشهر ${i}`, nextActivation, nextExpiration));
     } else {
       const exp = nextActivation;
       const act = addDaysToFtthDateInput(exp, -periodDays);
-      periods.unshift({
-        label: `الشهر ${i}`,
-        renewalDate: act,
-        newExpirationDate: exp,
-      });
+      periods.unshift(createFtthSyncPeriodDraft(`الشهر ${i}`, act, exp));
       nextActivation = act;
       nextExpiration = exp;
     }
@@ -982,8 +988,22 @@ const SubscribersPage: React.FC = () => {
     return renewalData.overrideSalePrice || selectedProfile.salePrice || 0;
   }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice]);
 
-  const renewalInvoiceTotalWithServiceFees =
-    renewalSubscriptionPrice * Math.max(1, ftthSyncPeriods.length || 1) + activationServiceFeesTotal;
+  const ftthMultiPeriodBilling = !!(ftthCompareSyncContext && ftthSyncPeriods.length > 1);
+
+  const ftthPeriodServiceFeesTotal = React.useCallback(
+    (period: FtthSyncPeriodDraft) =>
+      activationServiceFeesList
+        .filter((f) => period.serviceFeesEnabled?.[f.id] !== false)
+        .reduce((sum, f) => sum + (f.price ?? 0), 0),
+    [activationServiceFeesList],
+  );
+
+  const renewalInvoiceTotalWithServiceFees = ftthMultiPeriodBilling
+    ? ftthSyncPeriods.reduce(
+        (sum, period) => sum + renewalSubscriptionPrice + ftthPeriodServiceFeesTotal(period),
+        0,
+      )
+    : renewalSubscriptionPrice + activationServiceFeesTotal;
 
   useEffect(() => {
     if (!showRenewalModal || activationServiceFeesList.length === 0) return;
@@ -1063,6 +1083,50 @@ const SubscribersPage: React.FC = () => {
       paymentStatus: PaymentStatus.Paid,
     }));
   }, [ftthCompareSyncContext, renewalInfo?.availableProfiles, renewalData.newProfileId]);
+
+  useEffect(() => {
+    if (!showRenewalModal || !ftthMultiPeriodBilling || activationServiceFeesList.length === 0) return;
+    setFtthSyncPeriods((prev) =>
+      prev.map((period) => {
+        const enabled = { ...(period.serviceFeesEnabled ?? {}) };
+        const fullyPaid = { ...(period.serviceFeesFullyPaid ?? {}) };
+        let changed = false;
+        for (const fee of activationServiceFeesList) {
+          if (enabled[fee.id] === undefined) {
+            enabled[fee.id] = true;
+            changed = true;
+          }
+          if (fullyPaid[fee.id] === undefined) {
+            fullyPaid[fee.id] = true;
+            changed = true;
+          }
+        }
+        return changed ? { ...period, serviceFeesEnabled: enabled, serviceFeesFullyPaid: fullyPaid } : period;
+      }),
+    );
+  }, [showRenewalModal, ftthMultiPeriodBilling, activationServiceFeesList]);
+
+  useEffect(() => {
+    if (!ftthMultiPeriodBilling || !renewalData.newProfileId) return;
+    const profile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
+    if (!profile || profile.packageType === ProfilePackageType.Extension) return;
+    const salePrice = profile.salePrice || 0;
+    setFtthSyncPeriods((prev) =>
+      prev.map((period) => {
+        const fullyPaid = period.subscriptionFullyPaid !== false;
+        const amountPaid = fullyPaid ? salePrice : Math.min(period.amountPaid ?? 0, salePrice);
+        const remaining = fullyPaid ? 0 : Math.max(0, salePrice - amountPaid);
+        return {
+          ...period,
+          amountPaid,
+          remainingAmount: remaining,
+          debtDescription: remaining > 0
+            ? period.debtDescription || `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}`
+            : '',
+        };
+      }),
+    );
+  }, [ftthMultiPeriodBilling, renewalData.newProfileId, renewalInfo?.availableProfiles, formatNumber]);
 
   useEffect(() => {
     if (!renewalData.newProfileId || !renewalInfo?.availableProfiles) return;
@@ -1612,19 +1676,29 @@ const SubscribersPage: React.FC = () => {
       }
 
       let lastReceipt: any = null;
+      const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === baseRenewal.newProfileId);
+      const salePrice = selectedProfile?.packageType === ProfilePackageType.Extension
+        ? 0
+        : baseRenewal.overrideSalePrice || selectedProfile?.salePrice || 0;
+      const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+
       for (let i = 0; i < periods.length; i += 1) {
         const period = periods[i]!;
-        const isLast = i === periods.length - 1;
-        const periodPayload: RenewalData = {
-          ...baseRenewal,
-          subscriberId,
-          renewalDate: period.renewalDate,
-          newExpirationDate: period.newExpirationDate,
-          serviceFeesItems: isLast ? baseRenewal.serviceFeesItems : undefined,
-          serviceFeesId: isLast ? baseRenewal.serviceFeesId : undefined,
-          serviceFeesPrice: isLast ? baseRenewal.serviceFeesPrice : undefined,
-          serviceFeesAmountPaid: isLast ? baseRenewal.serviceFeesAmountPaid : undefined,
-        };
+        const periodPayload =
+          periods.length > 1
+            ? buildFtthPeriodRenewalPayload(
+                baseRenewal,
+                period,
+                subscriberId,
+                salePrice,
+                !!isExtension,
+              )
+            : {
+                ...baseRenewal,
+                subscriberId,
+                renewalDate: period.renewalDate,
+                newExpirationDate: period.newExpirationDate,
+              };
         if (!online) {
           await queueOperation('CreateRenewal', buildCreateRenewalPayload(periodPayload));
           lastReceipt = { receiptNumber: '(معلق للمزامنة)', subscriberId };
@@ -1967,6 +2041,75 @@ const SubscribersPage: React.FC = () => {
       debtDescription: remaining > 0 ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}` : '',
       debtDueDate: '',
       paymentStatus: PaymentStatus.Unpaid,
+    };
+  };
+
+  const buildFtthPeriodRenewalPayload = (
+    baseRenewal: RenewalData,
+    period: FtthSyncPeriodDraft,
+    subscriberId: string,
+    salePrice: number,
+    isExtension: boolean,
+  ): RenewalData => {
+    const isDeferred = baseRenewal.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+    const isCustomerWallet =
+      (baseRenewal.activationChannel ?? RenewalActivationChannel.Normal) ===
+      RenewalActivationChannel.CustomerWallet;
+    const subscriptionFullyPaid = period.subscriptionFullyPaid !== false;
+
+    let amountPaid = 0;
+    let remaining = 0;
+    let debtDescription = '';
+    if (!isExtension && !isDeferred && !isCustomerWallet) {
+      if (subscriptionFullyPaid) {
+        amountPaid = salePrice;
+      } else {
+        amountPaid = period.amountPaid ?? 0;
+        remaining = Math.max(0, salePrice - amountPaid);
+        debtDescription =
+          period.debtDescription ||
+          (remaining > 0 ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}` : '');
+      }
+    }
+
+    const serviceFeesItems = activationServiceFeesList
+      .filter((fee) => period.serviceFeesEnabled?.[fee.id] !== false)
+      .map((fee) => {
+        const price = fee.price ?? 0;
+        const feeFullyPaid = period.serviceFeesFullyPaid?.[fee.id] !== false;
+        return {
+          serviceFeesId: fee.id,
+          serviceFeesPrice: price,
+          serviceFeesAmountPaid: isDeferred || !feeFullyPaid ? 0 : price,
+        };
+      });
+    const firstServiceFee = serviceFeesItems[0];
+
+    return {
+      ...baseRenewal,
+      subscriberId,
+      renewalDate: period.renewalDate,
+      newExpirationDate: period.newExpirationDate,
+      paymentStatus: isExtension
+        ? PaymentStatus.Paid
+        : isCustomerWallet
+          ? PaymentStatus.Paid
+          : isDeferred
+            ? PaymentStatus.Unpaid
+            : subscriptionFullyPaid
+              ? PaymentStatus.Paid
+              : remaining > 0
+                ? PaymentStatus.Unpaid
+                : PaymentStatus.Paid,
+      overrideSalePrice: isExtension ? 0 : salePrice,
+      amountPaid: isExtension || isDeferred || isCustomerWallet ? 0 : amountPaid,
+      remainingAmount: isExtension || isCustomerWallet ? 0 : remaining,
+      debtDescription: isExtension || isCustomerWallet ? '' : debtDescription,
+      debtDueDate: '',
+      serviceFeesItems: serviceFeesItems.length > 0 ? serviceFeesItems : undefined,
+      serviceFeesId: firstServiceFee?.serviceFeesId,
+      serviceFeesPrice: firstServiceFee?.serviceFeesPrice,
+      serviceFeesAmountPaid: firstServiceFee?.serviceFeesAmountPaid,
     };
   };
 
@@ -4116,14 +4259,23 @@ const SubscribersPage: React.FC = () => {
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
                           فترات التفعيل ({ftthSyncPeriods.length} فواتير منفصلة)
                         </p>
-                        {ftthSyncPeriods.map((period, periodIndex) => (
+                        {ftthSyncPeriods.map((period, periodIndex) => {
+                          const isDeferredPayment =
+                            renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+                          const isCustomerWalletChannel =
+                            (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                            RenewalActivationChannel.CustomerWallet;
+                          const subscriptionFullyPaid = period.subscriptionFullyPaid !== false;
+                          const periodSalePrice = renewalSubscriptionPrice;
+                          return (
                           <div
                             key={`${period.label}-${periodIndex}`}
-                            className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                            className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-4"
                           >
-                            <p className="md:col-span-2 text-sm font-medium text-gray-800 dark:text-gray-100">
-                              {period.label}
+                            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                              {period.label} — فاتورة منفصلة
                             </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 تاريخ التفعيل
@@ -4156,8 +4308,207 @@ const SubscribersPage: React.FC = () => {
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                               />
                             </div>
+                            </div>
+
+                            {!isCustomerWalletChannel && !isDeferredPayment && renewalData.newProfileId && (
+                              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 p-3 space-y-3">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                      واصل الاشتراك
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 ms-2 tabular-nums">
+                                        ({formatNumber(periodSalePrice, { suffix: ' د.ع' })})
+                                      </span>
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      {subscriptionFullyPaid ? 'واصل — يُحفظ في الحسابات' : 'غير واصل — يُسجَّل دين اشتراك'}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={subscriptionFullyPaid}
+                                    aria-label={`واصل اشتراك ${period.label}`}
+                                    onClick={() => {
+                                      const nextFullyPaid = !subscriptionFullyPaid;
+                                      setFtthSyncPeriods((prev) =>
+                                        prev.map((p, i) => {
+                                          if (i !== periodIndex) return p;
+                                          const amountPaid = nextFullyPaid ? periodSalePrice : 0;
+                                          const remaining = nextFullyPaid ? 0 : periodSalePrice;
+                                          return {
+                                            ...p,
+                                            subscriptionFullyPaid: nextFullyPaid,
+                                            amountPaid,
+                                            remainingAmount: remaining,
+                                            debtDescription: remaining > 0
+                                              ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}`
+                                              : '',
+                                          };
+                                        }),
+                                      );
+                                    }}
+                                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                      subscriptionFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                                    }`}
+                                  >
+                                    <span
+                                      aria-hidden
+                                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                        subscriptionFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+                                {!subscriptionFullyPaid && (
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                      المبلغ الواصل (د.ع)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={period.amountPaid ?? 0}
+                                      onChange={(e) => {
+                                        const amountPaid = Math.max(0, Number(e.target.value) || 0);
+                                        const remaining = Math.max(0, periodSalePrice - amountPaid);
+                                        setFtthSyncPeriods((prev) =>
+                                          prev.map((p, i) =>
+                                            i === periodIndex
+                                              ? {
+                                                  ...p,
+                                                  amountPaid,
+                                                  remainingAmount: remaining,
+                                                  debtDescription: remaining > 0
+                                                    ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}`
+                                                    : '',
+                                                }
+                                              : p,
+                                          ),
+                                        );
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {activationServiceFeesList.length > 0 && (
+                              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 p-3 space-y-2">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">أجور الخدمة — {period.label}</p>
+                                {isDeferredPayment && (
+                                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    طريقة الدفع آجل — تُسجَّل أجور هذا الشهر كدين على المشترك
+                                  </p>
+                                )}
+                                {activationServiceFeesList.map((fee) => {
+                                  const isEnabled = period.serviceFeesEnabled?.[fee.id] !== false;
+                                  const feeFullyPaid = period.serviceFeesFullyPaid?.[fee.id] !== false;
+                                  const feePrice = fee.price ?? 0;
+                                  return (
+                                    <div
+                                      key={`${periodIndex}-${fee.id}`}
+                                      className="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2.5 space-y-2"
+                                    >
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-medium text-gray-900 dark:text-white">{fee.name}</p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 tabular-nums">
+                                            {formatNumber(feePrice, { suffix: ' د.ع' })}
+                                            {isEnabled
+                                              ? feeFullyPaid
+                                                ? ' — مفعّل (واصل)'
+                                                : ' — مفعّل (دين)'
+                                              : ' — غير مفعّل'}
+                                          </p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={isEnabled}
+                                          aria-label={`تفعيل ${fee.name} — ${period.label}`}
+                                          onClick={() => {
+                                            const nextEnabled = !isEnabled;
+                                            setFtthSyncPeriods((prev) =>
+                                              prev.map((p, i) => {
+                                                if (i !== periodIndex) return p;
+                                                const enabled = { ...(p.serviceFeesEnabled ?? {}) };
+                                                const fullyPaid = { ...(p.serviceFeesFullyPaid ?? {}) };
+                                                enabled[fee.id] = nextEnabled;
+                                                if (nextEnabled && fullyPaid[fee.id] === undefined) {
+                                                  fullyPaid[fee.id] = true;
+                                                }
+                                                return { ...p, serviceFeesEnabled: enabled, serviceFeesFullyPaid: fullyPaid };
+                                              }),
+                                            );
+                                          }}
+                                          className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                            isEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                                          }`}
+                                        >
+                                          <span
+                                            aria-hidden
+                                            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                              isEnabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                            }`}
+                                          />
+                                        </button>
+                                      </div>
+                                      {isEnabled && !isCustomerWalletChannel && (
+                                        <div className="flex items-center justify-between gap-4">
+                                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {feeFullyPaid ? 'واصل — يُحفظ في الحسابات' : 'غير واصل — دين أجور على المشترك'}
+                                          </p>
+                                          <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={feeFullyPaid}
+                                            aria-label={`واصل ${fee.name} — ${period.label}`}
+                                            onClick={() => {
+                                              setFtthSyncPeriods((prev) =>
+                                                prev.map((p, i) => {
+                                                  if (i !== periodIndex) return p;
+                                                  const fullyPaid = { ...(p.serviceFeesFullyPaid ?? {}) };
+                                                  fullyPaid[fee.id] = !feeFullyPaid;
+                                                  return { ...p, serviceFeesFullyPaid: fullyPaid };
+                                                }),
+                                              );
+                                            }}
+                                            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                              feeFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                                            }`}
+                                          >
+                                            <span
+                                              aria-hidden
+                                              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                feeFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                              }`}
+                                            />
+                                          </button>
+                                        </div>
+                                      )}
+                                      {isEnabled && isCustomerWalletChannel && !feeFullyPaid && (
+                                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                                          غير واصل — يُحفظ كدين أجور على المشترك
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
+                        {renewalData.newProfileId && (
+                          <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-base font-bold">
+                            <span className="text-gray-900 dark:text-white">إجمالي الفواتير ({ftthSyncPeriods.length})</span>
+                            <span className="text-primary-700 dark:text-primary-300 tabular-nums">
+                              {formatNumber(renewalInvoiceTotalWithServiceFees, { suffix: ' د.ع' })}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4">
@@ -4170,7 +4521,13 @@ const SubscribersPage: React.FC = () => {
                             value={ftthSyncPeriods[0]?.renewalDate ?? renewalData.renewalDate ?? ''}
                             onChange={(e) => {
                               const value = e.target.value;
-                              setFtthSyncPeriods([{ label: 'الفترة 1', renewalDate: value, newExpirationDate: ftthSyncPeriods[0]?.newExpirationDate }]);
+                              setFtthSyncPeriods([
+                                createFtthSyncPeriodDraft(
+                                  'الفترة 1',
+                                  value,
+                                  ftthSyncPeriods[0]?.newExpirationDate,
+                                ),
+                              ]);
                               setRenewalData((prev) => ({ ...prev, renewalDate: value }));
                             }}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
@@ -4185,7 +4542,13 @@ const SubscribersPage: React.FC = () => {
                             value={ftthSyncPeriods[0]?.newExpirationDate ?? renewalData.newExpirationDate ?? ''}
                             onChange={(e) => {
                               const value = e.target.value;
-                              setFtthSyncPeriods([{ label: 'الفترة 1', renewalDate: ftthSyncPeriods[0]?.renewalDate, newExpirationDate: value }]);
+                              setFtthSyncPeriods([
+                                createFtthSyncPeriodDraft(
+                                  'الفترة 1',
+                                  ftthSyncPeriods[0]?.renewalDate,
+                                  value,
+                                ),
+                              ]);
                               setRenewalData((prev) => ({ ...prev, newExpirationDate: value }));
                             }}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
@@ -4352,7 +4715,7 @@ const SubscribersPage: React.FC = () => {
                     RenewalActivationChannel.CustomerWallet;
                   const isDeferredPayment =
                     renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
-                  if (isExtension || !renewalData.newProfileId || isCustomerWalletChannel || isDeferredPayment)
+                  if (isExtension || !renewalData.newProfileId || isCustomerWalletChannel || isDeferredPayment || ftthMultiPeriodBilling)
                     return null;
                   return (
                     <>
@@ -4429,7 +4792,7 @@ const SubscribersPage: React.FC = () => {
                     hasActivationServiceFeesDebt);
                 const showDebtSection =
                   hasSubscriptionDebt || hasDeferredSubscriptionDebt || hasServiceFeesDebt;
-                if (!renewalData.newProfileId || !showDebtSection) {
+                if (!renewalData.newProfileId || !showDebtSection || ftthMultiPeriodBilling) {
                   return null;
                 }
                 return (
@@ -4482,7 +4845,7 @@ const SubscribersPage: React.FC = () => {
               })()}
 
               {/* أجور الخدمة */}
-              {activationServiceFeesList.length > 0 && (
+              {activationServiceFeesList.length > 0 && !ftthMultiPeriodBilling && (
                 <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة</h3>
                   <div className="space-y-2">
@@ -4592,14 +4955,9 @@ const SubscribersPage: React.FC = () => {
                   {enabledActivationServiceFees.length > 0 && (
                     <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {ftthSyncPeriods.length > 1 ? 'مجموع الاشتراكات:' : 'سعر الاشتراك:'}
-                        </span>
+                        <span className="text-gray-600 dark:text-gray-400">سعر الاشتراك:</span>
                         <span className="font-medium tabular-nums">
-                          {formatNumber(
-                            renewalSubscriptionPrice * Math.max(1, ftthSyncPeriods.length || 1),
-                            { suffix: ' د.ع' },
-                          )}
+                          {formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">

@@ -532,6 +532,15 @@ export interface FtthSyncPeriodDraft {
   label: string;
   renewalDate?: string;
   newExpirationDate?: string;
+  /** واصل اشتراك هذا الشهر */
+  subscriptionFullyPaid?: boolean;
+  amountPaid?: number;
+  remainingAmount?: number;
+  debtDescription?: string;
+  /** تفعيل كل أجر خدمة لهذا الشهر */
+  serviceFeesEnabled?: Record<string, boolean>;
+  /** واصل/غير واصل لكل أجر خدمة لهذا الشهر */
+  serviceFeesFullyPaid?: Record<string, boolean>;
 }
 
 /** سياق صف مزامنة FTTH عند فتح مودال التفعيل */
