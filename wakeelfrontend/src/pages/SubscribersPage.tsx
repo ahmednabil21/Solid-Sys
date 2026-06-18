@@ -621,7 +621,10 @@ const SubscribersPage: React.FC = () => {
     enabled: true,
   });
 
-  const subscribers = subscribersResponse?.data || [];
+  const subscribers = React.useMemo(
+    () => subscribersResponse?.data ?? [],
+    [subscribersResponse?.data]
+  );
   const renewalResellerIdForQuery =
     (selectedSubscriberForRenewal?.agentResellerId ?? '').trim() ||
     ftthCompareSyncContext?.resellerId ||
