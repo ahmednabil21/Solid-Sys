@@ -91,7 +91,7 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   kind: 'Renewal';
   profileName?: string;
   receiptNumber?: string;
-  activationProfit?: number;
+  returnPrice?: number;
   paymentMethod?: number;
   serviceFeesAmount?: number;
   totalProfit?: number;
@@ -627,7 +627,7 @@ const ReportsPage: React.FC = () => {
             />
             <StatCard
               title="وارد الكاشباك"
-              value={accounts?.totalActivationProfit ?? 0}
+              value={accounts?.totalCashbackIncome ?? 0}
               icon={Coins}
               color="indigo"
               isAmount
@@ -769,8 +769,8 @@ const ReportsPage: React.FC = () => {
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.activationProfit != null
-                                  ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
+                                {renewal?.returnPrice != null
+                                  ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">

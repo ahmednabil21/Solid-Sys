@@ -1879,7 +1879,9 @@ const SubscribersPage: React.FC = () => {
       serviceFeesId: firstServiceFee?.serviceFeesId,
       serviceFeesPrice: firstServiceFee?.serviceFeesPrice,
       serviceFeesAmountPaid: firstServiceFee?.serviceFeesAmountPaid,
-      activationChannel: isExtension ? RenewalActivationChannel.Normal : (renewalData.activationChannel ?? RenewalActivationChannel.Normal),
+      activationChannel: isExtension
+        ? RenewalActivationChannel.Normal
+        : (renewalData.activationChannel ?? RenewalActivationChannel.Normal),
       activationPaymentMethod: isExtension
         ? ActivationPaymentMethod.Cash
         : isCustomerWallet
@@ -4053,7 +4055,6 @@ const SubscribersPage: React.FC = () => {
                   !isExtensionForDebt && isDeferredPayment && (renewalData.remainingAmount || 0) > 0;
                 const hasServiceFeesDebt =
                   !isExtensionForDebt &&
-                  !isCustomerWalletChannel &&
                   ((isDeferredPayment && enabledActivationServiceFees.length > 0) ||
                     hasActivationServiceFeesDebt);
                 const showDebtSection =
@@ -4118,7 +4119,7 @@ const SubscribersPage: React.FC = () => {
                     {activationServiceFeesList.map((fee) => {
                       const isDeferredFee =
                         renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
-                      const isCustomerWalletFee =
+                      const isCustomerWalletChannel =
                         (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
                         RenewalActivationChannel.CustomerWallet;
                       const isEnabled = activationServiceFeesEnabled[fee.id] !== false;
@@ -4185,7 +4186,7 @@ const SubscribersPage: React.FC = () => {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                   {feeFullyPaid
                                     ? 'واصل — يُحفظ في الحسابات'
-                                    : isCustomerWalletFee
+                                    : isCustomerWalletChannel
                                       ? 'غير واصل — دين أجور على المشترك'
                                       : 'غير واصل — يُسجَّل كدين على المشترك'}
                                 </p>
