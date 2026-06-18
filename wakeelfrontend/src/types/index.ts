@@ -544,11 +544,20 @@ export interface FtthCompareSyncContext {
   periodCount: number;
 }
 
+/** كائن العميل من سكربت FTTH */
+export interface FtthSubscriptionsCompareCustomer {
+  id?: string | null;
+  displayValue?: string | null;
+}
+
 /** صف مقارنة FTTH — POST /providers/sas/ftth-subscriptions/compare */
 export interface FtthSubscriptionsCompareItem {
   basePlanRenewalCount?: number | null;
   createdBy?: string | null;
   customerName?: string | null;
+  /** معرف العميل في FTTH */
+  customerId?: string | null;
+  customer?: FtthSubscriptionsCompareCustomer | null;
   ftthActivation?: string | null;
   ftthExpiration?: string | null;
   isNewSubscriber?: boolean;

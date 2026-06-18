@@ -166,13 +166,27 @@ function splitFtthCustomerName(fullName: string): { firstName: string; lastName:
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
+function resolveFtthCompareCustomerId(row: FtthSubscriptionsCompareItem): string | undefined {
+  const id = (row.customerId ?? row.customer?.id ?? '').toString().trim();
+  return id || undefined;
+}
+
+function resolveFtthCompareCustomerName(row: FtthSubscriptionsCompareItem): string {
+  return (
+    row.customerName?.trim() ||
+    row.customer?.displayValue?.trim() ||
+    row.username?.trim() ||
+    ''
+  );
+}
+
 function buildSyntheticSubscriberFromFtthRow(
   row: FtthSubscriptionsCompareItem,
   resellerId: string,
   zone?: string | null,
   periods?: FtthSyncPeriodDraft[],
 ): Subscriber {
-  const { firstName, lastName } = splitFtthCustomerName(row.customerName ?? row.username ?? '');
+  const { firstName, lastName } = splitFtthCustomerName(resolveFtthCompareCustomerName(row) || row.username || '');
   const firstPeriod = periods?.[0];
   const lastPeriod = periods?.[periods.length - 1];
   const username = (row.username ?? '').trim() || 'ftth-user';
@@ -181,8 +195,8 @@ function buildSyntheticSubscriberFromFtthRow(
     username,
     firstName,
     lastName,
-    fullName: row.customerName?.trim() || username,
-    phoneNumber: (row.createdBy ?? '').trim() || '07000000000',
+    fullName: resolveFtthCompareCustomerName(row) || username,
+    phoneNumber: '',
     isActive: true,
     activationDate: firstPeriod?.renewalDate ?? new Date().toISOString().split('T')[0],
     expirationDate: lastPeriod?.newExpirationDate ?? firstPeriod?.newExpirationDate,
@@ -1577,13 +1591,16 @@ const SubscribersPage: React.FC = () => {
 
       let subscriberId = baseRenewal.subscriberId?.trim() ?? '';
       if (ftthCompareSyncContext.isNewSubscriber || !subscriberId) {
-        const { firstName, lastName } = splitFtthCustomerName(row.customerName ?? username);
+        const customerId = resolveFtthCompareCustomerId(row);
+        const displayName = resolveFtthCompareCustomerName(row) || username;
+        const { firstName, lastName } = splitFtthCustomerName(displayName);
         const created = await apiService.createSubscriber({
           username,
           password: username,
           firstName,
           lastName,
-          phoneNumber: (row.createdBy ?? '').trim() || '07000000000',
+          phoneNumber: '',
+          secruptionId: customerId,
           profileId: baseRenewal.newProfileId,
           activationDate: periods[0]!.renewalDate!,
           expirationDate: periods[periods.length - 1]!.newExpirationDate!,
