@@ -105,6 +105,7 @@ import {
   SasCredentialsItem,
   AgentResellerCredentialsDto,
   BalanceTopUpRequest,
+  BalanceTopUpUpdateRequest,
   BalanceTopUpResponse,
   AgentBalanceTopUp,
   BalanceTopUpsPageResponse,
@@ -3019,6 +3020,16 @@ class ApiService {
     if (payload.topUpDate === '' || payload.topUpDate == null) delete payload.topUpDate;
     if (!payload.agentResellerId) delete payload.agentResellerId;
     const response: AxiosResponse<BalanceTopUpResponse> = await this.api.post('/Renewals/balance/topup', payload);
+    return response.data;
+  }
+
+  async putBalanceTopUp(id: string, body: BalanceTopUpUpdateRequest): Promise<AgentBalanceTopUp> {
+    const payload: Record<string, unknown> = { ...body };
+    if (payload.topUpDate === '' || payload.topUpDate == null) delete payload.topUpDate;
+    const response = await this.api.put<AgentBalanceTopUp>(
+      `/Renewals/balance/topups/${encodeURIComponent(id)}`,
+      payload
+    );
     return response.data;
   }
 

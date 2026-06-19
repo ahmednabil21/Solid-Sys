@@ -4,10 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
-import { BalanceTopUpRequest, BalanceTopUpsPageResponse, UserRole } from '../types';
+import { BalanceTopUpRequest, BalanceTopUpUpdateRequest, BalanceTopUpsPageResponse, PACKING_SOURCE_OPTIONS, PackingSource, UserRole } from '../types';
 import { getAgentBalance } from '../utils/balance';
 import { showSuccess, showError } from '../utils/notifications';
-import { Wallet, Plus, History, X, User, CircleDollarSign } from 'lucide-react';
+import { Wallet, Plus, History, X, User, CircleDollarSign, Pencil } from 'lucide-react';
 
 const BalancePage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +30,8 @@ const BalancePage: React.FC = () => {
     (balanceQueryEnabled ? 0 : getAgentBalance(user?.id));
 
   const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [showEditTopUpModal, setShowEditTopUpModal] = useState(false);
+  const [editingTopUpId, setEditingTopUpId] = useState<string | null>(null);
   const [showEditBalanceModal, setShowEditBalanceModal] = useState(false);
   const [editBalanceValue, setEditBalanceValue] = useState<number>(0);
   const [editBalanceResellerId, setEditBalanceResellerId] = useState('');
@@ -39,6 +41,14 @@ const BalancePage: React.FC = () => {
     companyName: '',
     topUpDate: new Date().toISOString().split('T')[0],
     agentResellerId: '',
+    packingSource: PackingSource.NormalBalance,
+  });
+  const [editTopUpForm, setEditTopUpForm] = useState<BalanceTopUpUpdateRequest & { topUpDate: string }>({
+    amountIqd: 0,
+    recipientName: '',
+    companyName: '',
+    topUpDate: new Date().toISOString().split('T')[0],
+    packingSource: PackingSource.NormalBalance,
   });
 
   const resellerRows = useMemo(
@@ -78,6 +88,7 @@ const BalancePage: React.FC = () => {
         companyName: '',
         topUpDate: new Date().toISOString().split('T')[0],
         agentResellerId: '',
+        packingSource: PackingSource.NormalBalance,
       });
       queryClient.invalidateQueries({ queryKey: ['balance-topups'] });
       queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
@@ -87,6 +98,21 @@ const BalancePage: React.FC = () => {
     },
     onError: (err: unknown) => {
       showError('خطأ في التعبئة', ApiService.showError(err));
+    },
+  });
+
+  const editTopUpMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: BalanceTopUpUpdateRequest }) =>
+      apiService.putBalanceTopUp(id, body),
+    onSuccess: () => {
+      setShowEditTopUpModal(false);
+      setEditingTopUpId(null);
+      queryClient.invalidateQueries({ queryKey: ['balance-topups'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
+      showSuccess('تم التعديل', 'تم تحديث سجل التعبئة بنجاح');
+    },
+    onError: (err: unknown) => {
+      showError('خطأ في التعديل', ApiService.showError(err));
     },
   });
 
@@ -125,14 +151,62 @@ const BalancePage: React.FC = () => {
       showError('خطأ', 'يرجى اختيار المنطقة التي يُضاف إليها الرصيد');
       return;
     }
+    if (!topUpForm.packingSource) {
+      showError('خطأ', 'يرجى اختيار مصدر التعبئة');
+      return;
+    }
     topUpMutation.mutate({
       amountIqd: amount,
       recipientName: topUpForm.recipientName.trim(),
       companyName: topUpForm.companyName.trim(),
       topUpDate: topUpForm.topUpDate || undefined,
       agentResellerId: hasResellerRegions ? (topUpForm.agentResellerId ?? '').trim() : undefined,
+      packingSource: topUpForm.packingSource,
     });
   };
+
+  const openEditTopUp = (row: (typeof topUpsList)[number]) => {
+    setEditingTopUpId(row.id);
+    setEditTopUpForm({
+      amountIqd: row.amountIqd,
+      recipientName: row.recipientName,
+      companyName: row.companyName,
+      topUpDate: row.topUpDate ? row.topUpDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      packingSource: row.packingSource ?? PackingSource.NormalBalance,
+    });
+    setShowEditTopUpModal(true);
+  };
+
+  const handleEditTopUpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTopUpId) return;
+    const amount = Number(editTopUpForm.amountIqd);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showError('خطأ', 'يرجى إدخال مبلغ صحيح');
+      return;
+    }
+    if (!editTopUpForm.recipientName?.trim()) {
+      showError('خطأ', 'يرجى إدخال اسم المستلم');
+      return;
+    }
+    if (!editTopUpForm.companyName?.trim()) {
+      showError('خطأ', 'يرجى إدخال الشركة / جهة الرصيد');
+      return;
+    }
+    editTopUpMutation.mutate({
+      id: editingTopUpId,
+      body: {
+        amountIqd: amount,
+        recipientName: editTopUpForm.recipientName.trim(),
+        companyName: editTopUpForm.companyName.trim(),
+        topUpDate: editTopUpForm.topUpDate || undefined,
+        packingSource: editTopUpForm.packingSource,
+      },
+    });
+  };
+
+  const canManageBalance =
+    user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent;
 
   if (!isAuthenticated) {
     return (
@@ -246,28 +320,45 @@ const BalancePage: React.FC = () => {
           <table className="min-w-full text-right text-sm">
             <thead>
               <tr>
+                <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">مصدر التعبئة</th>
                 <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">المبلغ</th>
                 <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">المنطقة</th>
                 <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">المستلم</th>
                 <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">الشركة</th>
                 <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">التاريخ</th>
+                {canManageBalance && (
+                  <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">إجراء</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {topUpsList.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-gray-500 dark:text-gray-400 text-center">
+                  <td colSpan={canManageBalance ? 7 : 6} className="px-3 py-4 text-gray-500 dark:text-gray-400 text-center">
                     لا توجد تعبئات مسجّلة
                   </td>
                 </tr>
               ) : (
                 topUpsList.map((row) => (
                   <tr key={row.id} className="bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
+                    <td className="px-3 py-2">{row.packingSourceLabelAr || '—'}</td>
                     <td className="px-3 py-2">{formatNumber(row.amountIqd, { suffix: ' د.ع' })}</td>
                     <td className="px-3 py-2">{row.agentResellerName?.trim() || 'الرصيد العام'}</td>
                     <td className="px-3 py-2">{row.recipientName}</td>
                     <td className="px-3 py-2">{row.companyName}</td>
                     <td className="px-3 py-2">{row.topUpDate ? formatDate(row.topUpDate) : '—'}</td>
+                    {canManageBalance && (
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditTopUp(row)}
+                          className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline text-xs"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          تعديل
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -414,6 +505,26 @@ const BalancePage: React.FC = () => {
                   </div>
                 )}
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">مصدر التعبئة *</label>
+                  <select
+                    value={topUpForm.packingSource}
+                    onChange={(e) =>
+                      setTopUpForm((prev) => ({
+                        ...prev,
+                        packingSource: Number(e.target.value) as PackingSource,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                    required
+                  >
+                    {PACKING_SOURCE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.labelAr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المبلغ (د.ع) *</label>
                   <input
                     type="number"
@@ -463,6 +574,111 @@ const BalancePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowTopUpModal(false)}
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md text-sm font-medium"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditTopUpModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-topup-modal-title"
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 id="edit-topup-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Pencil className="h-5 w-5" />
+                تعديل سجل التعبئة
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowEditTopUpModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                aria-label="إغلاق"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              <form onSubmit={handleEditTopUpSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">مصدر التعبئة *</label>
+                  <select
+                    value={editTopUpForm.packingSource}
+                    onChange={(e) =>
+                      setEditTopUpForm((prev) => ({
+                        ...prev,
+                        packingSource: Number(e.target.value) as PackingSource,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                    required
+                  >
+                    {PACKING_SOURCE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.labelAr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المبلغ (د.ع) *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editTopUpForm.amountIqd || ''}
+                    onChange={(e) =>
+                      setEditTopUpForm((prev) => ({ ...prev, amountIqd: Number(e.target.value) || 0 }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">اسم المستلم *</label>
+                  <input
+                    type="text"
+                    value={editTopUpForm.recipientName}
+                    onChange={(e) => setEditTopUpForm((prev) => ({ ...prev, recipientName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الشركة / جهة الرصيد *</label>
+                  <input
+                    type="text"
+                    value={editTopUpForm.companyName}
+                    onChange={(e) => setEditTopUpForm((prev) => ({ ...prev, companyName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">تاريخ التعبئة</label>
+                  <input
+                    type="date"
+                    value={editTopUpForm.topUpDate}
+                    onChange={(e) => setEditTopUpForm((prev) => ({ ...prev, topUpDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={editTopUpMutation.isPending}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md text-sm font-medium"
+                  >
+                    {editTopUpMutation.isPending ? 'جاري الحفظ...' : 'حفظ التعديل'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditTopUpModal(false)}
                     className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md text-sm font-medium"
                   >
                     إلغاء

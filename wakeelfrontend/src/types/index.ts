@@ -1976,6 +1976,17 @@ export interface AgentBalanceDetail {
   resellerBalances?: AgentResellerBalanceItem[] | null;
 }
 
+/** مصدر التعبئة: 1 كاش باك، 2 محفظة الوكيل */
+export enum PackingSource {
+  Cashback = 1,
+  NormalBalance = 2,
+}
+
+export const PACKING_SOURCE_OPTIONS: { value: PackingSource; labelAr: string }[] = [
+  { value: PackingSource.Cashback, labelAr: 'كاش باك' },
+  { value: PackingSource.NormalBalance, labelAr: 'محفظة الوكيل' },
+];
+
 /** طلب تعبئة رصيد الوكيل */
 export interface BalanceTopUpRequest {
   amountIqd: number;
@@ -1984,6 +1995,17 @@ export interface BalanceTopUpRequest {
   topUpDate?: string; // ISO date "YYYY-MM-DD"
   /** إلزامي عند وجود مناطق للوكيل */
   agentResellerId?: string;
+  /** مصدر التعبئة: 1 كاش باك، 2 محفظة الوكيل */
+  packingSource: PackingSource;
+}
+
+/** طلب تعديل سجل تعبئة */
+export interface BalanceTopUpUpdateRequest {
+  amountIqd: number;
+  recipientName: string;
+  companyName: string;
+  topUpDate?: string;
+  packingSource: PackingSource;
 }
 
 /** استجابة تعبئة الرصيد */
@@ -1999,6 +2021,8 @@ export interface AgentBalanceTopUp {
   createdAt: string;
   agentResellerId?: string | null;
   agentResellerName?: string | null;
+  packingSource?: PackingSource;
+  packingSourceLabelAr?: string;
 }
 
 /** استجابة GET /Renewals/balance/topups */
