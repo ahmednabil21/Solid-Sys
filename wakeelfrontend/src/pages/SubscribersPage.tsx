@@ -18,7 +18,7 @@ import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -362,6 +362,18 @@ function resolveFtthComparePartnerId(resellers: AgentReseller[], resellerId: str
   return fromReseller || DEFAULT_FTTH_COMPARE_PARTNER_ID;
 }
 
+function resolveFtthTransactionAmountValue(
+  row: { transactionAmount?: FtthTransactionAmount | number | null },
+): number | null {
+  const raw = row.transactionAmount;
+  if (raw == null) return null;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'object' && raw.value != null && Number.isFinite(Number(raw.value))) {
+    return Number(raw.value);
+  }
+  return null;
+}
+
 function mapFtthAppTransactionToCompareItem(item: FtthAppTransactionsItem): FtthSubscriptionsCompareItem {
   return {
     customerName: item.customerName,
@@ -376,7 +388,7 @@ function mapFtthAppTransactionToCompareItem(item: FtthAppTransactionsItem): Ftth
     localActivation: item.localActivation,
     localExpiration: item.localExpiration,
     paymentType: item.paymentType,
-    planPrice: item.planPrice,
+    transactionAmount: item.transactionAmount,
     isNewSubscriber: item.isNewSubscriber,
     basePlanRenewalCount: item.activationCount,
     sameDayBasePlanRenewalCount: 0,
@@ -6134,7 +6146,7 @@ const SubscribersPage: React.FC = () => {
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">اسم المستخدم</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">باقة المشترك</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">سعر الباقة</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">planPrice</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-red-600 dark:text-red-400 whitespace-nowrap font-bold">مبلغ الاستقطاع</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">نوع العملية</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">عدد مرات التفعيل</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">تفعيل FTTH</th>
@@ -6195,10 +6207,13 @@ const SubscribersPage: React.FC = () => {
                                 : '—';
                             })()}
                           </td>
-                          <td className="px-4 py-3 align-top whitespace-normal break-words font-semibold text-red-600 dark:text-red-400">
-                            {row.planPrice != null && Number.isFinite(Number(row.planPrice))
-                              ? formatNumber(Number(row.planPrice), { suffix: ' د.ع' })
-                              : '—'}
+                          <td className="px-4 py-3 align-top whitespace-normal break-words font-bold text-red-600 dark:text-red-400">
+                            {(() => {
+                              const amount = resolveFtthTransactionAmountValue(row);
+                              return amount != null
+                                ? formatNumber(Math.abs(amount), { suffix: ' د.ع' })
+                                : '—';
+                            })()}
                           </td>
                           <td className="px-4 py-3 align-top whitespace-normal break-words">
                             {row.operationType ? (
@@ -6323,7 +6338,7 @@ const SubscribersPage: React.FC = () => {
                     <th className="px-4 py-3 border-b font-semibold">اسم المشترك</th>
                     <th className="px-4 py-3 border-b font-semibold">اسم المستخدم</th>
                     <th className="px-4 py-3 border-b font-semibold">الباقة</th>
-                    <th className="px-4 py-3 border-b font-semibold">السعر المستقطع</th>
+                    <th className="px-4 py-3 border-b font-semibold text-red-600 dark:text-red-400 font-bold">مبلغ الاستقطاع</th>
                     <th className="px-4 py-3 border-b font-semibold">تفعيل التطبيق</th>
                     <th className="px-4 py-3 border-b font-semibold">انتهاء التطبيق</th>
                     <th className="px-4 py-3 border-b font-semibold">تفعيل محلي</th>
@@ -6357,7 +6372,14 @@ const SubscribersPage: React.FC = () => {
                           <td className="px-4 py-3">{item.customerName || '—'}</td>
                           <td className="px-4 py-3 font-mono text-xs">{username || '—'}</td>
                           <td className="px-4 py-3">{item.packageName || '—'}</td>
-                          <td className="px-4 py-3">{formatNumber(item.planPrice ?? 0, { suffix: ' د.ع' })}</td>
+                          <td className="px-4 py-3 font-bold text-red-600 dark:text-red-400">
+                            {(() => {
+                              const amount = resolveFtthTransactionAmountValue(item);
+                              return amount != null
+                                ? formatNumber(Math.abs(amount), { suffix: ' د.ع' })
+                                : '—';
+                            })()}
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {item.startsAt ? formatDate(item.startsAt, FTTH_COMPARE_DATE_OPTIONS) : '—'}
                           </td>

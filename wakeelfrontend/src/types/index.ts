@@ -561,6 +561,11 @@ export interface FtthSubscriptionsCompareCustomer {
   displayValue?: string | null;
 }
 
+/** مبلغ الاستقطاع من الرصيد — transactionAmount.value من سكربت FTTH */
+export interface FtthTransactionAmount {
+  value?: number | null;
+}
+
 /** صف مقارنة FTTH — POST /providers/sas/ftth-subscriptions/compare */
 export interface FtthSubscriptionsCompareItem {
   basePlanRenewalCount?: number | null;
@@ -577,6 +582,7 @@ export interface FtthSubscriptionsCompareItem {
   packageName?: string | null;
   paymentType?: string | null;
   planPrice?: number | null;
+  transactionAmount?: FtthTransactionAmount | number | null;
   operationType?: string | null;
   transactionType?: string | null;
   sameDayBasePlanRenewalCount?: number | null;
@@ -606,6 +612,7 @@ export interface FtthAppTransactionsItem {
   packageName?: string | null;
   paymentType?: string | null;
   planPrice: number;
+  transactionAmount?: FtthTransactionAmount | number | null;
   startsAt?: string | null;
   username: string;
 }
