@@ -6083,8 +6083,8 @@ const SubscribersPage: React.FC = () => {
       )}
 
       {showFtthCompareModal && ftthCompareResult && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
-          <div className="w-[98vw] max-w-[1680px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/60 flex flex-col p-0">
+          <div className="w-full h-full bg-white dark:bg-gray-800 shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">مقارنة اشتراكات FTTH</h3>
@@ -6103,22 +6103,22 @@ const SubscribersPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1">
-              <table className="min-w-[1600px] w-full text-sm text-right border-separate border-spacing-0 table-fixed">
+            <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1 min-h-0">
+              <table className="w-full min-w-full text-sm text-right border-separate border-spacing-0">
                 <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[22%] min-w-[260px]">اسم المشترك</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">اسم المستخدم</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">باقة المشترك</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">عدد مرات التفعيل</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">تفعيل FTTH</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">انتهاء FTTH</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">تفعيل محلي</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">انتهاء محلي</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">طريقة الدفع</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">أُنشئ بواسطة</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[7%]">الحالة</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%] min-w-[100px]">إجراءات</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">اسم المشترك</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">اسم المستخدم</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">باقة المشترك</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">سعر الباقة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">نوع العملية</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">عدد مرات التفعيل</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">تفعيل FTTH</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">انتهاء FTTH</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">انتهاء محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">طريقة الدفع</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">الحالة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap min-w-[100px]">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -6145,9 +6145,9 @@ const SubscribersPage: React.FC = () => {
                           <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 align-top whitespace-normal break-words leading-relaxed">
                             {row.customerName || '—'}
                           </td>
-                          <td className="px-4 py-3 align-top">
+                          <td className="px-4 py-3 align-top whitespace-normal break-words">
                             {username ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 whitespace-normal break-all">
                                 {username}
                               </span>
                             ) : (
@@ -6156,8 +6156,22 @@ const SubscribersPage: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 align-top whitespace-normal break-words">
                             {row.packageName ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 whitespace-normal break-words">
                                 {row.packageName}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top whitespace-normal break-words">
+                            {row.planPrice != null && Number(row.planPrice) > 0
+                              ? formatNumber(Number(row.planPrice), { suffix: ' د.ع' })
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 align-top whitespace-normal break-words">
+                            {row.operationType ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200 whitespace-normal break-words">
+                                {row.operationType}
                               </span>
                             ) : (
                               '—'
@@ -6181,15 +6195,12 @@ const SubscribersPage: React.FC = () => {
                             {row.ftthExpiration ? formatDate(row.ftthExpiration, FTTH_COMPARE_DATE_OPTIONS) : '—'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap align-top">
-                            {row.localActivation ? formatDate(row.localActivation, FTTH_COMPARE_DATE_OPTIONS) : '—'}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap align-top">
                             {row.localExpiration ? formatDate(row.localExpiration, FTTH_COMPARE_DATE_OPTIONS) : '—'}
                           </td>
-                          <td className="px-4 py-3 align-top">
+                          <td className="px-4 py-3 align-top whitespace-normal break-words">
                             {row.paymentType ? (
                               <span
-                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${ftthComparePaymentBadgeClass(row.paymentType)}`}
+                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-normal break-words ${ftthComparePaymentBadgeClass(row.paymentType)}`}
                               >
                                 {ftthComparePaymentLabel(row.paymentType)}
                               </span>
@@ -6197,7 +6208,6 @@ const SubscribersPage: React.FC = () => {
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top whitespace-normal break-words">{row.createdBy || '—'}</td>
                           <td className="px-4 py-3">
                             {!mismatch ? (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
@@ -6281,7 +6291,7 @@ const SubscribersPage: React.FC = () => {
                     <th className="px-4 py-3 border-b font-semibold">اسم المشترك</th>
                     <th className="px-4 py-3 border-b font-semibold">اسم المستخدم</th>
                     <th className="px-4 py-3 border-b font-semibold">الباقة</th>
-                    <th className="px-4 py-3 border-b font-semibold">السعر</th>
+                    <th className="px-4 py-3 border-b font-semibold">السعر المستقطع</th>
                     <th className="px-4 py-3 border-b font-semibold">تفعيل التطبيق</th>
                     <th className="px-4 py-3 border-b font-semibold">انتهاء التطبيق</th>
                     <th className="px-4 py-3 border-b font-semibold">تفعيل محلي</th>
