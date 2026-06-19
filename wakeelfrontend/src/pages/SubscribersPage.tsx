@@ -14,6 +14,7 @@ import {
   hasOperationalWhatsAppSession,
 } from '../utils/operationalFilters';
 import { DEFAULT_DETAILS_TEMPLATE, DEFAULT_ACTIVATION_TEMPLATE } from '../utils/activationMessage';
+import { formatReceiptPrintDate, resolveReceiptPrintAmounts } from '../utils/receiptPrint';
 import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -2485,6 +2486,9 @@ const SubscribersPage: React.FC = () => {
       `;
     }
 
+    const printAmounts = resolveReceiptPrintAmounts(receipt);
+    const printDate = formatReceiptPrintDate(locale, receipt.renewalDate);
+
     const printContent = `
       <!DOCTYPE html>
       <html dir="rtl" lang="ar">
@@ -2608,7 +2612,7 @@ const SubscribersPage: React.FC = () => {
           <div class="header">
             <h1>فاتورة التفعيل</h1>
             <p><strong>رقم الفاتورة:</strong> ${receipt.receiptNumber}</p>
-            <p>${formatDate(receipt.renewalDate)} | ${new Date(receipt.renewalDate).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</p>
+            <p><strong>التاريخ:</strong> ${printDate}</p>
           </div>
 
           <div class="section">
@@ -2628,14 +2632,6 @@ const SubscribersPage: React.FC = () => {
             </div>
           </div>
 
-          <div class="section">
-            <h3>الصلاحية</h3>
-            <div class="info-row">
-              <span class="label">تاريخ الانتهاء:</span>
-              <span class="value">${formatDate(receipt.newExpirationDate)}</span>
-            </div>
-            </div>
-
           <div class="qrcode-block">
             <div class="qrcode-wrap">
               ${qrCodeHtml}
@@ -2651,35 +2647,17 @@ const SubscribersPage: React.FC = () => {
             </div>
             ` : ''}
             <div class="info-row">
-              <span class="label">السعر النهائي:</span>
-              <span class="value">${Number(receipt?.finalPrice ?? 0).toLocaleString()} د.ع</span>
+              <span class="label">سعر الاشتراك:</span>
+              <span class="value">${Number(printAmounts.subscriptionPrice).toLocaleString()} د.ع</span>
             </div>
             <div class="info-row total-row">
               <span class="label">المبلغ الواصل:</span>
-              <span class="value">${Number(receipt?.amountPaid ?? 0).toLocaleString()} د.ع</span>
+              <span class="value">${Number(printAmounts.amountPaid).toLocaleString()} د.ع</span>
             </div>
             <div class="info-row" style="margin-top: 1mm;">
-              <span class="label">المتبقي (دين الاشتراك):</span>
-              <span class="value">${(Number(receipt?.finalPrice ?? 0) - Number(receipt?.amountPaid ?? 0)).toLocaleString()} د.ع</span>
+              <span class="label">دين الاشتراك:</span>
+              <span class="value">${Number(printAmounts.debt).toLocaleString()} د.ع</span>
             </div>
-            ${(receipt?.serviceFeesName || receipt?.serviceFeesId) ? `
-            <div class="info-row" style="margin-top: 2mm; padding-top: 1mm; border-top: 0.5px dashed #000;">
-              <span class="label">أجور الخدمة:</span>
-              <span class="value">${receipt.serviceFeesName || '—'}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">سعر الخدمة:</span>
-              <span class="value">${Number(receipt?.serviceFeesPrice ?? 0).toLocaleString()} د.ع</span>
-            </div>
-            <div class="info-row">
-              <span class="label">الواصل (خدمة):</span>
-              <span class="value">${Number(receipt?.serviceFeesAmountPaid ?? 0).toLocaleString()} د.ع</span>
-            </div>
-            <div class="info-row">
-              <span class="label">متبقي (دين خدمة):</span>
-              <span class="value">${Number(receipt?.serviceFeesRemainingAmount ?? 0).toLocaleString()} د.ع</span>
-            </div>
-            ` : ''}
           </div>
 
           ${receipt.notes ? `

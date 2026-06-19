@@ -18,6 +18,7 @@ import {
 } from '../utils/operationalFilters';
 import { RenewalReceipt, PaymentStatus, ActivationType, AgentReseller, AgentRegion, UserRole } from '../types';
 import { WakeelBadge } from '../components/table/WakeelBadge';
+import { formatReceiptPrintDate, resolveReceiptPrintAmounts } from '../utils/receiptPrint';
 import QRCode from 'qrcode';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { 
@@ -394,6 +395,12 @@ const ReceiptsPage: React.FC = () => {
         `;
       }
 
+      const printAmounts = resolveReceiptPrintAmounts(receipt);
+      const printDate = formatReceiptPrintDate(
+        locale,
+        receipt.renewalDate || receipt.issueDate || receipt.createdAt
+      );
+
       const printContent = `
         <!DOCTYPE html>
         <html dir="rtl" lang="ar">
@@ -465,7 +472,7 @@ const ReceiptsPage: React.FC = () => {
             <div class="header">
               <h1>فاتورة التفعيل</h1>
               <p><strong>رقم الفاتورة:</strong> ${receipt.receiptNumber}</p>
-              <p><strong>التاريخ:</strong> ${formatDate(receipt.renewalDate || receipt.issueDate || receipt.createdAt)} - ${new Date(receipt.renewalDate || receipt.issueDate || receipt.createdAt).toLocaleTimeString(locale)}</p>
+              <p><strong>التاريخ:</strong> ${printDate}</p>
             </div>
 
             <div class="section">
@@ -484,14 +491,6 @@ const ReceiptsPage: React.FC = () => {
               </div>
             </div>
 
-            <div class="section">
-              <h3>تفاصيل التفعيل</h3>
-              <div class="info-row">
-                <span class="label">تاريخ الانتهاء الجديد:</span>
-                <span class="value">${receipt.newExpirationDate ? formatDate(receipt.newExpirationDate) : formatDate(new Date(new Date(receipt.renewalDate || receipt.issueDate || receipt.createdAt).getTime() + (receipt.renewalDays || receipt.renewalPeriod || 30) * 24 * 60 * 60 * 1000))}</span>
-              </div>
-            </div>
-
             ${qrCodeHtml}
 
             <div class="pricing">
@@ -504,34 +503,16 @@ const ReceiptsPage: React.FC = () => {
               ` : ''}
               <div class="info-row">
                 <span class="label">سعر الاشتراك:</span>
-                <span class="value">${formatNumber(receipt.finalPrice || receipt.amount || 0, { suffix: ' د.ع' })}</span>
+                <span class="value">${formatNumber(printAmounts.subscriptionPrice, { suffix: ' د.ع' })}</span>
               </div>
               <div class="info-row">
                 <span class="label">المبلغ الواصل:</span>
-                <span class="value" style="color: green;">${formatNumber(receipt.amountPaid || receipt.amount || 0, { suffix: ' د.ع' })}</span>
+                <span class="value" style="color: green;">${formatNumber(printAmounts.amountPaid, { suffix: ' د.ع' })}</span>
               </div>
               <div class="info-row">
                 <span class="label">دين الاشتراك:</span>
-                <span class="value" style="color: red;">${formatNumber(receipt.remainingAmount || 0, { suffix: ' د.ع' })}</span>
+                <span class="value" style="color: red;">${formatNumber(printAmounts.debt, { suffix: ' د.ع' })}</span>
               </div>
-              ${(receipt.serviceFeesName || receipt.serviceFeesId) ? `
-              <div class="info-row" style="margin-top: 1mm; padding-top: 1mm; border-top: 0.5px dashed #000;">
-                <span class="label">أجور الخدمة:</span>
-                <span class="value">${receipt.serviceFeesName || '—'}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">سعر الخدمة:</span>
-                <span class="value">${formatNumber(receipt.serviceFeesPrice || 0, { suffix: ' د.ع' })}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">الواصل (خدمة):</span>
-                <span class="value" style="color: green;">${formatNumber(receipt.serviceFeesAmountPaid || 0, { suffix: ' د.ع' })}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">دين أجور الخدمة:</span>
-                <span class="value" style="color: red;">${formatNumber(receipt.serviceFeesRemainingAmount || 0, { suffix: ' د.ع' })}</span>
-              </div>
-              ` : ''}
             </div>
 
             ${receipt.notes ? `
