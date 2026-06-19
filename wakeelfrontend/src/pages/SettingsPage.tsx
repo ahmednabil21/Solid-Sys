@@ -6,6 +6,7 @@ import { useDigits } from '../contexts/DigitsContext';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import SubscriberPhonesUpdateSection from '../components/SubscriberPhonesUpdateSection';
 import SubscriberExcelImportSection from '../components/SubscriberExcelImportSection';
+import ActivationExcelImportSection from '../components/ActivationExcelImportSection';
 import {
   getActivationMessageSettings,
   setActivationMessageSettings,
@@ -81,6 +82,7 @@ import {
   Activity,
   DollarSign,
   Upload,
+  Receipt,
 } from 'lucide-react';
 
 /** نقاط تُعرض أثناء استيراد المشتركين — ألوان ومزايا النظام */
@@ -489,7 +491,8 @@ function SettingsPage() {
     | 'subscriberApp'
     | 'subscriberAnnouncement'
     | 'subscriberPhones'
-    | 'subscriberExcelImport';
+    | 'subscriberExcelImport'
+    | 'activationExcelImport';
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
 
   const {
@@ -2290,6 +2293,9 @@ function SettingsPage() {
           {isAgentOrSubAgent && activeSection === 'subscriberExcelImport' && (
             <SubscriberExcelImportSection />
           )}
+          {isAgentOrSubAgent && activeSection === 'activationExcelImport' && (
+            <ActivationExcelImportSection />
+          )}
 
           {/* قالب رسالة خاصة — للوكيل/الموظف، يُرسل كما هو لأي مشترك بدون مكانات */}
           {isAgentOrSubAgent && activeSection === 'customMessage' && (
@@ -3886,6 +3892,20 @@ function SettingsPage() {
                 >
                   <Upload className="h-5 w-5 flex-shrink-0" />
                   <span>استيراد مشتركين Excel</span>
+                </button>
+              )}
+              {isAgentOrSubAgent && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('activationExcelImport')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                    activeSection === 'activationExcelImport'
+                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Receipt className="h-5 w-5 flex-shrink-0" />
+                  <span>رفع اكسل تفعيلات</span>
                 </button>
               )}
               {isAgentOrSubAgent && (

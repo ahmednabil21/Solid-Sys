@@ -87,8 +87,18 @@ function ftthCompareDateToInput(date: string | null | undefined): string | undef
   return norm || undefined;
 }
 
+function resolveFtthCompareIsNewSubscriber(row: {
+  isNewSubscriber?: boolean;
+  operationType?: string | null;
+}): boolean {
+  if (!row.isNewSubscriber) return false;
+  const op = String(row.operationType ?? '').trim();
+  if (op === 'مشترك جديد ثاني شهر 20' || op === 'مشترك لديه خصم 29') return false;
+  return true;
+}
+
 function ftthCompareRowHasMismatch(row: FtthSubscriptionsCompareItem): boolean {
-  if (row.isNewSubscriber) return true;
+  if (resolveFtthCompareIsNewSubscriber(row)) return true;
   if (!row.localExpiration) return true;
   const localExp = normalizeCompareDate(row.localExpiration);
   const ftthExp = normalizeCompareDate(row.ftthExpiration);
@@ -390,7 +400,8 @@ function mapFtthAppTransactionToCompareItem(item: FtthAppTransactionsItem): Ftth
     localExpiration: item.localExpiration,
     paymentType: item.paymentType,
     transactionAmount: item.transactionAmount,
-    isNewSubscriber: item.isNewSubscriber,
+    operationType: item.operationType,
+    isNewSubscriber: resolveFtthCompareIsNewSubscriber(item),
     basePlanRenewalCount: item.activationCount,
     sameDayBasePlanRenewalCount: 0,
   };
@@ -1542,7 +1553,7 @@ const SubscribersPage: React.FC = () => {
     }
     setOpeningFtthCompareRowIndex(rowIndex);
     try {
-      const isNewSubscriber = !!row.isNewSubscriber;
+      const isNewSubscriber = resolveFtthCompareIsNewSubscriber(row);
       let subscriberToRenew =
         (subscribers ?? []).find((s) => (s.username ?? '').toString().trim().toLowerCase() === username.toLowerCase()) ?? null;
 
@@ -6238,7 +6249,7 @@ const SubscribersPage: React.FC = () => {
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
                                 متطابق
                               </span>
-                            ) : row.isNewSubscriber ? (
+                            ) : resolveFtthCompareIsNewSubscriber(row) ? (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
                                 مشترك جديد
                               </span>

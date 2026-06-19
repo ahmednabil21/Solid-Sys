@@ -3127,6 +3127,28 @@ class ApiService {
     return response.data;
   }
 
+  async importActivationsFromExcel(
+    file: File,
+    options?: { agentId?: string; resellerId?: string },
+  ): Promise<ExcelImportResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const params = new URLSearchParams();
+    if (options?.agentId) params.set('agentId', options.agentId);
+    if (options?.resellerId) params.set('resellerId', options.resellerId);
+    const query = params.toString();
+    const url = `/ExcelImport/activations${query ? `?${query}` : ''}`;
+
+    const response: AxiosResponse<ExcelImportResponse> = await this.api.post(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 600000,
+    });
+    return response.data;
+  }
+
   async downloadSubscriberExcelTemplate(agentId?: string): Promise<Blob> {
     const response = await this.api.get('/ExcelImport/template', {
       params: agentId ? { agentId } : undefined,

@@ -9,6 +9,8 @@ interface PaginationProps {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   onPageChange: (page: number) => void;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (size: number) => void;
   className?: string;
 }
 
@@ -20,6 +22,8 @@ const Pagination: React.FC<PaginationProps> = ({
   hasNextPage,
   hasPreviousPage,
   onPageChange,
+  pageSizeOptions,
+  onPageSizeChange,
   className = '',
 }) => {
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -64,11 +68,31 @@ const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <div className={`wakeel-table-pagination ${className}`.trim()}>
-      <p className="wakeel-table-pagination-meta order-2 sm:order-1">
-        {totalItems === 0
-          ? 'لا توجد عناصر'
-          : `عرض ${startItem}–${endItem} من ${totalItems}`}
-      </p>
+      <div className="flex flex-wrap items-center gap-3 order-2 sm:order-1">
+        <p className="wakeel-table-pagination-meta">
+          {totalItems === 0
+            ? 'لا توجد عناصر'
+            : `عرض ${startItem}–${endItem} من ${totalItems}`}
+        </p>
+        {pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && (
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <span>عرض</span>
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm"
+              aria-label="عدد الصفوف في الصفحة"
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            <span>سطر</span>
+          </label>
+        )}
+      </div>
 
       <div className="wakeel-table-pagination-nav order-1 sm:order-2">
         <button

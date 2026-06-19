@@ -91,6 +91,21 @@ function activationPaymentMethodLabel(pm?: number | null): string {
 }
 
 const LEDGER_TABLE_COLS = 16;
+const ACCOUNTS_PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
+
+function formatAccountsDateRangeLabel(from: string, to: string): string {
+  if (!from && !to) return 'كل الفترة (الأحدث أولاً)';
+  if (from && to) return `${from} — ${to}`;
+  if (from) return `من ${from}`;
+  return `حتى ${to}`;
+}
+
+function normalizeAccountsDateRange(from: string, to: string): { from: string; to: string } {
+  const f = (from ?? '').trim();
+  const t = (to ?? '').trim();
+  if (f && t && f > t) return { from: t, to: f };
+  return { from: f, to: t };
+}
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
   kind: 'Renewal';
@@ -139,10 +154,10 @@ const ReportsPage: React.FC = () => {
 
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [selectedAgentId, setSelectedAgentId] = useState('');
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(defaultToDate);
-  const [appliedFromDate, setAppliedFromDate] = useState(defaultFromDate);
-  const [appliedToDate, setAppliedToDate] = useState(defaultToDate);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [appliedFromDate, setAppliedFromDate] = useState('');
+  const [appliedToDate, setAppliedToDate] = useState('');
   const [subscriberName, setSubscriberName] = useState('');
   const [appliedSubscriberName, setAppliedSubscriberName] = useState('');
   const [packageType, setPackageType] = useState<string>('');
@@ -152,7 +167,7 @@ const ReportsPage: React.FC = () => {
   const [selectedOperationalRegionId, setSelectedOperationalRegionId] = useState('');
   const [selectedOperationalResellerId, setSelectedOperationalResellerId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState<number>(ACCOUNTS_PAGE_SIZE_OPTIONS[0]);
   const [isExportingAccounts, setIsExportingAccounts] = useState(false);
   const [showAdvancedFiltersModal, setShowAdvancedFiltersModal] = useState(false);
 
@@ -318,8 +333,13 @@ const ReportsPage: React.FC = () => {
   const ledgerColSpan = LEDGER_TABLE_COLS + (canDeleteLedger ? 1 : 0);
 
   const handleApplyFilters = () => {
-    setAppliedFromDate(fromDate);
-    setAppliedToDate(toDate);
+    const normalized = normalizeAccountsDateRange(fromDate, toDate);
+    if (normalized.from !== fromDate.trim() || normalized.to !== toDate.trim()) {
+      setFromDate(normalized.from);
+      setToDate(normalized.to);
+    }
+    setAppliedFromDate(normalized.from);
+    setAppliedToDate(normalized.to);
     setAppliedSubscriberName(subscriberName);
     setAppliedPackageType(packageType);
     setAppliedExecutedByUserId(executedByUserId);
@@ -327,17 +347,29 @@ const ReportsPage: React.FC = () => {
     setShowAdvancedFiltersModal(false);
   };
 
+  const handleApplyDateFilter = () => {
+    handleApplyFilters();
+  };
+
   const handleResetFilters = () => {
-    setFromDate(defaultFromDate);
-    setToDate(defaultToDate);
+    setFromDate('');
+    setToDate('');
     setSubscriberName('');
     setPackageType('');
     setExecutedByUserId('');
-    setAppliedFromDate(defaultFromDate);
-    setAppliedToDate(defaultToDate);
+    setAppliedFromDate('');
+    setAppliedToDate('');
     setAppliedSubscriberName('');
     setAppliedPackageType('');
     setAppliedExecutedByUserId('');
+    setCurrentPage(1);
+  };
+
+  const handleLast30DaysFilter = () => {
+    setFromDate(defaultFromDate);
+    setToDate(defaultToDate);
+    setAppliedFromDate(defaultFromDate);
+    setAppliedToDate(defaultToDate);
     setCurrentPage(1);
   };
 
@@ -348,6 +380,7 @@ const ReportsPage: React.FC = () => {
         <input
           type="date"
           value={fromDate}
+          max={toDate || undefined}
           onChange={(e) => setFromDate(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
         />
@@ -357,9 +390,11 @@ const ReportsPage: React.FC = () => {
         <input
           type="date"
           value={toDate}
+          min={fromDate || undefined}
           onChange={(e) => setToDate(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
         />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">اترك الحقلين فارغين لعرض كل السجلات (الأحدث أولاً)</p>
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">اسم المشترك</label>
@@ -501,6 +536,55 @@ const ReportsPage: React.FC = () => {
               ))}
             </select>
           )}
+          <div className="flex flex-wrap items-end gap-2 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-white/80 dark:bg-gray-800/80">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">من</label>
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+                disabled={isAdmin && !selectedAgentId}
+                className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">إلى</label>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                disabled={isAdmin && !selectedAgentId}
+                className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleApplyDateFilter}
+              disabled={isAdmin && !selectedAgentId}
+              className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm disabled:opacity-50"
+            >
+              تطبيق
+            </button>
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              disabled={isAdmin && !selectedAgentId}
+              className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md text-sm disabled:opacity-50"
+              title="كل الفترة"
+            >
+              الكل
+            </button>
+            <button
+              type="button"
+              onClick={handleLast30DaysFilter}
+              disabled={isAdmin && !selectedAgentId}
+              className="px-3 py-1.5 text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md text-sm disabled:opacity-50"
+            >
+              30 يوم
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setShowAdvancedFiltersModal(true)}
@@ -813,15 +897,20 @@ const ReportsPage: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
-                {ledger && ledger.totalPages > 0 && (
+                {ledger && (
                   <Pagination
-                    currentPage={ledger.currentPage}
-                    totalPages={ledger.totalPages}
+                    currentPage={Math.max(1, ledger.currentPage)}
+                    totalPages={Math.max(1, ledger.totalPages)}
                     totalItems={ledger.totalItems}
                     pageSize={ledger.pageSize}
                     hasNextPage={ledger.hasNextPage}
                     hasPreviousPage={ledger.hasPreviousPage}
                     onPageChange={setCurrentPage}
+                    pageSizeOptions={[...ACCOUNTS_PAGE_SIZE_OPTIONS]}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
                   />
                 )}
               </div>
@@ -841,7 +930,7 @@ const ReportsPage: React.FC = () => {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">الفلترة المتقدمة</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  {appliedFromDate} — {appliedToDate}
+                  {formatAccountsDateRangeLabel(appliedFromDate, appliedToDate)}
                 </p>
               </div>
               <button
@@ -868,6 +957,13 @@ const ReportsPage: React.FC = () => {
                   type="button"
                   onClick={handleResetFilters}
                   className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md text-sm"
+                >
+                  كل الفترة
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLast30DaysFilter}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md text-sm"
                 >
                   آخر 30 يوم
                 </button>

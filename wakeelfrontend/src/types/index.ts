@@ -614,6 +614,8 @@ export interface FtthAppTransactionsItem {
   paymentType?: string | null;
   planPrice: number;
   transactionAmount?: FtthTransactionAmount | number | null;
+  operationType?: string | null;
+  transactionType?: string | null;
   startsAt?: string | null;
   username: string;
 }
@@ -2413,6 +2415,8 @@ export interface ExcelImportResponse {
   errorCount?: number;
   errorDetails?: string;
   importDate?: string;
+  activationsCreated?: number;
+  skippedCount?: number;
 }
 
 // Pagination Types
