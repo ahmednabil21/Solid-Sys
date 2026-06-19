@@ -107,8 +107,7 @@ const BalancePage: React.FC = () => {
     mutationFn: (id: string) => apiService.deleteBalanceTopUp(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['balance-topups'] });
-      queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
-      showSuccess('تم الحذف', 'تم حذف سجل التعبئة وخصم المبلغ من الرصيد');
+      showSuccess('تم الحذف', 'تم حذف سجل التعبئة من السجل');
     },
     onError: (err: unknown) => {
       showError('خطأ في الحذف', ApiService.showError(err));
@@ -222,7 +221,7 @@ const BalancePage: React.FC = () => {
   const handleDeleteTopUp = async (row: (typeof topUpsList)[number]) => {
     const ok = await confirmAction(
       'حذف التعبئة',
-      `هل تريد حذف تعبئة ${formatNumber(row.amountIqd, { suffix: ' د.ع' })} للمستلم «${row.recipientName}»؟ سيُخصم المبلغ من الرصيد.`
+      `هل تريد حذف تعبئة ${formatNumber(row.amountIqd, { suffix: ' د.ع' })} للمستلم «${row.recipientName}» من السجل؟ لن يتأثر الرصيد الحالي.`
     );
     if (!ok) return;
     deleteTopUpMutation.mutate(row.id);
