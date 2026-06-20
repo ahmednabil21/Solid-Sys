@@ -1497,7 +1497,7 @@ const SubscribersPage: React.FC = () => {
   const openRenewalModalForFtthSyncRow = async (row: CashbackSynchronizationFtthRow, rowIndex: number) => {
     const username = resolveAutoSyncRowUsername(row);
     if (!username) {
-      showError('تفعيل المشترك', 'لا يمكن التفعيل لأن اسم المستخدم فارغ. نفّذ المزامنة أولاً ثم أعد المحاولة.');
+      showError('مزامنة المشترك', 'لا يمكن المزامنة لأن اسم المستخدم فارغ.');
       return;
     }
     setOpeningRenewalFtthRowIndex(rowIndex);
@@ -1514,7 +1514,7 @@ const SubscribersPage: React.FC = () => {
       }
 
       if (!subscriberToRenew?.id) {
-        showError('تفعيل المشترك', 'تعذر العثور على المشترك داخل النظام بهذا اسم المستخدم. نفّذ الحفظ أولاً ثم أعد التفعيل.');
+        showError('مزامنة المشترك', 'تعذر العثور على المشترك داخل النظام بهذا اسم المستخدم.');
         return;
       }
 
@@ -1546,7 +1546,7 @@ const SubscribersPage: React.FC = () => {
       setShowAutoSyncModal(false);
       setShowRenewalModal(true);
     } catch (err: unknown) {
-      showError('تفعيل المشترك', ApiService.showError(err));
+      showError('مزامنة المشترك', ApiService.showError(err));
     } finally {
       setOpeningRenewalFtthRowIndex(null);
     }
@@ -6490,20 +6490,9 @@ const SubscribersPage: React.FC = () => {
                   </div>
                 )}
               </div>
-              {autoSyncReseller?.serviceType === ServiceType.Sas && (autoSyncFtthResult?.data?.length ?? 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => saveAllSasSyncItemsMutation.mutate()}
-                  disabled={savingAllSasRows}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
-                >
-                  {savingAllSasRows ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
-                  حفظ الكل
-                </button>
-              )}
             </div>
 
-            {effectiveAutoSyncServiceFeesList.length > 0 && (
+            {effectiveAutoSyncServiceFeesList.length > 0 && autoSyncReseller?.serviceType !== ServiceType.Sas && (
               <div className="mx-5 mt-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة عند الحفظ (اختياري)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -6611,9 +6600,7 @@ const SubscribersPage: React.FC = () => {
                     </tr>
                   ) : autoSyncReseller?.serviceType === ServiceType.Sas ? (
                     (autoSyncFtthResult?.data ?? []).map((row: CashbackSynchronizationFtthRow, idx: number) => {
-                      const isSavingThisRow = savingFtthRowIndex === idx;
                       const isOpeningRenewalThisRow = openingRenewalFtthRowIndex === idx;
-                      const isSaved = savedFtthRowIndices.has(idx);
                       const isActivated = activatedFtthRowIndices.has(idx);
                       const subscriberName = row.subscriberName ?? row.customerName ?? row.firstname ?? null;
                       const username = resolveAutoSyncRowUsername(row);
@@ -6681,26 +6668,17 @@ const SubscribersPage: React.FC = () => {
                             <div className="inline-flex flex-col items-stretch gap-1.5">
                               <button
                                 type="button"
-                                disabled={savingAllSasRows || isSavingThisRow || isOpeningRenewalThisRow || !username}
-                                onClick={() => saveFtthSyncItemMutation.mutate({ row, rowIndex: idx })}
+                                disabled={isOpeningRenewalThisRow || !username}
+                                onClick={() => openRenewalModalForFtthSyncRow(row, idx)}
                                 className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
                               >
-                                {isSavingThisRow ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                                {isOpeningRenewalThisRow ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
                                 مزامنة
                               </button>
-                              <button
-                                type="button"
-                                disabled={savingAllSasRows || isSavingThisRow || isOpeningRenewalThisRow || !username}
-                                onClick={() => openRenewalModalForFtthSyncRow(row, idx)}
-                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-gray-700 hover:bg-gray-800 text-white disabled:opacity-60"
-                              >
-                                {isOpeningRenewalThisRow ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
-                                تفعيل
-                              </button>
-                              {(isSaved || isActivated) && (
+                              {isActivated && (
                                 <span className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
                                   <Check className="h-3 w-3" />
-                                  {isActivated ? 'تم التفعيل' : 'تمت المزامنة'}
+                                  تمت المزامنة
                                 </span>
                               )}
                             </div>
