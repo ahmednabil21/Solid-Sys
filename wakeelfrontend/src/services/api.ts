@@ -1447,23 +1447,65 @@ class ApiService {
   }
 
   private normalizeSynchronizationDiffRow(r: any): import('../types').CashbackSynchronizationFtthRow {
+    const subscriberName = r?.subscriberName ?? r?.SubscriberName ?? null;
+    const externalMsisdn = r?.externalMsisdn ?? r?.ExternalMsisdn ?? null;
+    const localUsername = r?.localUsername ?? r?.LocalUsername ?? null;
+    const externalEndDate = r?.externalEndDate ?? r?.ExternalEndDate ?? null;
+    const localExpirationDate = r?.localExpirationDate ?? r?.LocalExpirationDate ?? null;
+    const externalOfferName = r?.externalOfferName ?? r?.ExternalOfferName ?? null;
+    const localProfileName = r?.localProfileName ?? r?.LocalProfileName ?? null;
+    const offerName = r?.offerName ?? r?.OfferName ?? externalOfferName ?? null;
+    const expirationDate = r?.expirationDate ?? r?.ExpirationDate ?? externalEndDate ?? null;
+    const diffFieldsRaw = r?.diffFields ?? r?.DiffFields;
+    const diffFields = Array.isArray(diffFieldsRaw)
+      ? diffFieldsRaw.map((x: unknown) => String(x))
+      : undefined;
+
     return {
       subscriberId: r?.subscriberId ?? r?.SubscriberId ?? null,
       customerId: r?.customerId ?? r?.CustomerId ?? null,
-      customerName: r?.customerName ?? r?.CustomerName ?? r?.firstname ?? r?.Firstname ?? null,
-      deviceUsername: r?.deviceUsername ?? r?.DeviceUsername ?? r?.username ?? r?.Username ?? null,
+      customerName: r?.customerName ?? r?.CustomerName ?? subscriberName ?? r?.firstname ?? r?.Firstname ?? null,
+      subscriberName,
+      deviceUsername:
+        r?.deviceUsername ?? r?.DeviceUsername ?? localUsername ?? externalMsisdn ?? r?.username ?? r?.Username ?? null,
+      localUsername,
+      externalMsisdn,
       subscriptionName:
-        r?.subscriptionName ?? r?.SubscriptionName ?? r?.profile_details?.name ?? r?.ProfileDetails?.name ?? null,
+        r?.subscriptionName ??
+        r?.SubscriptionName ??
+        externalOfferName ??
+        localProfileName ??
+        offerName ??
+        r?.profile_details?.name ??
+        r?.ProfileDetails?.name ??
+        null,
+      offerName,
+      externalOfferName,
+      localProfileName,
       subscriptionEndsAt:
-        r?.subscriptionEndsAt ?? r?.SubscriptionEndsAt ?? r?.new_expiration ?? r?.NewExpiration ?? null,
-      localSubscriptionEndsAt: r?.localSubscriptionEndsAt ?? r?.LocalSubscriptionEndsAt ?? null,
+        r?.subscriptionEndsAt ??
+        r?.SubscriptionEndsAt ??
+        externalEndDate ??
+        expirationDate ??
+        r?.new_expiration ??
+        r?.NewExpiration ??
+        null,
+      expirationDate,
+      externalEndDate,
+      localSubscriptionEndsAt:
+        r?.localSubscriptionEndsAt ?? r?.LocalSubscriptionEndsAt ?? localExpirationDate ?? null,
+      localExpirationDate,
+      localActivationDate: r?.localActivationDate ?? r?.LocalActivationDate ?? null,
       zoneId: r?.zoneId ?? r?.ZoneId ?? null,
       activationType: r?.activationType ?? r?.ActivationType ?? null,
+      diffFields,
+      externalSubscriptionActive: r?.externalSubscriptionActive ?? r?.ExternalSubscriptionActive ?? null,
+      localSubscriptionActive: r?.localSubscriptionActive ?? r?.LocalSubscriptionActive ?? null,
       firstname: r?.firstname ?? r?.Firstname ?? null,
       profile_details: r?.profile_details ?? r?.ProfileDetails ?? null,
-      new_expiration: r?.new_expiration ?? r?.NewExpiration ?? null,
+      new_expiration: r?.new_expiration ?? r?.NewExpiration ?? externalEndDate ?? null,
       parent_username: r?.parent_username ?? r?.ParentUsername ?? null,
-      username: r?.username ?? r?.Username ?? null,
+      username: r?.username ?? r?.Username ?? localUsername ?? externalMsisdn ?? null,
       activation_method: r?.activation_method ?? r?.ActivationMethod ?? null,
     };
   }
@@ -1487,11 +1529,27 @@ class ApiService {
     options?: { serviceFeesId?: string; serviceFeesAmountPaid?: number }
   ): import('../types').SynchronizationDiffSaveRequest {
     const body: import('../types').SynchronizationDiffSaveRequest = {
-      customerId: row.customerId ?? undefined,
-      customerName: (row.customerName ?? row.firstname ?? undefined) || undefined,
-      deviceUsername: (row.deviceUsername ?? row.username ?? undefined) || undefined,
-      subscriptionName: (row.subscriptionName ?? row.profile_details?.name ?? undefined) || undefined,
-      subscriptionEndsAt: (row.subscriptionEndsAt ?? row.new_expiration ?? undefined) || undefined,
+      customerId: row.customerId ?? row.subscriberId ?? undefined,
+      customerName:
+        (row.customerName ?? row.subscriberName ?? row.firstname ?? undefined) || undefined,
+      deviceUsername:
+        (row.deviceUsername ?? row.localUsername ?? row.externalMsisdn ?? row.username ?? undefined) ||
+        undefined,
+      subscriptionName:
+        (row.subscriptionName ??
+          row.externalOfferName ??
+          row.localProfileName ??
+          row.offerName ??
+          row.profile_details?.name ??
+          undefined) ||
+        undefined,
+      subscriptionEndsAt:
+        (row.subscriptionEndsAt ??
+          row.externalEndDate ??
+          row.expirationDate ??
+          row.new_expiration ??
+          undefined) ||
+        undefined,
       zoneId: row.zoneId ?? undefined,
     };
     if (options?.serviceFeesId) {

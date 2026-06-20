@@ -454,15 +454,25 @@ function formatTransactionPaymentDisplay(row: { wallet_owner_type?: string | nul
   return formatSyncWalletOrPaymentDisplay(row);
 }
 
-/** مزامنة تلقائياً: الصفوف التي يعيدها الباكند مع deviceUsername فارغ لا تُعرض كمشترك */
+/** مزامنة تلقائياً: الصفوف بدون اسم مستخدم/خط لا تُعرض */
+function resolveAutoSyncRowUsername(row: CashbackSynchronizationFtthRow): string {
+  return (row.localUsername ?? row.externalMsisdn ?? row.deviceUsername ?? row.username ?? '')
+    .toString()
+    .trim();
+}
+
+function sasSyncRowHasMismatch(row: CashbackSynchronizationFtthRow): boolean {
+  if (row.diffFields && row.diffFields.length > 0) return true;
+  const ext = row.externalEndDate ?? row.expirationDate ?? row.subscriptionEndsAt;
+  const local = row.localExpirationDate ?? row.localSubscriptionEndsAt;
+  if (!ext || !local) return true;
+  return new Date(ext).getTime() !== new Date(local).getTime();
+}
+
 function filterAutoSyncFtthRowsWithDeviceUsername(
   res: CashbackSynchronizationFtthResponse
 ): CashbackSynchronizationFtthResponse {
-  const data = (res.data ?? []).filter((row) => {
-    const v = row.deviceUsername;
-    if (v === undefined) return true;
-    return String(v).trim() !== '';
-  });
+  const data = (res.data ?? []).filter((row) => resolveAutoSyncRowUsername(row) !== '');
   return { ...res, data, count: data.length };
 }
 
@@ -1276,9 +1286,13 @@ const SubscribersPage: React.FC = () => {
         agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
       });
     },
-    onSuccess: (res) => {
+    onSuccess: (res, selectedReseller) => {
       const filtered = filterAutoSyncFtthRowsWithDeviceUsername(res);
-      setAutoSyncFtthResult(filtered);
+      const targetReseller = selectedReseller ?? autoSyncReseller;
+      setAutoSyncFtthResult({
+        ...filtered,
+        provider: targetReseller?.serviceType === ServiceType.Sas ? 'SAS' : 'FTTH',
+      });
       resetAutoSyncServiceFeesState();
       setSavedFtthRowIndices(new Set());
       setActivatedFtthRowIndices(new Set());
@@ -1481,9 +1495,9 @@ const SubscribersPage: React.FC = () => {
   });
 
   const openRenewalModalForFtthSyncRow = async (row: CashbackSynchronizationFtthRow, rowIndex: number) => {
-    const username = (row.deviceUsername ?? row.username ?? '').toString().trim();
+    const username = resolveAutoSyncRowUsername(row);
     if (!username) {
-      showError('تفعيل المشترك', 'لا يمكن التفعيل لأن deviceUsername فارغ. احفظ المشترك أولاً ثم أعد المحاولة.');
+      showError('تفعيل المشترك', 'لا يمكن التفعيل لأن اسم المستخدم فارغ. نفّذ المزامنة أولاً ثم أعد المحاولة.');
       return;
     }
     setOpeningRenewalFtthRowIndex(rowIndex);
@@ -1521,8 +1535,10 @@ const SubscribersPage: React.FC = () => {
         serviceFeesAmountPaid: undefined,
         activationPaymentMethod: ActivationPaymentMethod.Cash,
         activationChannel: RenewalActivationChannel.Normal,
-        renewalDate: ftthCompareDateToInput((row as { ftthActivation?: string }).ftthActivation),
-        newExpirationDate: ftthCompareDateToInput((row as { ftthExpiration?: string }).ftthExpiration),
+        renewalDate: ftthCompareDateToInput(row.localActivationDate ?? undefined),
+        newExpirationDate: ftthCompareDateToInput(
+          row.externalEndDate ?? row.expirationDate ?? row.subscriptionEndsAt ?? row.new_expiration ?? undefined
+        ),
       });
       setActivationServiceFeesEnabled({});
       setRenewalViaSasTab(false);
@@ -6436,7 +6452,9 @@ const SubscribersPage: React.FC = () => {
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  نتائج المزامنة التلقائية {String(autoSyncFtthResult?.provider || '').toUpperCase() || 'FTTH'}
+                  {autoSyncReseller?.serviceType === ServiceType.Sas
+                    ? 'مزامنة SAS — اختلافات تاريخ الانتهاء'
+                    : `نتائج المزامنة التلقائية ${String(autoSyncFtthResult?.provider || '').toUpperCase() || 'FTTH'}`}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 </p>
@@ -6560,25 +6578,136 @@ const SubscribersPage: React.FC = () => {
             <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20">
               <table className="min-w-[980px] w-full text-sm text-right border-separate border-spacing-0">
                 <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10 backdrop-blur-sm">
-                  <tr>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المشترك</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">الباقة</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">انتهاء الاشتراك</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">
-                      {autoSyncReseller?.serviceType === ServiceType.Sas ? 'الوكيل' : 'المنطقة'}
-                    </th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المستخدم</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">طريقة التفعيل</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">إجراءات</th>
-                  </tr>
+                  {autoSyncReseller?.serviceType === ServiceType.Sas ? (
+                    <tr>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المشترك</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المستخدم</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">باقة SAS</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">باقة محلية</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">تفعيل محلي</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">انتهاء SAS</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">انتهاء محلي</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">الحالة</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">إجراءات</th>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المشترك</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">الباقة</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">انتهاء الاشتراك</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">المنطقة</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">اسم المستخدم</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">طريقة التفعيل</th>
+                      <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200">إجراءات</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody>
                   {(autoSyncFtthResult?.data ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={autoSyncReseller?.serviceType === ServiceType.Sas ? 9 : 7} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
                         لا توجد اختلافات في تاريخ انتهاء الاشتراك.
                       </td>
                     </tr>
+                  ) : autoSyncReseller?.serviceType === ServiceType.Sas ? (
+                    (autoSyncFtthResult?.data ?? []).map((row: CashbackSynchronizationFtthRow, idx: number) => {
+                      const isSavingThisRow = savingFtthRowIndex === idx;
+                      const isOpeningRenewalThisRow = openingRenewalFtthRowIndex === idx;
+                      const isSaved = savedFtthRowIndices.has(idx);
+                      const isActivated = activatedFtthRowIndices.has(idx);
+                      const subscriberName = row.subscriberName ?? row.customerName ?? row.firstname ?? null;
+                      const username = resolveAutoSyncRowUsername(row);
+                      const externalOffer = row.externalOfferName ?? row.offerName ?? row.subscriptionName ?? null;
+                      const localOffer = row.localProfileName ?? null;
+                      const externalEnd = row.externalEndDate ?? row.expirationDate ?? row.subscriptionEndsAt ?? null;
+                      const localEnd = row.localExpirationDate ?? row.localSubscriptionEndsAt ?? null;
+                      const mismatch = sasSyncRowHasMismatch(row);
+                      return (
+                        <tr
+                          key={`${username || subscriberName || 'r'}-${idx}`}
+                          className={`border-t border-gray-100 dark:border-gray-700 even:bg-white odd:bg-gray-50/70 dark:even:bg-gray-800/40 dark:odd:bg-gray-800/20 transition-colors ${
+                            mismatch ? 'bg-amber-50/80 dark:bg-amber-900/15' : 'hover:bg-primary-50/50 dark:hover:bg-primary-900/15'
+                          }`}
+                        >
+                          <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{subscriberName || '—'}</td>
+                          <td className="px-4 py-3">
+                            {username ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 break-all">
+                                {username}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {externalOffer ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                                {externalOffer}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {localOffer ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
+                                {localOffer}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {row.localActivationDate ? formatDate(row.localActivationDate, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap font-medium text-amber-700 dark:text-amber-300">
+                            {externalEnd ? formatDate(externalEnd, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {localEnd ? formatDate(localEnd, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {!mismatch ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                متطابق
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                اختلاف تواريخ
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="inline-flex flex-col items-stretch gap-1.5">
+                              <button
+                                type="button"
+                                disabled={savingAllSasRows || isSavingThisRow || isOpeningRenewalThisRow || !username}
+                                onClick={() => saveFtthSyncItemMutation.mutate({ row, rowIndex: idx })}
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
+                              >
+                                {isSavingThisRow ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                                مزامنة
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingAllSasRows || isSavingThisRow || isOpeningRenewalThisRow || !username}
+                                onClick={() => openRenewalModalForFtthSyncRow(row, idx)}
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-gray-700 hover:bg-gray-800 text-white disabled:opacity-60"
+                              >
+                                {isOpeningRenewalThisRow ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                                تفعيل
+                              </button>
+                              {(isSaved || isActivated) && (
+                                <span className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                  <Check className="h-3 w-3" />
+                                  {isActivated ? 'تم التفعيل' : 'تمت المزامنة'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     (autoSyncFtthResult?.data ?? []).map((row: CashbackSynchronizationFtthRow, idx: number) => {
                       const isSavingThisRow = savingFtthRowIndex === idx;

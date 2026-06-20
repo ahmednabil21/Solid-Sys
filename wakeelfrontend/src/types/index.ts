@@ -506,6 +506,20 @@ export interface CashbackSynchronizationFtthRow {
   zoneId?: string | null;
   deviceUsername?: string | null;
   activationType?: string | null;
+  /** حقول SAS/Zain Fi diff الجديدة */
+  subscriberName?: string | null;
+  expirationDate?: string | null;
+  offerName?: string | null;
+  diffFields?: string[];
+  externalMsisdn?: string | null;
+  localUsername?: string | null;
+  localActivationDate?: string | null;
+  externalEndDate?: string | null;
+  localExpirationDate?: string | null;
+  externalOfferName?: string | null;
+  localProfileName?: string | null;
+  externalSubscriptionActive?: boolean | null;
+  localSubscriptionActive?: boolean | null;
   /** حقول SAS القديمة */
   firstname?: string | null;
   profile_details?: { name?: string | null } | null;
