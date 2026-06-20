@@ -2094,6 +2094,10 @@ export interface RenewalReceipt {
   serviceFeesPrice?: number;
   serviceFeesAmountPaid?: number;
   serviceFeesRemainingAmount?: number;
+  /** اسم الموظف الذي نفّذ التفعيل */
+  performedByFullName?: string | null;
+  /** تاريخ طباعة/إصدار الفاتورة */
+  receiptIssueDate?: string | null;
   /** الفاتورة المرتبطة بالتجديد إن وُجدت (من الباكند) */
   createdReceipt?: unknown | null;
 }

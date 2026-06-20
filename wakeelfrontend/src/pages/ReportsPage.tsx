@@ -4,6 +4,11 @@ import { apiService, ApiService } from '../services/api';
 import { StatCard } from '../components/StatCard';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import Pagination from '../components/Pagination';
+import PageSearchDateFilterBar from '../components/filters/PageSearchDateFilterBar';
+import OperationalFiltersSidebar from '../components/filters/OperationalFiltersSidebar';
+import ListPageWithFilters from '../components/layout/ListPageWithFilters';
+import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
+import { useOperationalFilters } from '../hooks/useOperationalFilters';
 import { useAuth } from '../contexts/AuthContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { useConfirmation } from '../contexts/ConfirmationContext';
@@ -21,11 +26,6 @@ import {
 import { showError, showSuccess } from '../utils/notifications';
 import {
   buildRegionResellerFilterParams,
-  filterResellersByRegion,
-  loadStoredOperationalRegionId,
-  loadStoredOperationalResellerId,
-  saveStoredOperationalRegionId,
-  saveStoredOperationalResellerId,
 } from '../utils/operationalFilters';
 import {
   ArrowDownLeft,
@@ -92,7 +92,6 @@ function activationPaymentMethodLabel(pm?: number | null): string {
 }
 
 const LEDGER_TABLE_COLS = 17;
-const ACCOUNTS_PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 
 function formatAccountsDateRangeLabel(from: string, to: string): string {
   if (!from && !to) return 'كل الفترة (الأحدث أولاً)';
@@ -166,51 +165,28 @@ const ReportsPage: React.FC = () => {
   const [appliedPackageType, setAppliedPackageType] = useState<string>('');
   const [executedByUserId, setExecutedByUserId] = useState('');
   const [appliedExecutedByUserId, setAppliedExecutedByUserId] = useState('');
-  const [selectedOperationalRegionId, setSelectedOperationalRegionId] = useState('');
-  const [selectedOperationalResellerId, setSelectedOperationalResellerId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(ACCOUNTS_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
   const [isExportingAccounts, setIsExportingAccounts] = useState(false);
   const [showAdvancedFiltersModal, setShowAdvancedFiltersModal] = useState(false);
 
-  const { data: myResellers = [] } = useQuery<AgentReseller[]>({
-    queryKey: ['myResellers', 'accounts'],
-    queryFn: () => apiService.getMyResellers(),
-    enabled: isAuthenticated && !!isAgentOrSubAgentOrEmployee,
-    retry: false,
-  });
-  const { data: myRegions = [] } = useQuery<AgentRegion[]>({
-    queryKey: ['myRegions', 'accounts'],
-    queryFn: () => apiService.getMyRegions(true),
-    enabled: isAuthenticated && !!isAgentOrSubAgentOrEmployee,
-    retry: false,
-  });
+  const {
+    myRegions,
+    myResellers,
+    filteredOperationalResellers,
+    selectedOperationalRegionId,
+    selectedOperationalResellerId,
+    handleRegionSelect,
+    handleResellerSelect,
+    showOperationalFilters,
+  } = useOperationalFilters(isAuthenticated && !!isAgentOrSubAgentOrEmployee, () => setCurrentPage(1));
+
   const { data: myEmployees = [] } = useQuery<User[]>({
     queryKey: ['myEmployees', 'accounts'],
     queryFn: () => apiService.getMyEmployees(),
     enabled: isAuthenticated && isAgentOrSubAgentOrEmployee && !isAdmin,
     retry: false,
   });
-
-  useEffect(() => {
-    if (!isAgentOrSubAgentOrEmployee) return;
-    setSelectedOperationalRegionId(loadStoredOperationalRegionId());
-    setSelectedOperationalResellerId(loadStoredOperationalResellerId());
-  }, [isAgentOrSubAgentOrEmployee]);
-
-  useEffect(() => {
-    if (!isAgentOrSubAgentOrEmployee) return;
-    const regionExists = !selectedOperationalRegionId || myRegions.some((r) => r.id === selectedOperationalRegionId);
-    if (!regionExists) {
-      setSelectedOperationalRegionId('');
-      saveStoredOperationalRegionId('');
-    }
-    const resellerExists = !selectedOperationalResellerId || myResellers.some((r) => r.id === selectedOperationalResellerId);
-    if (!resellerExists) {
-      setSelectedOperationalResellerId('');
-      saveStoredOperationalResellerId('');
-    }
-  }, [isAgentOrSubAgentOrEmployee, myRegions, myResellers, selectedOperationalRegionId, selectedOperationalResellerId]);
 
   const accountsRegionResellerFilter = useMemo(
     () => buildRegionResellerFilterParams(selectedOperationalRegionId, selectedOperationalResellerId, myResellers),
@@ -295,46 +271,9 @@ const ReportsPage: React.FC = () => {
     return map;
   }, [myResellers]);
 
-  const filteredOperationalResellers = useMemo(
-    () => filterResellersByRegion(myResellers, selectedOperationalRegionId),
-    [myResellers, selectedOperationalRegionId]
-  );
-
-  const handleRegionCardClick = (regionId: string) => {
-    const next = selectedOperationalRegionId === regionId ? '' : regionId;
-    setSelectedOperationalRegionId(next);
-    saveStoredOperationalRegionId(next);
-    setSelectedOperationalResellerId('');
-    saveStoredOperationalResellerId('');
-    setCurrentPage(1);
-  };
-
-  const handleResellerCardClick = (resellerId: string) => {
-    const next = selectedOperationalResellerId === resellerId ? '' : resellerId;
-    setSelectedOperationalResellerId(next);
-    saveStoredOperationalResellerId(next);
-    if (next) {
-      const match = myResellers.find((r) => r.id === next);
-      if (match?.regionId && match.regionId !== selectedOperationalRegionId) {
-        setSelectedOperationalRegionId(match.regionId);
-        saveStoredOperationalRegionId(match.regionId);
-      }
-    }
-    setCurrentPage(1);
-  };
-
-  const filterGlassCardBase =
-    'rounded-2xl border px-3 py-2.5 text-right transition-all duration-300 min-h-[44px] backdrop-blur-xl backdrop-saturate-150 shadow-sm hover:-translate-y-0.5';
-  const filterGlassCardInactive =
-    'bg-white/30 dark:bg-white/5 border-white/50 dark:border-white/10 text-gray-800 dark:text-gray-100 hover:bg-white/40 dark:hover:bg-white/10 hover:shadow-md';
-  const filterGlassCardRegionActive =
-    'bg-primary-500/25 dark:bg-primary-500/15 border-primary-400/60 text-primary-900 dark:text-primary-100 ring-1 ring-primary-400/40 shadow-md';
-  const filterGlassCardResellerActive =
-    'bg-emerald-500/25 dark:bg-emerald-500/15 border-emerald-400/60 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-400/40 shadow-md';
-
   const ledgerColSpan = LEDGER_TABLE_COLS + (canDeleteLedger ? 1 : 0);
 
-  const handleApplyFilters = () => {
+  const handleApplyMainFilters = () => {
     const normalized = normalizeAccountsDateRange(fromDate, toDate);
     if (normalized.from !== fromDate.trim() || normalized.to !== toDate.trim()) {
       setFromDate(normalized.from);
@@ -343,6 +282,10 @@ const ReportsPage: React.FC = () => {
     setAppliedFromDate(normalized.from);
     setAppliedToDate(normalized.to);
     setAppliedSubscriberName(subscriberName);
+    setCurrentPage(1);
+  };
+
+  const handleApplyFilters = () => {
     setAppliedPackageType(packageType);
     setAppliedExecutedByUserId(executedByUserId);
     setCurrentPage(1);
@@ -505,18 +448,6 @@ const ReportsPage: React.FC = () => {
           )}
           <button
             type="button"
-            onClick={() => setShowAdvancedFiltersModal(true)}
-            disabled={isAdmin && !selectedAgentId}
-            className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm backdrop-blur-sm disabled:opacity-50"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>فلترة متقدمة</span>
-            {(appliedPackageType || appliedExecutedByUserId) && (
-              <span className="inline-flex h-2 w-2 rounded-full bg-primary-500" aria-hidden />
-            )}
-          </button>
-          <button
-            type="button"
             onClick={handleExportAccountsExcel}
             disabled={isExportingAccounts || (isAdmin && !selectedAgentId)}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm disabled:opacity-50"
@@ -536,57 +467,23 @@ const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/70 dark:bg-gray-900/40 backdrop-blur-sm p-4 shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-end gap-3">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">بحث عن المشترك</label>
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={subscriberName}
-                onChange={(e) => setSubscriberName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleApplyFilters();
-                }}
-                placeholder="الاسم أو اسم المستخدم..."
-                disabled={isAdmin && !selectedAgentId}
-                className="w-full pr-9 pl-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">من تاريخ</label>
-            <input
-              type="date"
-              value={fromDate}
-              max={toDate || undefined}
-              onChange={(e) => setFromDate(e.target.value)}
-              disabled={isAdmin && !selectedAgentId}
-              className="w-full min-w-[140px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">إلى تاريخ</label>
-            <input
-              type="date"
-              value={toDate}
-              min={fromDate || undefined}
-              onChange={(e) => setToDate(e.target.value)}
-              disabled={isAdmin && !selectedAgentId}
-              className="w-full min-w-[140px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleApplyFilters}
-              disabled={isAdmin && !selectedAgentId}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm disabled:opacity-50"
-            >
-              <Search className="h-4 w-4" />
-              بحث
-            </button>
+      <PageSearchDateFilterBar
+        searchTerm={subscriberName}
+        onSearchTermChange={setSubscriberName}
+        searchPlaceholder="الاسم أو اسم المستخدم..."
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDateChange={setFromDate}
+        onToDateChange={setToDate}
+        onApply={handleApplyMainFilters}
+        onClear={handleResetFilters}
+        disabled={isAdmin && !selectedAgentId}
+        showAdvancedButton
+        onAdvancedClick={() => setShowAdvancedFiltersModal(true)}
+        advancedActive={!!(appliedPackageType || appliedExecutedByUserId)}
+        advancedLabel="فلترة متقدمة"
+        extraActions={
+          <>
             <button
               type="button"
               onClick={handleResetFilters}
@@ -603,89 +500,33 @@ const ReportsPage: React.FC = () => {
             >
               آخر 30 يوم
             </button>
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          الفترة المعروضة: {formatAccountsDateRangeLabel(appliedFromDate, appliedToDate)}
-          {appliedSubscriberName.trim() ? ` — المشترك: «${appliedSubscriberName.trim()}»` : ''}
-        </p>
-      </div>
+          </>
+        }
+      />
+      <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+        الفترة المعروضة: {formatAccountsDateRangeLabel(appliedFromDate, appliedToDate)}
+        {appliedSubscriberName.trim() ? ` — المشترك: «${appliedSubscriberName.trim()}»` : ''}
+      </p>
 
       {isAdmin && !selectedAgentId ? (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-200 mb-6">
           يرجى اختيار وكيل لعرض الحسابات (للأدمن).
         </div>
       ) : (
-        <>
-          {isAgentOrSubAgentOrEmployee && (myRegions.length > 0 || myResellers.length > 0) && (
-            <div className="mb-4 space-y-3">
-              {myRegions.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">المناطق</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleRegionCardClick('')}
-                      className={`${filterGlassCardBase} ${
-                        !selectedOperationalRegionId ? filterGlassCardRegionActive : filterGlassCardInactive
-                      }`}
-                    >
-                      <div className="text-sm font-semibold truncate">الكل</div>
-                      <div className="text-xs opacity-75 truncate">كل المناطق</div>
-                    </button>
-                    {myRegions.map((region) => {
-                      const active = selectedOperationalRegionId === region.id;
-                      return (
-                        <button
-                          key={region.id}
-                          type="button"
-                          onClick={() => handleRegionCardClick(region.id)}
-                          className={`${filterGlassCardBase} ${
-                            active ? filterGlassCardRegionActive : filterGlassCardInactive
-                          }`}
-                        >
-                          <div className="text-sm font-semibold truncate">{region.name}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {filteredOperationalResellers.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">الرسيلرز</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleResellerCardClick('')}
-                      className={`${filterGlassCardBase} ${
-                        !selectedOperationalResellerId ? filterGlassCardResellerActive : filterGlassCardInactive
-                      }`}
-                    >
-                      <div className="text-sm font-semibold truncate">الكل</div>
-                      <div className="text-xs opacity-75 truncate">كل الرسيلرز</div>
-                    </button>
-                    {filteredOperationalResellers.map((r) => {
-                      const active = selectedOperationalResellerId === r.id;
-                      return (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => handleResellerCardClick(r.id)}
-                          className={`${filterGlassCardBase} ${
-                            active ? filterGlassCardResellerActive : filterGlassCardInactive
-                          }`}
-                        >
-                          <div className="text-sm font-semibold truncate">{r.name}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
+        <ListPageWithFilters
+          sidebar={
+            showOperationalFilters ? (
+              <OperationalFiltersSidebar
+                regions={myRegions}
+                resellers={filteredOperationalResellers}
+                selectedRegionId={selectedOperationalRegionId}
+                selectedResellerId={selectedOperationalResellerId}
+                onRegionSelect={handleRegionSelect}
+                onResellerSelect={handleResellerSelect}
+              />
+            ) : undefined
+          }
+        >
           <div className="space-y-5 mb-6">
             <div>
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">الوارد والإيرادات</h3>
@@ -928,7 +769,7 @@ const ReportsPage: React.FC = () => {
                     hasNextPage={ledger.hasNextPage}
                     hasPreviousPage={ledger.hasPreviousPage}
                     onPageChange={setCurrentPage}
-                    pageSizeOptions={[...ACCOUNTS_PAGE_SIZE_OPTIONS]}
+                    pageSizeOptions={[...STANDARD_PAGE_SIZE_OPTIONS]}
                     onPageSizeChange={(size) => {
                       setPageSize(size);
                       setCurrentPage(1);
@@ -937,7 +778,7 @@ const ReportsPage: React.FC = () => {
                 )}
               </div>
           )}
-        </>
+        </ListPageWithFilters>
       )}
 
       {showAdvancedFiltersModal && (

@@ -10,15 +10,21 @@ import { fetchReceiptsWithCache } from '../services/offlineSync';
 import { showSuccess, showError } from '../utils/notifications';
 import {
   buildRegionResellerFilterParams,
-  filterResellersByRegion,
-  loadStoredOperationalRegionId,
-  loadStoredOperationalResellerId,
-  saveStoredOperationalRegionId,
-  saveStoredOperationalResellerId,
 } from '../utils/operationalFilters';
-import { RenewalReceipt, PaymentStatus, ActivationType, AgentReseller, AgentRegion, UserRole } from '../types';
+import { RenewalReceipt, PaymentStatus, UserRole } from '../types';
 import { WakeelBadge } from '../components/table/WakeelBadge';
 import { formatReceiptPrintDate, resolveReceiptPrintAmounts } from '../utils/receiptPrint';
+import {
+  getCombinedPaymentPaid,
+  getServiceFeesReceivedAmount,
+  getSubscriptionReceivedAmount,
+} from '../utils/renewalReceiptDisplay';
+import PageSearchDateFilterBar from '../components/filters/PageSearchDateFilterBar';
+import OperationalFiltersSidebar from '../components/filters/OperationalFiltersSidebar';
+import ListPageWithFilters from '../components/layout/ListPageWithFilters';
+import Pagination from '../components/Pagination';
+import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
+import { useOperationalFilters } from '../hooks/useOperationalFilters';
 import QRCode from 'qrcode';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { 
@@ -30,7 +36,6 @@ import {
   X,
   FileSpreadsheet,
   Zap,
-  SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
 
@@ -53,12 +58,23 @@ const ReceiptsPage: React.FC = () => {
   const [appliedFromDate, setAppliedFromDate] = useState('');
   const [appliedToDate, setAppliedToDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [showAdvancedFiltersModal, setShowAdvancedFiltersModal] = useState(false);
-  const [selectedOperationalRegionId, setSelectedOperationalRegionId] = useState<string>('');
-  const [selectedOperationalResellerId, setSelectedOperationalResellerId] = useState<string>('');
   const printRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { confirmAction } = useConfirmation();
+
+  const isAgentOrSubAgentOrEmployee =
+    user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
+
+  const {
+    myRegions,
+    myResellers,
+    filteredOperationalResellers,
+    selectedOperationalRegionId,
+    selectedOperationalResellerId,
+    handleRegionSelect,
+    handleResellerSelect,
+    showOperationalFilters,
+  } = useOperationalFilters(isAuthenticated && !!isAgentOrSubAgentOrEmployee, () => setCurrentPage(1));
 
   const canDeleteRenewal =
     user?.role === UserRole.Admin ||
@@ -92,79 +108,6 @@ const ReceiptsPage: React.FC = () => {
     deleteRenewalMutation.mutate(renewalId);
   };
 
-  const isAgentOrSubAgentOrEmployee =
-    user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
-
-  const { data: myResellers = [] } = useQuery<AgentReseller[]>({
-    queryKey: ['myResellers'],
-    queryFn: () => apiService.getMyResellers(),
-    enabled: isAuthenticated && !!isAgentOrSubAgentOrEmployee,
-    retry: false,
-  });
-  const { data: myRegions = [] } = useQuery<AgentRegion[]>({
-    queryKey: ['myRegions'],
-    queryFn: () => apiService.getMyRegions(true),
-    enabled: isAuthenticated && !!isAgentOrSubAgentOrEmployee,
-    retry: false,
-  });
-
-  useEffect(() => {
-    if (!isAgentOrSubAgentOrEmployee) return;
-    setSelectedOperationalRegionId(loadStoredOperationalRegionId());
-    setSelectedOperationalResellerId(loadStoredOperationalResellerId());
-  }, [isAgentOrSubAgentOrEmployee]);
-
-  useEffect(() => {
-    if (!isAgentOrSubAgentOrEmployee) return;
-    const regionExists = !selectedOperationalRegionId || myRegions.some((r) => r.id === selectedOperationalRegionId);
-    if (!regionExists) {
-      setSelectedOperationalRegionId('');
-      saveStoredOperationalRegionId('');
-    }
-    const resellerExists = !selectedOperationalResellerId || myResellers.some((r) => r.id === selectedOperationalResellerId);
-    if (!resellerExists) {
-      setSelectedOperationalResellerId('');
-      saveStoredOperationalResellerId('');
-    }
-  }, [isAgentOrSubAgentOrEmployee, myRegions, myResellers, selectedOperationalRegionId, selectedOperationalResellerId]);
-
-  const filteredOperationalResellers = useMemo(
-    () => filterResellersByRegion(myResellers, selectedOperationalRegionId),
-    [myResellers, selectedOperationalRegionId]
-  );
-
-  const handleRegionCardClick = (regionId: string) => {
-    const next = selectedOperationalRegionId === regionId ? '' : regionId;
-    setSelectedOperationalRegionId(next);
-    saveStoredOperationalRegionId(next);
-    setSelectedOperationalResellerId('');
-    saveStoredOperationalResellerId('');
-    setCurrentPage(1);
-  };
-
-  const handleResellerCardClick = (resellerId: string) => {
-    const next = selectedOperationalResellerId === resellerId ? '' : resellerId;
-    setSelectedOperationalResellerId(next);
-    saveStoredOperationalResellerId(next);
-    if (next) {
-      const match = myResellers.find((r) => r.id === next);
-      if (match?.regionId && match.regionId !== selectedOperationalRegionId) {
-        setSelectedOperationalRegionId(match.regionId);
-        saveStoredOperationalRegionId(match.regionId);
-      }
-    }
-    setCurrentPage(1);
-  };
-
-  const filterGlassCardBase =
-    'rounded-2xl border px-3 py-2.5 text-right transition-all duration-300 min-h-[44px] backdrop-blur-xl backdrop-saturate-150 shadow-sm hover:-translate-y-0.5';
-  const filterGlassCardInactive =
-    'bg-white/30 dark:bg-white/5 border-white/50 dark:border-white/10 text-gray-800 dark:text-gray-100 hover:bg-white/40 dark:hover:bg-white/10 hover:shadow-md';
-  const filterGlassCardRegionActive =
-    'bg-primary-500/25 dark:bg-primary-500/15 border-primary-400/60 text-primary-900 dark:text-primary-100 ring-1 ring-primary-400/40 shadow-md';
-  const filterGlassCardResellerActive =
-    'bg-emerald-500/25 dark:bg-emerald-500/15 border-emerald-400/60 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-400/40 shadow-md';
-
   const { data: receiptsData, error, isLoading } = useQuery<{ receipts: RenewalReceipt[], pagination: any }>({
     queryKey: [
       'renewal-receipts',
@@ -174,6 +117,7 @@ const ReceiptsPage: React.FC = () => {
       pageSize,
       appliedFromDate || null,
       appliedToDate || null,
+      appliedSearchTerm || null,
       selectedOperationalRegionId || null,
       selectedOperationalResellerId || null,
     ],
@@ -190,7 +134,8 @@ const ReceiptsPage: React.FC = () => {
         appliedFromDate || undefined,
         appliedToDate || undefined,
         regionResellerFilter.resellerId,
-        regionResellerFilter.regionId
+        regionResellerFilter.regionId,
+        appliedSearchTerm || undefined
       );
       if (data.pagination) {
         setTotalItems(data.pagination.totalItems ?? 0);
@@ -258,27 +203,11 @@ const ReceiptsPage: React.FC = () => {
     );
   }
 
-  const filteredReceipts = Array.isArray(receipts) ? receipts.filter(receipt => {
-    const name = receipt.subscriberName ?? '';
-    const username = receipt.subscriberUsername ?? '';
-    const number = receipt.receiptNumber ?? '';
-    const phone = receipt.subscriberPhone ?? '';
-    const term = appliedSearchTerm.toLowerCase();
-    const matchesSearch = name.toLowerCase().includes(term) ||
-                         username.toLowerCase().includes(term) ||
-                         number.toLowerCase().includes(term) ||
-                         phone.includes(appliedSearchTerm);
-
-    return matchesSearch;
-  }) : [];
-
-  /** يطبّق نطاق التاريخ والبحث معاً */
   const handleApplyFilters = () => {
     setAppliedFromDate(fromDate);
     setAppliedToDate(toDate);
     setAppliedSearchTerm(searchTerm.trim());
     setCurrentPage(1);
-    setShowAdvancedFiltersModal(false);
   };
 
   /** يفرّغ حقول البحث والتواريخ */
@@ -292,46 +221,14 @@ const ReceiptsPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const renderAdvancedFiltersForm = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">بحث</label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="رقم الفاتورة، اسم المشترك، يوزر، أو رقم الهاتف"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">من تاريخ</label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">إلى تاريخ</label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  console.log('Receipts:', receipts);
-  console.log('Filtered receipts:', filteredReceipts);
+  const getCombinedPaymentStatusBadge = (receipt: RenewalReceipt) => {
+    const paid = getCombinedPaymentPaid(receipt);
+    return (
+      <WakeelBadge color={paid ? 'success' : 'error'}>
+        {paid ? 'مدفوع' : 'غير مدفوع'}
+      </WakeelBadge>
+    );
+  };
 
 
 
@@ -677,13 +574,6 @@ const ReceiptsPage: React.FC = () => {
     return <WakeelBadge color={config.color}>{config.text}</WakeelBadge>;
   };
 
-  const getActivationTypeBadge = (type?: ActivationType) => {
-    if (type === ActivationType.Extension) {
-      return <WakeelBadge color="warning">تمديد</WakeelBadge>;
-    }
-    return <WakeelBadge color="primary">اشتراك</WakeelBadge>;
-  };
-
   if (error) {
     return (
       <div className="p-6">
@@ -737,14 +627,6 @@ const ReceiptsPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowAdvancedFiltersModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm backdrop-blur-sm"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>الفلترة المتقدمة</span>
-          </button>
-          <button
-            type="button"
             onClick={handleExportToExcel}
             disabled={isExporting}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm disabled:opacity-50"
@@ -764,97 +646,52 @@ const ReceiptsPage: React.FC = () => {
         </div>
       </div>
 
-      {isAgentOrSubAgentOrEmployee && (myRegions.length > 0 || myResellers.length > 0) && (
-        <div className="mb-4 space-y-3">
-          {myRegions.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">المناطق</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleRegionCardClick('')}
-                  className={`${filterGlassCardBase} ${
-                    !selectedOperationalRegionId ? filterGlassCardRegionActive : filterGlassCardInactive
-                  }`}
-                >
-                  <div className="text-sm font-semibold truncate">الكل</div>
-                  <div className="text-xs opacity-75 truncate">كل المناطق</div>
-                </button>
-                {myRegions.map((region) => {
-                  const active = selectedOperationalRegionId === region.id;
-                  return (
-                    <button
-                      key={region.id}
-                      type="button"
-                      onClick={() => handleRegionCardClick(region.id)}
-                      className={`${filterGlassCardBase} ${
-                        active ? filterGlassCardRegionActive : filterGlassCardInactive
-                      }`}
-                    >
-                      <div className="text-sm font-semibold truncate">{region.name}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {filteredOperationalResellers.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">الرسيلرز</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleResellerCardClick('')}
-                  className={`${filterGlassCardBase} ${
-                    !selectedOperationalResellerId ? filterGlassCardResellerActive : filterGlassCardInactive
-                  }`}
-                >
-                  <div className="text-sm font-semibold truncate">الكل</div>
-                  <div className="text-xs opacity-75 truncate">كل الرسيلرز</div>
-                </button>
-                {filteredOperationalResellers.map((r) => {
-                  const active = selectedOperationalResellerId === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => handleResellerCardClick(r.id)}
-                      className={`${filterGlassCardBase} ${
-                        active ? filterGlassCardResellerActive : filterGlassCardInactive
-                      }`}
-                    >
-                      <div className="text-sm font-semibold truncate">{r.name}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <ListPageWithFilters
+        sidebar={
+          showOperationalFilters ? (
+            <OperationalFiltersSidebar
+              regions={myRegions}
+              resellers={filteredOperationalResellers}
+              selectedRegionId={selectedOperationalRegionId}
+              selectedResellerId={selectedOperationalResellerId}
+              onRegionSelect={handleRegionSelect}
+              onResellerSelect={handleResellerSelect}
+            />
+          ) : undefined
+        }
+      >
+        <PageSearchDateFilterBar
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          searchPlaceholder="رقم الفاتورة، اسم المشترك، يوزر، أو رقم الهاتف"
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={setFromDate}
+          onToDateChange={setToDate}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+        />
 
-      {/* Table */}
-      <div className="wakeel-table-card">
+        {/* Table */}
+        <div className="wakeel-table-card">
         <div className="wakeel-table-scroll">
           <table className="min-w-[1200px] w-full text-right">
             <thead>
               <tr>
                 <th>رقم الفاتورة</th>
-                <th>المشترك</th>
-                <th>الهاتف</th>
+                <th>اسم المشترك</th>
                 <th>الباقة</th>
-                <th>نوع التفعيل</th>
-                <th>حالة الدفع</th>
                 <th>المبلغ الواصل</th>
-                <th>المتبقي</th>
-                <th>المدة</th>
+                <th>مبلغ الأجر الواصل</th>
+                <th>حالة الدفع</th>
                 <th>تاريخ التفعيل</th>
-                <th>تاريخ الانتهاء</th>
+                <th>تاريخ طباعة الفاتورة</th>
+                <th>بواسطة الموظف</th>
                 <th className="w-[1%]">إجراءات</th>
               </tr>
             </thead>
             <tbody>
-              {filteredReceipts.map((receipt) => {
+              {receipts.map((receipt) => {
                 const profileChanged =
                   receipt.oldProfileName &&
                   receipt.newProfileName &&
@@ -864,7 +701,6 @@ const ReceiptsPage: React.FC = () => {
                   <tr key={receipt.id}>
                     <td className="whitespace-nowrap font-medium">{receipt.receiptNumber || '—'}</td>
                     <td className="whitespace-nowrap">{receipt.subscriberName || '—'}</td>
-                    <td className="whitespace-nowrap">{receipt.subscriberPhone || '—'}</td>
                     <td>
                       <div className="text-sm font-medium">{receipt.newProfileName || '—'}</div>
                       {profileChanged && (
@@ -872,41 +708,27 @@ const ReceiptsPage: React.FC = () => {
                           من: {receipt.oldProfileName}
                         </div>
                       )}
-                      {(receipt.discountAmount ?? 0) > 0 && (
-                        <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                          خصم: {formatNumber(receipt.discountAmount, { suffix: ' د.ع' })}
-                        </div>
-                      )}
-                      {(receipt.serviceFeesName || receipt.serviceFeesId) && (
-                        <div className="text-xs text-primary-600 dark:text-primary-400 mt-0.5">
-                          خدمة: {receipt.serviceFeesName}
-                          {(receipt.serviceFeesRemainingAmount ?? 0) > 0
-                            ? ` — دين ${formatNumber(receipt.serviceFeesRemainingAmount ?? 0, { suffix: ' د.ع' })}`
-                            : ''}
-                        </div>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap">{getActivationTypeBadge(receipt.activationType)}</td>
-                    <td className="whitespace-nowrap">
-                      {getPaymentStatusBadge(receipt.paymentStatus as PaymentStatus)}
                     </td>
                     <td className="whitespace-nowrap font-medium">
-                      {formatNumber(receipt.amountPaid ?? 0, { suffix: ' د.ع' })}
+                      {formatNumber(getSubscriptionReceivedAmount(receipt), { suffix: ' د.ع' })}
+                    </td>
+                    <td className="whitespace-nowrap font-medium">
+                      {formatNumber(getServiceFeesReceivedAmount(receipt), { suffix: ' د.ع' })}
                     </td>
                     <td className="whitespace-nowrap">
-                      {(receipt.remainingAmount ?? 0) > 0 ? (
-                        <span className="text-red-600 dark:text-red-400 font-medium">
-                          {formatNumber(receipt.remainingAmount, { suffix: ' د.ع' })}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
+                      {getCombinedPaymentStatusBadge(receipt)}
                     </td>
-                    <td className="whitespace-nowrap">{receipt.renewalDays || receipt.renewalPeriod || 0} يوم</td>
                     <td className="whitespace-nowrap">
-                      {formatDate(receipt.renewalDate || receipt.issueDate || receipt.createdAt)}
+                      {formatDate(receipt.renewalDate || receipt.createdAt)}
                     </td>
-                    <td className="whitespace-nowrap">{formatDate(receipt.newExpirationDate)}</td>
+                    <td className="whitespace-nowrap">
+                      {receipt.receiptIssueDate
+                        ? formatDate(receipt.receiptIssueDate)
+                        : receipt.issueDate
+                          ? formatDate(receipt.issueDate)
+                          : '—'}
+                    </td>
+                    <td className="whitespace-nowrap">{receipt.performedByFullName || '—'}</td>
                     <td className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
@@ -945,7 +767,7 @@ const ReceiptsPage: React.FC = () => {
           </table>
         </div>
         
-        {filteredReceipts.length === 0 && (
+        {receipts.length === 0 && (
           <div className="text-center py-12">
             <Receipt className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">لا توجد تفعيلات</h3>
@@ -1003,9 +825,24 @@ const ReceiptsPage: React.FC = () => {
             )}
           </div>
         )}
-      </div>
 
-      {/* Receipt Modal */}
+        </div>
+
+        {totalItems > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            hasNextPage={currentPage < totalPages}
+            hasPreviousPage={currentPage > 1}
+            onPageChange={handlePageChange}
+            pageSizeOptions={[...STANDARD_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={handlePageSizeChange}
+            className="mt-4"
+          />
+        )}
+      </ListPageWithFilters>
       {showReceiptModal && selectedReceipt && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -1153,125 +990,6 @@ const ReceiptsPage: React.FC = () => {
         />
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600 dark:text-gray-400">عدد العناصر:</label>
-                <select
-                  value={pageSize}
-                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                  className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                عرض {((currentPage - 1) * pageSize) + 1} إلى {Math.min(currentPage * pageSize, totalItems)} من {totalItems} تفعيل
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-white"
-              >
-                السابق
-              </button>
-              
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                if (page > totalPages) return null;
-                
-                return (
-                  <button
-                    key={page}
-                    onClick={() => handlePageChange(page)}
-                    className={`px-3 py-1 text-sm border rounded-md ${
-                      page === currentPage
-                        ? 'bg-primary-600 text-white border-primary-600'
-                        : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-700 dark:text-white'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
-              
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-white"
-              >
-                التالي
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAdvancedFiltersModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowAdvancedFiltersModal(false)}
-            aria-hidden
-          />
-          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-5 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">الفلترة المتقدمة</h2>
-                {(appliedFromDate || appliedToDate || appliedSearchTerm) && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                    {[appliedFromDate, appliedToDate].filter(Boolean).join(' — ') || appliedSearchTerm}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAdvancedFiltersModal(false)}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                aria-label="إغلاق"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-5">
-              {renderAdvancedFiltersForm()}
-              <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  type="button"
-                  onClick={handleApplyFilters}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm"
-                >
-                  <Search className="h-4 w-4" />
-                  تطبيق الفلاتر
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md text-sm"
-                >
-                  تفريغ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedFiltersModal(false)}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-sm mr-auto"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

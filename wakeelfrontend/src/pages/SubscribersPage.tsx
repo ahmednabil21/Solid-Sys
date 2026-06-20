@@ -25,6 +25,10 @@ import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
 import SubscriberRegionExcelExport from '../components/SubscriberRegionExcelExport';
 import Pagination from '../components/Pagination';
+import PageSearchDateFilterBar from '../components/filters/PageSearchDateFilterBar';
+import OperationalFiltersSidebar from '../components/filters/OperationalFiltersSidebar';
+import ListPageWithFilters from '../components/layout/ListPageWithFilters';
+import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { 
   Plus, 
@@ -678,7 +682,12 @@ const SubscribersPage: React.FC = () => {
   const [activationServiceFeesFullyPaid, setActivationServiceFeesFullyPaid] = useState<Record<string, boolean>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const { data: subscribersResponse, error, isLoading } = useQuery<PaginatedResponse<Subscriber>>({
     queryKey: ['subscribers', 'offline', online, currentPage, pageSize, debouncedSearchTerm, statusFilter, sortDescending, appliedMaxDaysUntilExpiry, appliedFatFilter, appliedApartmentNumberFilter, appliedZoneFilter, appliedProfileIdsFilter, appliedNoteTypeFilter, appliedExtensionActivationFilter, appliedExpirationFromDate, appliedExpirationToDate, selectedOperationalRegionId, selectedOperationalResellerId],
@@ -1931,7 +1940,6 @@ const SubscribersPage: React.FC = () => {
   };
 
   const handleApplyAdvancedFilter = () => {
-    setDebouncedSearchTerm(searchTerm.trim());
     setAppliedMaxDaysUntilExpiry(maxDaysUntilExpiry.trim());
     setAppliedFatFilter(fatFilter.trim());
     setAppliedApartmentNumberFilter(apartmentNumberFilter.trim());
@@ -1939,8 +1947,23 @@ const SubscribersPage: React.FC = () => {
     setAppliedProfileIdsFilter([...profileIdsFilter]);
     setAppliedNoteTypeFilter(noteTypeFilter);
     setAppliedExtensionActivationFilter(extensionActivationFilter);
+    setCurrentPage(1);
+  };
+
+  const handleApplyMainSubscriberFilters = () => {
+    applySearch();
     setAppliedExpirationFromDate(expirationFromDate.trim());
     setAppliedExpirationToDate(expirationToDate.trim());
+    setCurrentPage(1);
+  };
+
+  const handleClearMainSubscriberFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setExpirationFromDate('');
+    setExpirationToDate('');
+    setAppliedExpirationFromDate('');
+    setAppliedExpirationToDate('');
     setCurrentPage(1);
   };
 
@@ -1959,10 +1982,9 @@ const SubscribersPage: React.FC = () => {
   };
 
   const hasActiveAdvancedFilter =
-    appliedExpirationFromDate !== '' || appliedExpirationToDate !== '' ||
     appliedMaxDaysUntilExpiry !== '' || appliedFatFilter !== '' || appliedApartmentNumberFilter !== '' ||
     appliedZoneFilter !== '' || appliedProfileIdsFilter.length > 0 ||
-    appliedNoteTypeFilter !== 'all' || appliedExtensionActivationFilter || (debouncedSearchTerm?.trim() ?? '') !== '' || statusFilter !== 'all';
+    appliedNoteTypeFilter !== 'all' || appliedExtensionActivationFilter || statusFilter !== 'all';
 
   const toggleProfileIdFilter = (profileId: string) => {
     setProfileIdsFilter((prev) =>
@@ -3223,85 +3245,6 @@ const SubscribersPage: React.FC = () => {
             عرض وإدارة جميع المشتركين
           </p>
         </div>
-        {isAgentOrSubAgentOrEmployee && (myRegions.length > 0 || myResellers.length > 0) && (
-          <div className="mb-3 space-y-3">
-            {myRegions.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">المناطق</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSubscribersRegionCardClick('')}
-                    className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                      !selectedOperationalRegionId
-                        ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-500 text-primary-800 dark:text-primary-200'
-                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="text-sm font-semibold truncate">الكل</div>
-                    <div className="text-xs opacity-75 truncate">كل المناطق</div>
-                  </button>
-                  {myRegions.map((region) => {
-                    const active = selectedOperationalRegionId === region.id;
-                    return (
-                      <button
-                        key={region.id}
-                        type="button"
-                        onClick={() => handleSubscribersRegionCardClick(region.id)}
-                        className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                          active
-                            ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-500 text-primary-800 dark:text-primary-200'
-                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="text-sm font-semibold truncate">{region.name}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {filteredOperationalResellers.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">الرسيلرز</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSubscribersResellerCardClick('')}
-                    className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                      !selectedOperationalResellerId
-                        ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 text-emerald-800 dark:text-emerald-200'
-                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="text-sm font-semibold truncate">الكل</div>
-                    <div className="text-xs opacity-75 truncate">كل الرسيلرز</div>
-                  </button>
-                  {filteredOperationalResellers.map((r) => {
-                    const active = selectedOperationalResellerId === r.id;
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => handleSubscribersResellerCardClick(r.id)}
-                        className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                          active
-                            ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 text-emerald-800 dark:text-emerald-200'
-                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="text-sm font-semibold truncate">{r.name}</div>
-                        <div className="text-xs opacity-75 truncate">
-                          {r.serviceType === ServiceType.Ftth ? 'FTTH' : r.serviceType === ServiceType.Sas ? 'SAS' : 'Earthlink'}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative" ref={dropdownRef}>
@@ -3506,30 +3449,47 @@ const SubscribersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* فلترة متقدمة */}
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => setShowAdvancedFilter((v) => !v)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
-            showAdvancedFilter || hasActiveAdvancedFilter
-              ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-500 text-primary-700 dark:text-primary-300'
-              : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-          }`}
-        >
-          <Filter className="h-4 w-4" />
-          <span>فلترة متقدمة</span>
-          {hasActiveAdvancedFilter && (
-            <span className="mr-1 px-1.5 py-0.5 text-xs rounded-full bg-primary-200 dark:bg-primary-800">
-              مفعّل
-            </span>
-          )}
-        </button>
+      <ListPageWithFilters
+        sidebar={
+          isAgentOrSubAgentOrEmployee && (myRegions.length > 0 || myResellers.length > 0) ? (
+            <OperationalFiltersSidebar
+              regions={myRegions}
+              resellers={filteredOperationalResellers}
+              selectedRegionId={selectedOperationalRegionId}
+              selectedResellerId={selectedOperationalResellerId}
+              onRegionSelect={handleSubscribersRegionCardClick}
+              onResellerSelect={handleSubscribersResellerCardClick}
+            />
+          ) : undefined
+        }
+      >
+        <PageSearchDateFilterBar
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          searchPlaceholder={
+            requireTwoWordsForSearch
+              ? 'البحث بالاسم الأول والثاني (كلمتين على الأقل)...'
+              : 'البحث بالاسم أو رقم الهاتف...'
+          }
+          fromDate={expirationFromDate}
+          toDate={expirationToDate}
+          onFromDateChange={setExpirationFromDate}
+          onToDateChange={setExpirationToDate}
+          fromLabel="انتهاء الاشتراك من"
+          toLabel="انتهاء الاشتراك إلى"
+          onApply={handleApplyMainSubscriberFilters}
+          onClear={handleClearMainSubscriberFilters}
+          showAdvancedButton
+          onAdvancedClick={() => setShowAdvancedFilter((v) => !v)}
+          advancedActive={showAdvancedFilter || hasActiveAdvancedFilter}
+          advancedLabel="فلترة متقدمة"
+        />
 
-        {showAdvancedFilter && (
+      {/* فلترة متقدمة */}
+      {showAdvancedFilter && (
           <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              الحالة، رقم البناية، رقم الشقة، المنطقة، الباقات، نوع الملاحظة، ترتيب التاريخ، الأيام حتى الانتهاء، ونطاق تاريخ انتهاء الاشتراك.
+              الحالة، رقم البناية، رقم الشقة، المنطقة، الباقات، نوع الملاحظة، ترتيب التاريخ، والأيام حتى الانتهاء.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <div>
@@ -3617,24 +3577,6 @@ const SubscribersPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">انتهاء الاشتراك من تاريخ</label>
-                <input
-                  type="date"
-                  value={expirationFromDate}
-                  onChange={(e) => setExpirationFromDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">انتهاء الاشتراك إلى تاريخ</label>
-                <input
-                  type="date"
-                  value={expirationToDate}
-                  onChange={(e) => setExpirationToDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
-                />
-              </div>
               <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">الباقات</label>
                 <div className="max-h-36 overflow-y-auto rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2 space-y-1">
@@ -3699,29 +3641,6 @@ const SubscribersPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
-
-      {/* فلترة البحث */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder={requireTwoWordsForSearch ? 'البحث بالاسم الأول والثاني (كلمتين على الأقل)...' : 'البحث بالاسم أو رقم الهاتف...'}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applySearch())}
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={applySearch}
-          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm font-medium whitespace-nowrap"
-        >
-          بحث
-        </button>
-      </div>
 
       {/* Table */}
       <div className="wakeel-table-card">
@@ -3952,13 +3871,16 @@ const SubscribersPage: React.FC = () => {
             currentPage={subscribersResponse.currentPage}
             totalPages={subscribersResponse.totalPages}
             totalItems={subscribersResponse.totalItems}
-            pageSize={subscribersResponse.pageSize}
+            pageSize={pageSize}
             hasNextPage={subscribersResponse.hasNextPage}
             hasPreviousPage={subscribersResponse.hasPreviousPage}
             onPageChange={handlePageChange}
+            pageSizeOptions={[...STANDARD_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={handlePageSizeChange}
           />
         )}
       </div>
+      </ListPageWithFilters>
 
       {/* Add Subscriber Modal */}
       {showAddModal && (

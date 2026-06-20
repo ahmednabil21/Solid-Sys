@@ -7,15 +7,15 @@ import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { fetchDebtsWithCache, fetchSubscribersWithCache, queueOperation, buildPayDebtPayload } from '../services/offlineSync';
 import Pagination from '../components/Pagination';
+import PageSearchDateFilterBar from '../components/filters/PageSearchDateFilterBar';
+import OperationalFiltersSidebar from '../components/filters/OperationalFiltersSidebar';
+import ListPageWithFilters from '../components/layout/ListPageWithFilters';
+import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
+import { useOperationalFilters } from '../hooks/useOperationalFilters';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { showError, showSuccess, showInfo } from '../utils/notifications';
 import {
-  loadStoredOperationalRegionId,
-  loadStoredOperationalResellerId,
-  saveStoredOperationalRegionId,
-  saveStoredOperationalResellerId,
   buildRegionResellerFilterParams,
-  filterResellersByRegion,
 } from '../utils/operationalFilters';
 import { createXlsxBlob } from '../utils/excelExport';
 import { 
@@ -95,11 +95,10 @@ const DebtsPage: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<{
     status?: DebtStatus;
     sortDescending?: boolean;
-    /** YYYY-MM-DD — يُحوَّل إلى ISO عند الطلب */
-    paymentReceivedFrom?: string;
-    paymentReceivedTo?: string;
     debtDescription?: string;
   }>({});
+  const [appliedPaymentReceivedFrom, setAppliedPaymentReceivedFrom] = useState('');
+  const [appliedPaymentReceivedTo, setAppliedPaymentReceivedTo] = useState('');
   const [showAddDebtModal, setShowAddDebtModal] = useState(false);
   const [showPayDebtModal, setShowPayDebtModal] = useState(false);
   const [showEditDebtModal, setShowEditDebtModal] = useState(false);
@@ -125,68 +124,20 @@ const DebtsPage: React.FC = () => {
   const [postDebtPaymentWhatsApp, setPostDebtPaymentWhatsApp] = useState<{ subscriberId: string; subscriberName?: string | null } | null>(null);
   const [sendingDebtDetailsWhatsApp, setSendingDebtDetailsWhatsApp] = useState(false);
   const [sendingDebtAlertBulk, setSendingDebtAlertBulk] = useState(false);
-  const [selectedOperationalRegionId, setSelectedOperationalRegionId] = useState('');
-  const [selectedOperationalResellerId, setSelectedOperationalResellerId] = useState('');
 
-  const { data: myResellers = [] } = useQuery<AgentReseller[]>({
-    queryKey: ['myResellers'],
-    queryFn: () => apiService.getMyResellers(),
-    enabled: !!isAgentOrSubAgentOrEmployee,
-  });
-  const { data: myRegions = [] } = useQuery<AgentRegion[]>({
-    queryKey: ['myRegions'],
-    queryFn: () => apiService.getMyRegions(true),
-    enabled: !!isAgentOrSubAgentOrEmployee,
-  });
-  const filteredOperationalResellers = React.useMemo(
-    () => filterResellersByRegion(myResellers, selectedOperationalRegionId),
-    [myResellers, selectedOperationalRegionId]
-  );
-
-  const handleDebtsRegionCardClick = (regionId: string) => {
-    const next = selectedOperationalRegionId === regionId ? '' : regionId;
-    setSelectedOperationalRegionId(next);
-    saveStoredOperationalRegionId(next);
-    setSelectedOperationalResellerId('');
-    saveStoredOperationalResellerId('');
+  const {
+    myRegions,
+    myResellers,
+    filteredOperationalResellers,
+    selectedOperationalRegionId,
+    selectedOperationalResellerId,
+    handleRegionSelect,
+    handleResellerSelect,
+    showOperationalFilters,
+  } = useOperationalFilters(!!isAgentOrSubAgentOrEmployee, () => {
     setCurrentPage(1);
     setSelectedIds([]);
-  };
-
-  useEffect(() => {
-    if (!isAgentOrSubAgentOrEmployee) return;
-    setSelectedOperationalRegionId(loadStoredOperationalRegionId());
-    setSelectedOperationalResellerId(loadStoredOperationalResellerId());
-  }, [isAgentOrSubAgentOrEmployee]);
-
-  useEffect(() => {
-    if (!isAgentOrSubAgentOrEmployee) return;
-    const regionExists = !selectedOperationalRegionId || myRegions.some((r) => r.id === selectedOperationalRegionId);
-    if (!regionExists) {
-      setSelectedOperationalRegionId('');
-      saveStoredOperationalRegionId('');
-    }
-    const resellerExists = !selectedOperationalResellerId || myResellers.some((r) => r.id === selectedOperationalResellerId);
-    if (!resellerExists) {
-      setSelectedOperationalResellerId('');
-      saveStoredOperationalResellerId('');
-    }
-  }, [isAgentOrSubAgentOrEmployee, myRegions, myResellers, selectedOperationalRegionId, selectedOperationalResellerId]);
-
-  const handleDebtsResellerCardClick = (resellerId: string) => {
-    const next = selectedOperationalResellerId === resellerId ? '' : resellerId;
-    setSelectedOperationalResellerId(next);
-    saveStoredOperationalResellerId(next);
-    if (next) {
-      const match = myResellers.find((r) => r.id === next);
-      if (match?.regionId && match.regionId !== selectedOperationalRegionId) {
-        setSelectedOperationalRegionId(match.regionId);
-        saveStoredOperationalRegionId(match.regionId);
-      }
-    }
-    setCurrentPage(1);
-    setSelectedIds([]);
-  };
+  });
 
   useQuery({
     queryKey: ['myAgent'],
@@ -199,7 +150,7 @@ const DebtsPage: React.FC = () => {
   const [, setSelectedSubscriberId] = useState<string>('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [newDebtData, setNewDebtData] = useState<DebtCreateRequest>({
     subscriberId: '',
@@ -310,6 +261,8 @@ const DebtsPage: React.FC = () => {
       showOverdueOnly,
       appliedSearchTerm,
       appliedFilters,
+      appliedPaymentReceivedFrom,
+      appliedPaymentReceivedTo,
       selectedOperationalRegionId,
       selectedOperationalResellerId,
     ],
@@ -321,8 +274,8 @@ const DebtsPage: React.FC = () => {
         searchTerm: appliedSearchTerm.trim() || undefined,
         sortDescending: appliedFilters.sortDescending ?? true,
         status: appliedFilters.status !== undefined && appliedFilters.status !== null ? appliedFilters.status : undefined,
-        paymentCreatedAtFrom: ymdToPaymentCreatedAtFromUtc(appliedFilters.paymentReceivedFrom ?? '') || undefined,
-        paymentCreatedAtTo: ymdToPaymentCreatedAtToUtc(appliedFilters.paymentReceivedTo ?? '') || undefined,
+        paymentCreatedAtFrom: ymdToPaymentCreatedAtFromUtc(appliedPaymentReceivedFrom) || undefined,
+        paymentCreatedAtTo: ymdToPaymentCreatedAtToUtc(appliedPaymentReceivedTo) || undefined,
         debtDescription: appliedFilters.debtDescription?.trim() || undefined,
         ...buildRegionResellerFilterParams(
           selectedOperationalRegionId,
@@ -437,6 +390,11 @@ const DebtsPage: React.FC = () => {
     setCurrentPage(page);
   };
 
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
   // Get unique subscribers from debts data (reserved for future use)
   /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const _uniqueSubscribers = transformedDebts.reduce((acc: any[], debt: Debt) => {
@@ -451,13 +409,27 @@ const DebtsPage: React.FC = () => {
 
   const filteredDebts = subscriberDebts || [];
 
-  const handleApplyFilters = () => {
+  const handleApplyMainFilters = () => {
     setAppliedSearchTerm(searchTerm.trim());
+    setAppliedPaymentReceivedFrom(paymentReceivedFrom.trim());
+    setAppliedPaymentReceivedTo(paymentReceivedTo.trim());
+    setCurrentPage(1);
+  };
+
+  const handleClearMainFilters = () => {
+    setSearchTerm('');
+    setAppliedSearchTerm('');
+    setPaymentReceivedFrom('');
+    setPaymentReceivedTo('');
+    setAppliedPaymentReceivedFrom('');
+    setAppliedPaymentReceivedTo('');
+    setCurrentPage(1);
+  };
+
+  const handleApplyFilters = () => {
     setAppliedFilters({
       status: statusFilter === '' ? undefined : statusFilter,
       sortDescending,
-      paymentReceivedFrom: paymentReceivedFrom.trim() || undefined,
-      paymentReceivedTo: paymentReceivedTo.trim() || undefined,
       debtDescription: debtDescription.trim() || undefined,
     });
     setCurrentPage(1);
@@ -471,6 +443,8 @@ const DebtsPage: React.FC = () => {
     setSortDescending(true);
     setPaymentReceivedFrom('');
     setPaymentReceivedTo('');
+    setAppliedPaymentReceivedFrom('');
+    setAppliedPaymentReceivedTo('');
     setDebtDescription('');
     setAppliedFilters({});
     setShowOverdueOnly(false);
@@ -478,7 +452,7 @@ const DebtsPage: React.FC = () => {
   };
 
   const hasActiveAdvancedFilter =
-    appliedSearchTerm !== '' || Object.keys(appliedFilters).length > 0 || showOverdueOnly;
+    Object.keys(appliedFilters).length > 0 || showOverdueOnly;
 
   /** فتح رابط إطفاء/تشغيل المشترك (نفس رابط تفعيل عبر تاب SAS/FTTH). عند العودة للنظام يُظهَر مودال لتحديث الحالة. */
   const handleOpenActivationTab = async (subscriberId: string, subscriberName?: string) => {
@@ -528,11 +502,8 @@ const DebtsPage: React.FC = () => {
 
   useEffect(() => {
     if (showFiltersModal) {
-      setSearchTerm(appliedSearchTerm);
-      setPaymentReceivedFrom(appliedFilters.paymentReceivedFrom?.split('T')[0] ?? '');
-      setPaymentReceivedTo(appliedFilters.paymentReceivedTo?.split('T')[0] ?? '');
-      setSortDescending(appliedFilters.sortDescending ?? true);
       setStatusFilter(appliedFilters.status ?? '');
+      setSortDescending(appliedFilters.sortDescending ?? true);
       setDebtDescription(appliedFilters.debtDescription ?? '');
     }
     // Sync only when modal opens; appliedFilters are intentionally omitted to avoid overwriting form on every filter change
@@ -541,19 +512,6 @@ const DebtsPage: React.FC = () => {
 
   const renderFiltersForm = () => (
     <div className="space-y-4">
-      <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">بحث بالاسم أو الهاتف</label>
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="البحث بالاسم أو رقم الهاتف..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
-      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">وصف الدين</label>
@@ -587,24 +545,6 @@ const DebtsPage: React.FC = () => {
             <option value="false">تصاعدي</option>
             <option value="true">تنازلي</option>
           </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">تاريخ استلام الدين من</label>
-          <input
-            type="date"
-            value={paymentReceivedFrom}
-            onChange={(e) => setPaymentReceivedFrom(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">تاريخ استلام الدين إلى</label>
-          <input
-            type="date"
-            value={paymentReceivedTo}
-            onChange={(e) => setPaymentReceivedTo(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-          />
         </div>
       </div>
       <label className="flex items-center gap-2 cursor-pointer">
@@ -900,80 +840,6 @@ const DebtsPage: React.FC = () => {
           </p>
         </div>
 
-        {isAgentOrSubAgentOrEmployee && (myRegions.length > 0 || myResellers.length > 0) && (
-          <div className="mb-1 space-y-3">
-            {myRegions.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">المناطق</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDebtsRegionCardClick('')}
-                    className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                      !selectedOperationalRegionId
-                        ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-500 text-primary-800 dark:text-primary-200'
-                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="text-sm font-semibold truncate">الكل</div>
-                    <div className="text-xs opacity-75 truncate">كل المناطق</div>
-                  </button>
-                  {myRegions.map((region) => (
-                    <button
-                      key={region.id}
-                      type="button"
-                      onClick={() => handleDebtsRegionCardClick(region.id)}
-                      className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                        selectedOperationalRegionId === region.id
-                          ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-500 text-primary-800 dark:text-primary-200'
-                          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      <div className="text-sm font-semibold truncate">{region.name}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {filteredOperationalResellers.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">الرسيلرز</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDebtsResellerCardClick('')}
-                    className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                      !selectedOperationalResellerId
-                        ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 text-emerald-800 dark:text-emerald-200'
-                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="text-sm font-semibold truncate">الكل</div>
-                    <div className="text-xs opacity-75 truncate">كل الرسيلرز</div>
-                  </button>
-                  {filteredOperationalResellers.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => handleDebtsResellerCardClick(r.id)}
-                      className={`rounded-xl border px-3 py-2 text-right transition-colors min-h-[44px] ${
-                        selectedOperationalResellerId === r.id
-                          ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 text-emerald-800 dark:text-emerald-200'
-                          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      <div className="text-sm font-semibold truncate">{r.name}</div>
-                      <div className="text-xs opacity-75 truncate">
-                        {r.serviceType === ServiceType.Ftth ? 'FTTH' : r.serviceType === ServiceType.Sas ? 'SAS' : 'Earthlink'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="flex flex-wrap items-center gap-2">
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 sm:p-4">
             <div className="flex items-center gap-2">
@@ -986,21 +852,6 @@ const DebtsPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowFiltersModal(true)}
-            className={`flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 rounded-md border text-sm transition-colors min-h-[44px] touch-manipulation backdrop-blur-sm ${
-              hasActiveAdvancedFilter
-                ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-500 text-primary-700 dark:text-primary-300'
-                : 'bg-white/80 dark:bg-gray-800/80 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-            }`}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>الفلترة</span>
-            {hasActiveAdvancedFilter && (
-              <span className="px-1.5 py-0.5 text-xs rounded-full bg-primary-200 dark:bg-primary-800">مفعّل</span>
-            )}
-          </button>
           <button
             type="button"
             onClick={handleExportDebtsToExcel}
@@ -1172,6 +1023,38 @@ const DebtsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ListPageWithFilters
+        sidebar={
+          showOperationalFilters ? (
+            <OperationalFiltersSidebar
+              regions={myRegions}
+              resellers={filteredOperationalResellers}
+              selectedRegionId={selectedOperationalRegionId}
+              selectedResellerId={selectedOperationalResellerId}
+              onRegionSelect={handleRegionSelect}
+              onResellerSelect={handleResellerSelect}
+            />
+          ) : undefined
+        }
+      >
+        <PageSearchDateFilterBar
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          searchPlaceholder="البحث بالاسم أو رقم الهاتف..."
+          fromDate={paymentReceivedFrom}
+          toDate={paymentReceivedTo}
+          onFromDateChange={setPaymentReceivedFrom}
+          onToDateChange={setPaymentReceivedTo}
+          fromLabel="تاريخ استلام الدين من"
+          toLabel="تاريخ استلام الدين إلى"
+          onApply={handleApplyMainFilters}
+          onClear={handleClearMainFilters}
+          showAdvancedButton
+          onAdvancedClick={() => setShowFiltersModal(true)}
+          advancedActive={hasActiveAdvancedFilter}
+          advancedLabel="فلترة متقدمة"
+        />
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1372,7 +1255,7 @@ const DebtsPage: React.FC = () => {
       </div>
 
       {/* Pagination — قيمها من الباكند فقط؛ تُعطّل أثناء جلب الصفحة الجديدة */}
-      {debtsResponse && debtsResponse.totalPages > 1 && (
+      {debtsResponse && (
         <div className={isFetching ? 'opacity-70 pointer-events-none' : ''}>
           <Pagination
             currentPage={debtsResponse.currentPage}
@@ -1382,9 +1265,13 @@ const DebtsPage: React.FC = () => {
             hasNextPage={debtsResponse.hasNextPage}
             hasPreviousPage={debtsResponse.hasPreviousPage}
             onPageChange={handlePageChange}
+            pageSizeOptions={[...STANDARD_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={handlePageSizeChange}
+            className="mt-4"
           />
         </div>
       )}
+      </ListPageWithFilters>
 
       {/* Summary */}
       

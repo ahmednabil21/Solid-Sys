@@ -202,6 +202,11 @@ function normalizeRenewalReceiptFromApi(raw: unknown): RenewalReceipt {
     serviceFeesPrice: num('serviceFeesPrice', 'ServiceFeesPrice'),
     serviceFeesAmountPaid: num('serviceFeesAmountPaid', 'ServiceFeesAmountPaid'),
     serviceFeesRemainingAmount: num('serviceFeesRemainingAmount', 'ServiceFeesRemainingAmount'),
+    performedByFullName: (r.performedByFullName ?? r.PerformedByFullName ?? null) as string | null | undefined,
+    receiptIssueDate: (r.receiptIssueDate ?? r.ReceiptIssueDate ?? r.issueDate ?? r.IssueDate ?? null) as
+      | string
+      | null
+      | undefined,
   };
 }
 
@@ -2858,7 +2863,8 @@ class ApiService {
     fromDate?: string,
     toDate?: string,
     resellerId?: string,
-    regionId?: string
+    regionId?: string,
+    searchTerm?: string
   ): Promise<{ receipts: RenewalReceipt[], pagination: any }> {
     try {
       const token = localStorage.getItem('token');
@@ -2870,6 +2876,7 @@ class ApiService {
       if (toDate) params.set('ToDate', toDate);
       if (resellerId?.trim()) params.set('resellerId', resellerId.trim());
       if (regionId?.trim()) params.set('regionId', regionId.trim());
+      if (searchTerm?.trim()) params.set('SearchTerm', searchTerm.trim());
 
       const response: AxiosResponse<PaginatedResponse<RenewalReceipt>> = await this.api.get(`/Renewals?${params.toString()}`);
       console.log('API Response from backend:', response.data);

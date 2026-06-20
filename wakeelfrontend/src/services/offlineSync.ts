@@ -459,7 +459,8 @@ export async function fetchReceiptsWithCache(
   fromDate?: string,
   toDate?: string,
   resellerId?: string,
-  regionId?: string
+  regionId?: string,
+  searchTerm?: string
 ): Promise<{ receipts: RenewalReceipt[]; pagination: any }> {
   const fallback = async () => {
     const cached = await getCachedReceipts();
@@ -475,7 +476,15 @@ export async function fetchReceiptsWithCache(
   };
   if (online) {
     try {
-      const res = await apiService.getRenewalReceipts(page, size, fromDate, toDate, resellerId, regionId);
+      const res = await apiService.getRenewalReceipts(
+        page,
+        size,
+        fromDate,
+        toDate,
+        resellerId,
+        regionId,
+        searchTerm
+      );
       if (res?.receipts?.length) await cacheReceipts(res.receipts);
       return res;
     } catch {
