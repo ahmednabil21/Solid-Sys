@@ -578,7 +578,6 @@ const SubscribersPage: React.FC = () => {
   const [autoSyncSaveServiceFeesPrice, setAutoSyncSaveServiceFeesPrice] = useState<number | undefined>(undefined);
   const [autoSyncSaveServiceFeesFullyPaid, setAutoSyncSaveServiceFeesFullyPaid] = useState(true);
   const [savingFtthRowIndex, setSavingFtthRowIndex] = useState<number | null>(null);
-  const [savingAllSasRows, setSavingAllSasRows] = useState(false);
   const [openingRenewalFtthRowIndex, setOpeningRenewalFtthRowIndex] = useState<number | null>(null);
   const [openingFtthCompareRowIndex, setOpeningFtthCompareRowIndex] = useState<number | null>(null);
   const [savedFtthRowIndices, setSavedFtthRowIndices] = useState<Set<number>>(new Set());
@@ -1445,52 +1444,6 @@ const SubscribersPage: React.FC = () => {
     },
     onSettled: () => {
       setSavingFtthRowIndex(null);
-    },
-  });
-  const saveAllSasSyncItemsMutation = useMutation({
-    mutationFn: async () => {
-      const rows = autoSyncFtthResult?.data ?? [];
-      const resellerId = autoSyncReseller?.id || undefined;
-      const agentId = user?.role === UserRole.Admin ? myAgent?.id : undefined;
-      const pendingRows = rows
-        .map((row, idx) => ({ row, idx }))
-        .filter(({ idx }) => !savedFtthRowIndices.has(idx) && !activatedFtthRowIndices.has(idx));
-      const serviceFeesParams = buildAutoSyncSaveServiceFeesParams();
-      const settled = await Promise.allSettled(
-        pendingRows.map(({ row }) =>
-          apiService.synchronizationSASDiffSave(row, { resellerId, agentId, ...serviceFeesParams })
-        )
-      );
-      return { settled, pendingRows };
-    },
-    onMutate: () => {
-      setSavingAllSasRows(true);
-    },
-    onSuccess: ({ settled, pendingRows }) => {
-      const succeededIndexes = pendingRows
-        .map((item, i) => ({ idx: item.idx, ok: settled[i]?.status === 'fulfilled' }))
-        .filter((x) => x.ok)
-        .map((x) => x.idx);
-      if (succeededIndexes.length > 0) {
-        setSavedFtthRowIndices((prev) => {
-          const next = new Set(prev);
-          succeededIndexes.forEach((i) => next.add(i));
-          return next;
-        });
-        queryClient.invalidateQueries({ queryKey: ['subscribers'] });
-      }
-      const failedCount = pendingRows.length - succeededIndexes.length;
-      if (failedCount === 0) {
-        showSuccess('حفظ الكل', `تم حفظ ${succeededIndexes.length} مشترك بنجاح.`);
-      } else {
-        showError('حفظ الكل', `تم حفظ ${succeededIndexes.length} وفشل ${failedCount}. يمكن إعادة المحاولة للمتبقي.`);
-      }
-    },
-    onError: (err: unknown) => {
-      showError('حفظ الكل', ApiService.showError(err));
-    },
-    onSettled: () => {
-      setSavingAllSasRows(false);
     },
   });
 
@@ -6760,7 +6713,7 @@ const SubscribersPage: React.FC = () => {
                             <div className="inline-flex items-center gap-2">
                               <button
                                 type="button"
-                                disabled={savingAllSasRows || isSavingThisRow || isOpeningRenewalThisRow}
+                                disabled={isSavingThisRow || isOpeningRenewalThisRow}
                                 onClick={() => saveFtthSyncItemMutation.mutate({ row, rowIndex: idx })}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-gray-700 hover:bg-gray-800 text-white disabled:opacity-60"
                               >
@@ -6769,7 +6722,7 @@ const SubscribersPage: React.FC = () => {
                               </button>
                               <button
                                 type="button"
-                                disabled={savingAllSasRows || isSavingThisRow || isOpeningRenewalThisRow}
+                                disabled={isSavingThisRow || isOpeningRenewalThisRow}
                                 onClick={() => openRenewalModalForFtthSyncRow(row, idx)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
                               >
