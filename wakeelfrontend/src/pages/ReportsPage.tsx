@@ -28,6 +28,7 @@ import {
   saveStoredOperationalResellerId,
 } from '../utils/operationalFilters';
 import {
+  ArrowDownLeft,
   Coins,
   CreditCard,
   DollarSign,
@@ -90,7 +91,7 @@ function activationPaymentMethodLabel(pm?: number | null): string {
   return '—';
 }
 
-const LEDGER_TABLE_COLS = 16;
+const LEDGER_TABLE_COLS = 17;
 const ACCOUNTS_PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 
 function formatAccountsDateRangeLabel(from: string, to: string): string {
@@ -117,6 +118,7 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   serviceFeesDebtAmount?: number;
   totalProfit?: number;
   nationalSubscriptionCost?: number;
+  balanceDeductionAmount?: number;
   agentResellerId?: string;
 } {
   return row.kind === 'Renewal';
@@ -690,7 +692,7 @@ const ReportsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4 mb-6">
             <StatCard
               title="الوارد الكلي"
               value={accounts?.totalGeneralIncome ?? 0}
@@ -700,10 +702,18 @@ const ReportsPage: React.FC = () => {
               glass
             />
             <StatCard
-              title="اقتطاع الباقات"
+              title="واصل اشتراك"
               value={accounts?.totalPackageIncome ?? 0}
               icon={Wallet}
               color="green"
+              isAmount
+              glass
+            />
+            <StatCard
+              title="استقطاع رصيد المنطقة"
+              value={accounts?.totalBalanceDeduction ?? 0}
+              icon={ArrowDownLeft}
+              color="red"
               isAmount
               glass
             />
@@ -787,7 +797,8 @@ const ReportsPage: React.FC = () => {
                         <th>الباقة</th>
                         <th>طريقة الدفع</th>
                         <th>كلفة اشتراك الوكيل</th>
-                        <th>كلفة اشتراك الوطني</th>
+                        <th>واصل اشتراك</th>
+                        <th>استقطاع الرصيد</th>
                         <th>وارد عام</th>
                         <th>مبلغ الأجور</th>
                         <th>مبلغ الكاشباك</th>
@@ -846,6 +857,13 @@ const ReportsPage: React.FC = () => {
                                 {renewal?.nationalSubscriptionCost != null
                                   ? formatNumber(renewal.nationalSubscriptionCost, { suffix: ' د.ع' })
                                   : '—'}
+                              </td>
+                              <td className="whitespace-nowrap font-medium text-red-700 dark:text-red-300">
+                                {renewal?.balanceDeductionAmount != null
+                                  ? formatNumber(renewal.balanceDeductionAmount, { suffix: ' د.ع' })
+                                  : renewal
+                                    ? formatNumber(0, { suffix: ' د.ع' })
+                                    : '—'}
                               </td>
                               <td className="whitespace-nowrap font-semibold text-primary-700 dark:text-primary-300">
                                 {row.generalIncome != null

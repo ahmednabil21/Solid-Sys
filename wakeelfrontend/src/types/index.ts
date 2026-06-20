@@ -2523,8 +2523,10 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   totalProfit?: number;
   /** مبلغ الكاشباك */
   returnPrice?: number;
-  /** كلفة اشتراك الوطني (SalePrice) */
+  /** كلفة اشتراك الوطني (واصل اشتراك) */
   nationalSubscriptionCost?: number;
+  /** مبلغ الاستقطاع من رصيد المنطقة/الوكيل */
+  balanceDeductionAmount?: number;
   notes?: string | null;
   subscriberNoteType?: SubscriberNoteType | number | null;
   note?: string | null;
@@ -2563,8 +2565,10 @@ export interface AccountsResponse {
   totalActivationProfit: number;
   /** مجموع الوارد الكلي = مبلغ الباقة + الأجور + تسديد الديون */
   totalGeneralIncome?: number;
-  /** مجموع وارد الباقات (كلفة اشتراك الوطني) */
+  /** مجموع واصل اشتراك المشترك (AmountPaid) */
   totalPackageIncome?: number;
+  /** مجموع استقطاع رصيد المنطقة/الوكيل عند التفعيل */
+  totalBalanceDeduction?: number;
   /** مجموع وارد كلفة الوكيل */
   totalAgentPackageIncome?: number;
   /** مجموع وارد الأجور (واصل عند التفعيل + تسديد ديون الأجور) */
