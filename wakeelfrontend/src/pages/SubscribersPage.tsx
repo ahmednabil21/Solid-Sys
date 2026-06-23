@@ -111,6 +111,8 @@ function ftthCompareRowHasMismatch(row: FtthSubscriptionsCompareItem): boolean {
 }
 
 function resolveFtthRenewalPeriodCount(row: FtthSubscriptionsCompareItem): number {
+  const activation = Number(row.activationCount ?? 0);
+  if (activation > 0) return activation;
   const base = Number(row.basePlanRenewalCount ?? 0);
   const sameDay = Number(row.sameDayBasePlanRenewalCount ?? 0);
   if (base > 1) return base;
@@ -404,8 +406,10 @@ function mapFtthAppTransactionToCompareItem(item: FtthAppTransactionsItem): Ftth
     localActivation: item.localActivation,
     localExpiration: item.localExpiration,
     paymentType: item.paymentType,
+    planPrice: item.planPrice,
     transactionAmount: item.transactionAmount,
     operationType: item.operationType,
+    transactionType: item.transactionType,
     isNewSubscriber: resolveFtthCompareIsNewSubscriber(item),
     activationCount: item.activationCount,
   };

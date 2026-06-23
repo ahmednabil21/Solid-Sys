@@ -602,6 +602,7 @@ export interface FtthSubscriptionsCompareItem {
   operationType?: string | null;
   transactionType?: string | null;
   sameDayBasePlanRenewalCount?: number | null;
+  activationCount?: number | null;
   username?: string | null;
 }
 
