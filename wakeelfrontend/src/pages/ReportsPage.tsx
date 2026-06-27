@@ -77,6 +77,7 @@ function getBaghdadDateDaysAgo(days: number): string {
 
 function ledgerKindLabel(kind: string): string {
   if (kind === 'Renewal') return 'تفعيل';
+  if (kind === 'RenewalDebtPayment') return 'تفعيل + تسديد دين';
   if (kind === 'DebtPayment') return 'تسديد دين';
   return kind;
 }
@@ -106,7 +107,7 @@ function normalizeAccountsDateRange(from: string, to: string): { from: string; t
 }
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
-  kind: 'Renewal';
+  kind: 'Renewal' | 'RenewalDebtPayment';
   profileName?: string;
   receiptNumber?: string;
   activationProfit?: number;
@@ -118,7 +119,7 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   balanceDeductionAmount?: number;
   agentResellerId?: string;
 } {
-  return row.kind === 'Renewal';
+  return row.kind === 'Renewal' || row.kind === 'RenewalDebtPayment';
 }
 
 /** تمييز سجل تفعيل فيه دين غير مسدّد */
@@ -724,7 +725,9 @@ const ReportsPage: React.FC = () => {
                                   className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
                                     row.kind === 'Renewal'
                                       ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-                                      : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
+                                      : row.kind === 'RenewalDebtPayment'
+                                        ? 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200'
+                                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
                                   }`}
                                 >
                                   {ledgerKindLabel(row.kind)}

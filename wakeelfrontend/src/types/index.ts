@@ -2562,7 +2562,7 @@ export interface DebtsListParams extends Omit<PaginationParams, 'status'> {
 }
 
 /** نوع سطر السجل — GET /Accounts */
-export type AccountsLedgerKind = 'Renewal' | 'DebtPayment';
+export type AccountsLedgerKind = 'Renewal' | 'RenewalDebtPayment' | 'DebtPayment';
 
 export interface AccountsLedgerEntryBase {
   kind: AccountsLedgerKind;
@@ -2583,7 +2583,7 @@ export interface AccountsLedgerEntryBase {
 }
 
 export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
-  kind: 'Renewal';
+  kind: 'Renewal' | 'RenewalDebtPayment';
   packageType?: ProfilePackageType | number;
   profileName?: string;
   agentResellerId?: string;
