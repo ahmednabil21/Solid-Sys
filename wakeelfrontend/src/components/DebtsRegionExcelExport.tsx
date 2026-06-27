@@ -6,7 +6,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
-import { apiService, ApiService } from '../services/api';
+import { ApiService } from '../services/api';
 import { showError, showSuccess } from '../utils/notifications';
 import { createXlsxBlob } from '../utils/excelExport';
 import { fetchDebtsWithCache } from '../services/offlineSync';
