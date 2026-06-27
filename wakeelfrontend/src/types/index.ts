@@ -2604,9 +2604,6 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   /** مبلغ الاستقطاع من رصيد المنطقة/الوكيل */
   balanceDeductionAmount?: number;
   notes?: string | null;
-  /** تفعيل آجل تم تسديد دينه */
-  deferredDebtSettled?: boolean;
-  deferredSettledDetails?: AccountsLedgerDeferredSettledDetails;
   subscriberNoteType?: SubscriberNoteType | number | null;
   note?: string | null;
 }
@@ -2617,11 +2614,6 @@ export interface AccountsLedgerDebtPaymentEntry extends AccountsLedgerEntryBase 
 }
 
 export type AccountsLedgerEntry = AccountsLedgerRenewalEntry | AccountsLedgerDebtPaymentEntry;
-
-export interface AccountsLedgerDeferredSettledDetails {
-  activationDeferred: AccountsLedgerRenewalEntry;
-  payments: AccountsLedgerEntry[];
-}
 
 export interface AccountsLedgerPage {
   data: AccountsLedgerEntry[];
