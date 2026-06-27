@@ -10,6 +10,7 @@ import Pagination from '../components/Pagination';
 import PageSearchDateFilterBar from '../components/filters/PageSearchDateFilterBar';
 import OperationalFiltersSidebar from '../components/filters/OperationalFiltersSidebar';
 import ListPageWithFilters from '../components/layout/ListPageWithFilters';
+import DebtsRegionExcelExport from '../components/DebtsRegionExcelExport';
 import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 import { useOperationalFilters } from '../hooks/useOperationalFilters';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
@@ -17,7 +18,6 @@ import { showError, showSuccess, showInfo } from '../utils/notifications';
 import {
   buildRegionResellerFilterParams,
 } from '../utils/operationalFilters';
-import { createXlsxBlob } from '../utils/excelExport';
 import { 
   CreditCard,
   DollarSign,
@@ -150,6 +150,7 @@ const DebtsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [showExcelExportModal, setShowExcelExportModal] = useState(false);
   const [newDebtData, setNewDebtData] = useState<DebtCreateRequest>({
     subscriberId: '',
     amount: 0,
@@ -605,59 +606,6 @@ const DebtsPage: React.FC = () => {
 
   const totalDebtAmount = debtsResponse?.totalDebtAmount ?? subscriberTotalDebt;
 
-  const [isExporting, setIsExporting] = useState(false);
-
-  const handleExportDebtsToExcel = () => {
-    try {
-      setIsExporting(true);
-      const headers = ['المشترك', 'إجمالي الدين', 'تاريخ التسديد', 'الدين غير المدفوع', 'عدد الديون', 'ملاحظات الدين', 'إطفاء/تشغيل', 'الإجراءات'];
-      const dataRows = (filteredDebts || []).map((sd: any) => {
-        const unpaidDebts = (sd.debts || []).filter((d: any) => d.status === 0);
-        const datesToShow = unpaidDebts.length > 0 ? unpaidDebts : sd.debts || [];
-        const earliestDue = datesToShow.reduce((min: string | null, d: any) => {
-          const dDate = getDueDatePart(d.dueDate);
-          if (!dDate) return min;
-          return !min || dDate < min ? dDate : min;
-        }, null as string | null);
-        const dueDateStr = earliestDue ? formatDate(earliestDue + 'T12:00:00') : '';
-        const descStr = (sd.debts || []).map((d: any) => d.description || '').filter(Boolean).join('، ') || '';
-        const offOn = sd.debts?.[0]?.offOn;
-        const offOnStr = offOn === DebtOffOn.Off || offOn === 0 ? 'إطفاء' : 'تشغيل';
-        return [
-          sd.subscriberName ?? '',
-          sd.totalDebt ?? 0,
-          dueDateStr,
-          sd.unpaidDebt ?? 0,
-          sd.debts?.length ?? 0,
-          descStr,
-          offOnStr,
-          '',
-        ];
-      });
-      const sumTotalDebt = dataRows.reduce((s, row) => s + (Number(row[1]) || 0), 0);
-      const sumUnpaidDebt = dataRows.reduce((s, row) => s + (Number(row[3]) || 0), 0);
-      const sumDebtCount = dataRows.reduce((s, row) => s + (Number(row[4]) || 0), 0);
-      const totalRow = ['المجموع', sumTotalDebt, '', sumUnpaidDebt, sumDebtCount, '', '', ''];
-      const blob = createXlsxBlob([headers, ...dataRows, totalRow], 'الديون', {
-        alignCenter: true,
-        colWidths: [22, 16, 16, 18, 12, 28, 14, 14],
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `ديون_${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showSuccess('تم التصدير', 'تم تنزيل ملف Excel بنجاح.');
-    } catch (err: any) {
-      showError('خطأ في التصدير', ApiService.showError(err));
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const openAddDebtForSubscriber = (subscriberId: string, subscriberName?: string) => {
     if (!subscriberId) {
       showError('إضافة دين', 'معرف المشترك غير متوفر.');
@@ -852,13 +800,12 @@ const DebtsPage: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={handleExportDebtsToExcel}
-            disabled={isExporting || (filteredDebts?.length ?? 0) === 0}
-            className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+            onClick={() => setShowExcelExportModal(true)}
+            className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm transition-colors min-h-[44px] touch-manipulation"
             title="تصدير جدول الديون إلى Excel"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            <span>{isExporting ? 'جاري التصدير...' : 'تصدير اكسل'}</span>
+            <span>تصدير اكسل</span>
           </button>
           <div className="relative" ref={dropdownRef}>
             <button
@@ -2331,6 +2278,24 @@ const DebtsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <DebtsRegionExcelExport
+        open={showExcelExportModal}
+        onClose={() => setShowExcelExportModal(false)}
+        regionId={selectedOperationalRegionId}
+        resellerId={selectedOperationalResellerId}
+        regionName={myRegions.find((r) => r.id === selectedOperationalRegionId)?.name}
+        resellerName={myResellers.find((r) => r.id === selectedOperationalResellerId)?.name}
+        online={online}
+        showOverdueOnly={showOverdueOnly}
+        appliedSearchTerm={appliedSearchTerm}
+        appliedFilters={appliedFilters}
+        appliedPaymentReceivedFrom={appliedPaymentReceivedFrom}
+        appliedPaymentReceivedTo={appliedPaymentReceivedTo}
+        myResellers={myResellers}
+        formatDate={formatDate}
+        formatNumber={formatNumber}
+      />
     </div>
   );
 };
