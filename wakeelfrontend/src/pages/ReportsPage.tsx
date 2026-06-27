@@ -18,6 +18,7 @@ import {
   AccountsResponse,
   ActivationPaymentMethod,
   ProfilePackageType,
+  AccountsLedgerKind,
   User,
   UserRole,
 } from '../types';
@@ -88,7 +89,7 @@ function activationPaymentMethodLabel(pm?: number | null): string {
   return '—';
 }
 
-const LEDGER_TABLE_COLS = 17;
+const LEDGER_TABLE_COLS = 18;
 
 function formatAccountsDateRangeLabel(from: string, to: string): string {
   if (!from && !to) return 'كل الفترة (الأحدث أولاً)';
@@ -116,16 +117,26 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   nationalSubscriptionCost?: number;
   balanceDeductionAmount?: number;
   agentResellerId?: string;
+  /** تفعيل آجل تم تسديد دينه — يُعرض بلون أصفر في الحسابات */
+  deferredDebtSettled?: boolean;
 } {
   return row.kind === 'Renewal';
 }
 
-/** تمييز سجل تفعيل فيه دين: وارد عام = 0 أو مبلغ الأجور = 0 */
+/** تمييز سجل تفعيل فيه دين غير مسدّد: وارد عام = 0 أو مبلغ الأجور = 0 */
 function isUnpaidLedgerRenewalRow(row: AccountsLedgerEntry): boolean {
   if (!isRenewalEntry(row)) return false;
+  if (row.deferredDebtSettled) return false;
   const serviceFeesAmount = row.serviceFeesAmount ?? 0;
   const generalIncome = row.generalIncome ?? 0;
   return serviceFeesAmount === 0 || generalIncome === 0;
+}
+
+function ledgerRowClassName(row: AccountsLedgerEntry): string | undefined {
+  if (!isRenewalEntry(row)) return undefined;
+  if (row.deferredDebtSettled) return 'wakeel-table-row-deferred-settled';
+  if (isUnpaidLedgerRenewalRow(row)) return 'wakeel-table-row-unpaid';
+  return undefined;
 }
 
 const ReportsPage: React.FC = () => {
@@ -162,6 +173,10 @@ const ReportsPage: React.FC = () => {
   const [appliedPackageType, setAppliedPackageType] = useState<string>('');
   const [executedByUserId, setExecutedByUserId] = useState('');
   const [appliedExecutedByUserId, setAppliedExecutedByUserId] = useState('');
+  const [ledgerKind, setLedgerKind] = useState<string>('');
+  const [appliedLedgerKind, setAppliedLedgerKind] = useState<string>('');
+  const [activationPaymentMethod, setActivationPaymentMethod] = useState<string>('');
+  const [appliedActivationPaymentMethod, setAppliedActivationPaymentMethod] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
   const [isExportingAccounts, setIsExportingAccounts] = useState(false);
@@ -210,6 +225,8 @@ const ReportsPage: React.FC = () => {
         appliedSubscriberName || null,
         appliedPackageType || null,
         appliedExecutedByUserId || null,
+        appliedLedgerKind || null,
+        appliedActivationPaymentMethod || null,
         currentPage,
         pageSize,
       ] as const,
@@ -223,6 +240,8 @@ const ReportsPage: React.FC = () => {
       appliedSubscriberName,
       appliedPackageType,
       appliedExecutedByUserId,
+      appliedLedgerKind,
+      appliedActivationPaymentMethod,
       currentPage,
       pageSize,
     ]
@@ -236,6 +255,10 @@ const ReportsPage: React.FC = () => {
     subscriberName: appliedSubscriberName.trim() || undefined,
     packageType: appliedPackageType ? Number(appliedPackageType) : undefined,
     executedByUserId: appliedExecutedByUserId.trim() || undefined,
+    ledgerKind: (appliedLedgerKind as AccountsLedgerKind) || undefined,
+    activationPaymentMethod: appliedActivationPaymentMethod
+      ? Number(appliedActivationPaymentMethod)
+      : undefined,
     page: currentPage,
     pageSize,
   });
@@ -285,6 +308,8 @@ const ReportsPage: React.FC = () => {
   const handleApplyFilters = () => {
     setAppliedPackageType(packageType);
     setAppliedExecutedByUserId(executedByUserId);
+    setAppliedLedgerKind(ledgerKind);
+    setAppliedActivationPaymentMethod(activationPaymentMethod);
     setCurrentPage(1);
     setShowAdvancedFiltersModal(false);
   };
@@ -295,11 +320,15 @@ const ReportsPage: React.FC = () => {
     setSubscriberName('');
     setPackageType('');
     setExecutedByUserId('');
+    setLedgerKind('');
+    setActivationPaymentMethod('');
     setAppliedFromDate('');
     setAppliedToDate('');
     setAppliedSubscriberName('');
     setAppliedPackageType('');
     setAppliedExecutedByUserId('');
+    setAppliedLedgerKind('');
+    setAppliedActivationPaymentMethod('');
     setCurrentPage(1);
   };
 
@@ -326,6 +355,31 @@ const ReportsPage: React.FC = () => {
               {opt.label}
             </option>
           ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">نوع الإجراء</label>
+        <select
+          value={ledgerKind}
+          onChange={(e) => setLedgerKind(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+        >
+          <option value="">الكل</option>
+          <option value="Renewal">تفعيل</option>
+          <option value="DebtPayment">تسديد</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">طريقة الدفع</label>
+        <select
+          value={activationPaymentMethod}
+          onChange={(e) => setActivationPaymentMethod(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+        >
+          <option value="">الكل</option>
+          <option value={ActivationPaymentMethod.Cash}>كاش</option>
+          <option value={ActivationPaymentMethod.CustomerWallet}>محفظة زبون</option>
+          <option value={ActivationPaymentMethod.Deferred}>آجل</option>
         </select>
       </div>
       {!isAdmin && myEmployees.length > 0 && (
@@ -477,7 +531,7 @@ const ReportsPage: React.FC = () => {
         disabled={isAdmin && !selectedAgentId}
         showAdvancedButton
         onAdvancedClick={() => setShowAdvancedFiltersModal(true)}
-        advancedActive={!!(appliedPackageType || appliedExecutedByUserId)}
+        advancedActive={!!(appliedPackageType || appliedExecutedByUserId || appliedLedgerKind || appliedActivationPaymentMethod)}
         advancedLabel="فلترة متقدمة"
         extraActions={
           <>
@@ -648,6 +702,7 @@ const ReportsPage: React.FC = () => {
                         <th>تاريخ العملية</th>
                         <th>تاريخ الإنشاء</th>
                         <th>رقم الفاتورة</th>
+                        <th>ملاحظات</th>
                         <th>نفّذ بواسطة</th>
                         {canDeleteLedger && <th className="w-[1%]" />}
                       </tr>
@@ -670,7 +725,7 @@ const ReportsPage: React.FC = () => {
                           return (
                             <tr
                               key={`${row.kind}-${row.id}`}
-                              className={isUnpaidLedgerRenewalRow(row) ? 'wakeel-table-row-unpaid' : undefined}
+                              className={ledgerRowClassName(row)}
                             >
                               <td>{resellerName}</td>
                               <td className="whitespace-nowrap">
@@ -736,6 +791,9 @@ const ReportsPage: React.FC = () => {
                                 {formatDate(row.createdAt, LEDGER_DATE_OPTIONS)}
                               </td>
                               <td className="whitespace-nowrap text-xs">{renewal?.receiptNumber || '—'}</td>
+                              <td className="max-w-[220px] text-xs text-gray-700 dark:text-gray-300 whitespace-normal">
+                                {renewal?.notes || '—'}
+                              </td>
                               <td className="whitespace-nowrap">{row.executedByFullName || '—'}</td>
                               {canDeleteLedger && (
                                 <td className="text-center">

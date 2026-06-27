@@ -2518,6 +2518,8 @@ class ApiService {
     if (params?.paymentCreatedAtFrom?.trim()) queryParams.paymentCreatedAtFrom = params.paymentCreatedAtFrom.trim();
     if (params?.paymentCreatedAtTo?.trim()) queryParams.paymentCreatedAtTo = params.paymentCreatedAtTo.trim();
     if (params?.debtDescription?.trim()) queryParams.DebtDescription = params.debtDescription.trim();
+    if (params?.debtDateFrom?.trim()) queryParams.debtDateFrom = params.debtDateFrom.trim();
+    if (params?.debtDateTo?.trim()) queryParams.debtDateTo = params.debtDateTo.trim();
     if (params?.resellerId?.trim()) queryParams.resellerId = params.resellerId.trim();
     if (params?.regionId?.trim()) queryParams.regionId = params.regionId.trim();
     return queryParams;
@@ -2542,6 +2544,7 @@ class ApiService {
       ...raw,
       data: transformedData,
       totalDebtAmount: raw.totalDebtAmount,
+      totalDebtPaymentsIncome: raw.totalDebtPaymentsIncome,
     };
   }
 
@@ -2557,7 +2560,7 @@ class ApiService {
       paidDate: undefined,
       status: debt.status ?? 0,
     }));
-    return { ...raw, data: transformedData, totalDebtAmount: raw.totalDebtAmount };
+    return { ...raw, data: transformedData, totalDebtAmount: raw.totalDebtAmount, totalDebtPaymentsIncome: raw.totalDebtPaymentsIncome };
   }
 
   async getSubscriberDebts(subscriberId: string, params?: PaginationParams): Promise<PaginatedResponse<Debt>> {
@@ -3056,6 +3059,12 @@ class ApiService {
     }
     if (params?.packageType !== undefined && params.packageType !== null) {
       queryParams.packageType = Number(params.packageType);
+    }
+    if (params && 'ledgerKind' in params && params.ledgerKind) {
+      queryParams.ledgerKind = String(params.ledgerKind);
+    }
+    if (params && 'activationPaymentMethod' in params && params.activationPaymentMethod != null && params.activationPaymentMethod !== '') {
+      queryParams.activationPaymentMethod = Number(params.activationPaymentMethod);
     }
     if (options?.includePagination !== false) {
       const listParams = params as AccountsListParams | undefined;

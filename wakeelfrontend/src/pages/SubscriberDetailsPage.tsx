@@ -37,6 +37,8 @@ import {
   ActivationPaymentMethod,
   AccountsLedgerEntry,
   UserRole,
+  Debt,
+  DebtStatus,
 } from '../types';
 import { apiService, ApiService } from '../services/api';
 import { showSuccess, showError } from '../utils/notifications';
@@ -170,6 +172,9 @@ const SubscriberDetailsPage: React.FC = () => {
   const [reminderSending, setReminderSending] = useState(false);
   const [selectedTask, setSelectedTask] = useState<EmployeeTask | null>(null);
   const [taskLoadingId, setTaskLoadingId] = useState<string | null>(null);
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [debtDetailsLoading, setDebtDetailsLoading] = useState(false);
 
   const canAccessAccounts =
     user?.role !== UserRole.Employee || user?.canAccessAccounts !== false;
@@ -216,6 +221,35 @@ const SubscriberDetailsPage: React.FC = () => {
     subscriber?.agentResellerId,
     myAgent?.whatsAppSessionId
   );
+
+  const {
+    data: subscriberDebtsData,
+    isLoading: subscriberDebtsLoading,
+  } = useQuery({
+    queryKey: ['subscriber-debts-details', subscriberId],
+    queryFn: () => apiService.getSubscriberDebts(subscriberId!, { page: 1, pageSize: 100 }),
+    enabled: !!subscriberId,
+  });
+  const subscriberDebts = subscriberDebtsData?.data ?? [];
+
+  const openDebtDetails = async (debt: Debt) => {
+    setSelectedDebt(debt);
+    setShowDebtModal(true);
+    setDebtDetailsLoading(true);
+    try {
+      const full = await apiService.getDebt(debt.id);
+      setSelectedDebt({
+        ...debt,
+        ...full,
+        agentName: full.agentCompanyName || debt.agentName,
+        isPaid: full.status === DebtStatus.Paid,
+      });
+    } catch (err: unknown) {
+      showError('خطأ', ApiService.showError(err));
+    } finally {
+      setDebtDetailsLoading(false);
+    }
+  };
 
   const {
     data: accountsData,
@@ -583,6 +617,14 @@ const SubscriberDetailsPage: React.FC = () => {
                   value={formatNumber(subscriber.totalDebt || 0, { suffix: ' د.ع' })}
                   valueClass={(subscriber.totalDebt || 0) > 0 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400'}
                 />
+                <InfoCell
+                  label="إجمالي التسديدات"
+                  value={formatNumber(
+                    subscriberDebts.reduce((s, d) => s + (d.totalPaidAmount ?? d.lastPaymentAmount ?? 0), 0),
+                    { suffix: ' د.ع' }
+                  )}
+                  valueClass="text-green-600 dark:text-green-400 font-semibold"
+                />
                 <InfoCell label="طريقة الدفع" value={subscriber.paymentMethod?.trim() || '—'} />
                 <InfoCell label="تاريخ التفعيل" value={formatDate(subscriber.activationDate)} />
                 <InfoCell
@@ -615,6 +657,64 @@ const SubscriberDetailsPage: React.FC = () => {
                     </div>
                   )}
               </div>
+            </div>
+          </section>
+
+          {/* ديون المشترك */}
+          <section className="scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                <CreditCard className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">ديون المشترك</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">قائمة الديون وقيم التسديد</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-900/40 shadow-sm overflow-hidden">
+              {subscriberDebtsLoading ? (
+                <p className="p-4 text-sm text-gray-500">جاري تحميل الديون...</p>
+              ) : subscriberDebts.length === 0 ? (
+                <p className="p-4 text-sm text-gray-500 dark:text-gray-400">لا توجد ديون مسجّلة.</p>
+              ) : (
+                <div className="wakeel-table-scroll">
+                  <table className="w-full text-right text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700">
+                        <th className="p-3 font-medium">اسم الدين</th>
+                        <th className="p-3 font-medium">المتبقي</th>
+                        <th className="p-3 font-medium">قيمة التسديد</th>
+                        <th className="p-3 font-medium">الحالة</th>
+                        <th className="p-3 font-medium">إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subscriberDebts.map((debt) => (
+                        <tr key={debt.id} className="border-b border-gray-100 dark:border-gray-800">
+                          <td className="p-3">{debt.originalDescription || (debt.description !== 'تم التسديد' ? debt.description : '—')}</td>
+                          <td className="p-3 tabular-nums">{formatNumber(debt.amount, { suffix: ' د.ع' })}</td>
+                          <td className="p-3 tabular-nums text-green-700 dark:text-green-300">
+                            {(debt.totalPaidAmount ?? debt.lastPaymentAmount ?? 0) > 0
+                              ? formatNumber(debt.totalPaidAmount ?? debt.lastPaymentAmount ?? 0, { suffix: ' د.ع' })
+                              : '—'}
+                          </td>
+                          <td className="p-3">{debt.isPaid || debt.status === DebtStatus.Paid ? 'مدفوع' : 'غير مدفوع'}</td>
+                          <td className="p-3">
+                            <button
+                              type="button"
+                              onClick={() => openDebtDetails(debt)}
+                              className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
+                            >
+                              <Eye className="h-4 w-4" />
+                              تفاصيل
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </section>
 
@@ -1048,6 +1148,44 @@ const SubscriberDetailsPage: React.FC = () => {
                   <TaskInfoBlock label="تفاصيل المهمة" value={selectedTask.taskDetails || '—'} />
                   <TaskInfoBlock label="الملاحظة" value={selectedTask.note || '—'} />
                   <TaskInfoBlock label="ملاحظة الإكمال" value={selectedTask.completedNote || '—'} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showDebtModal && selectedDebt && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">تفاصيل الدين</h3>
+                  <button type="button" onClick={() => { setShowDebtModal(false); setSelectedDebt(null); }} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-3 text-sm">
+                  {debtDetailsLoading ? (
+                    <p className="text-gray-500">جاري التحميل...</p>
+                  ) : (
+                    <>
+                      <TaskInfoItem label="اسم الدين" value={selectedDebt.originalDescription || (selectedDebt.description !== 'تم التسديد' ? selectedDebt.description : '—')} />
+                      <TaskInfoItem label="المبلغ المتبقي" value={formatNumber(selectedDebt.amount, { suffix: ' د.ع' })} />
+                      <TaskInfoItem label="قيمة التسديد" value={formatNumber(selectedDebt.totalPaidAmount ?? selectedDebt.lastPaymentAmount ?? 0, { suffix: ' د.ع' })} />
+                      <TaskInfoItem label="الحالة" value={selectedDebt.isPaid || selectedDebt.status === DebtStatus.Paid ? 'مدفوع' : 'غير مدفوع'} />
+                      {selectedDebt.paymentRecords && selectedDebt.paymentRecords.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">سجل التسديدات</p>
+                          <div className="space-y-1">
+                            {selectedDebt.paymentRecords.map((p) => (
+                              <div key={p.id} className="flex justify-between rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2">
+                                <span>{formatDate(p.createdAt)}</span>
+                                <span className="text-green-700 dark:text-green-300 font-medium">{formatNumber(p.amount, { suffix: ' د.ع' })}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>

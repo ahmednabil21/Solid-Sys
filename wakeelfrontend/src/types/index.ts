@@ -2149,6 +2149,8 @@ export interface PaginatedResponse<T> {
 export interface DebtsListResponse extends PaginatedResponse<Debt> {
   /** إجمالي مبالغ الديون المطابقة للاستعلام (كل الصفحات وليس الصفحة الحالية فقط) */
   totalDebtAmount?: number;
+  /** إجمالي وارد التسديد (مجموع مبالغ التسديدات) ضمن نفس الفلاتر */
+  totalDebtPaymentsIncome?: number;
 }
 
 /** إحصائيات قائمة الوكلاء (مرتبطة بتتبع آخر دخول وانتهاء الاشتراك) */
@@ -2279,6 +2281,10 @@ export interface Debt {
   agentId?: string;
   amount: number;
   description: string;
+  /** وصف الدين قبل «تم التسديد» */
+  originalDescription?: string | null;
+  /** تاريخ إنشاء الدين */
+  debtDate?: string;
   dueDate: string;
   isPaid?: boolean;
   paidDate?: string;
@@ -2305,6 +2311,18 @@ export interface Debt {
   materialDisbursementDate?: string;
   /** تاريخ/وقت إنشاء آخر تسديد (يُرجع بعد POST تسديد دين، وفي قائمة الديون قد يكون null) */
   paymentCreatedAt?: string | null;
+  /** مبلغ آخر تسديد */
+  lastPaymentAmount?: number;
+  /** مجموع كل التسديدات على هذا الدين */
+  totalPaidAmount?: number;
+  paymentRecords?: DebtPaymentRecord[];
+}
+
+export interface DebtPaymentRecord {
+  id: string;
+  amount: number;
+  createdAt: string;
+  performedByUserName?: string | null;
 }
 
 export interface DebtCreateRequest {
@@ -2537,6 +2555,10 @@ export interface DebtsListParams extends Omit<PaginationParams, 'status'> {
   resellerId?: string;
   /** فلترة ديون مشتركي منطقة معيّنة */
   regionId?: string;
+  /** تاريخ إنشاء الدين (DebtDate) من — YYYY-MM-DD */
+  debtDateFrom?: string;
+  /** تاريخ إنشاء الدين (DebtDate) إلى — YYYY-MM-DD */
+  debtDateTo?: string;
 }
 
 /** نوع سطر السجل — GET /Accounts */
@@ -2579,6 +2601,8 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   /** مبلغ الاستقطاع من رصيد المنطقة/الوكيل */
   balanceDeductionAmount?: number;
   notes?: string | null;
+  /** تفعيل آجل تم تسديد دينه */
+  deferredDebtSettled?: boolean;
   subscriberNoteType?: SubscriberNoteType | number | null;
   note?: string | null;
 }
@@ -2641,6 +2665,9 @@ export interface AccountsListParams {
   executedByUserId?: string;
   subscriberName?: string;
   packageType?: ProfilePackageType | number;
+  /** Renewal | DebtPayment */
+  ledgerKind?: AccountsLedgerKind | '';
+  activationPaymentMethod?: ActivationPaymentMethod | number;
   page?: number;
   pageSize?: number;
   /** للأدمن: وكيل محدد */

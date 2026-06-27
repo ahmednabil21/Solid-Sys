@@ -89,6 +89,9 @@ const DebtsPage: React.FC = () => {
   const [sortDescending, setSortDescending] = useState(true);
   const [paymentReceivedFrom, setPaymentReceivedFrom] = useState('');
   const [paymentReceivedTo, setPaymentReceivedTo] = useState('');
+  const [debtDateFrom, setDebtDateFrom] = useState('');
+  const [debtDateTo, setDebtDateTo] = useState('');
+  const [debtDetailsLoading, setDebtDetailsLoading] = useState(false);
   const [debtDescription, setDebtDescription] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<{
     status?: DebtStatus;
@@ -97,6 +100,8 @@ const DebtsPage: React.FC = () => {
   }>({});
   const [appliedPaymentReceivedFrom, setAppliedPaymentReceivedFrom] = useState('');
   const [appliedPaymentReceivedTo, setAppliedPaymentReceivedTo] = useState('');
+  const [appliedDebtDateFrom, setAppliedDebtDateFrom] = useState('');
+  const [appliedDebtDateTo, setAppliedDebtDateTo] = useState('');
   const [showAddDebtModal, setShowAddDebtModal] = useState(false);
   const [showPayDebtModal, setShowPayDebtModal] = useState(false);
   const [showEditDebtModal, setShowEditDebtModal] = useState(false);
@@ -262,6 +267,8 @@ const DebtsPage: React.FC = () => {
       appliedFilters,
       appliedPaymentReceivedFrom,
       appliedPaymentReceivedTo,
+      appliedDebtDateFrom,
+      appliedDebtDateTo,
       selectedOperationalRegionId,
       selectedOperationalResellerId,
     ],
@@ -275,6 +282,8 @@ const DebtsPage: React.FC = () => {
         status: appliedFilters.status !== undefined && appliedFilters.status !== null ? appliedFilters.status : undefined,
         paymentCreatedAtFrom: ymdToPaymentCreatedAtFromUtc(appliedPaymentReceivedFrom) || undefined,
         paymentCreatedAtTo: ymdToPaymentCreatedAtToUtc(appliedPaymentReceivedTo) || undefined,
+        debtDateFrom: appliedDebtDateFrom.trim() || undefined,
+        debtDateTo: appliedDebtDateTo.trim() || undefined,
         debtDescription: appliedFilters.debtDescription?.trim() || undefined,
         ...buildRegionResellerFilterParams(
           selectedOperationalRegionId,
@@ -431,6 +440,8 @@ const DebtsPage: React.FC = () => {
       sortDescending,
       debtDescription: debtDescription.trim() || undefined,
     });
+    setAppliedDebtDateFrom(debtDateFrom.trim());
+    setAppliedDebtDateTo(debtDateTo.trim());
     setCurrentPage(1);
     setShowFiltersModal(false);
   };
@@ -444,6 +455,10 @@ const DebtsPage: React.FC = () => {
     setPaymentReceivedTo('');
     setAppliedPaymentReceivedFrom('');
     setAppliedPaymentReceivedTo('');
+    setDebtDateFrom('');
+    setDebtDateTo('');
+    setAppliedDebtDateFrom('');
+    setAppliedDebtDateTo('');
     setDebtDescription('');
     setAppliedFilters({});
     setShowOverdueOnly(false);
@@ -451,7 +466,7 @@ const DebtsPage: React.FC = () => {
   };
 
   const hasActiveAdvancedFilter =
-    Object.keys(appliedFilters).length > 0 || showOverdueOnly;
+    Object.keys(appliedFilters).length > 0 || showOverdueOnly || !!appliedDebtDateFrom || !!appliedDebtDateTo;
 
   /** فتح رابط إطفاء/تشغيل المشترك (نفس رابط تفعيل عبر تاب SAS/FTTH). عند العودة للنظام يُظهَر مودال لتحديث الحالة. */
   const handleOpenActivationTab = async (subscriberId: string, subscriberName?: string) => {
@@ -504,6 +519,8 @@ const DebtsPage: React.FC = () => {
       setStatusFilter(appliedFilters.status ?? '');
       setSortDescending(appliedFilters.sortDescending ?? true);
       setDebtDescription(appliedFilters.debtDescription ?? '');
+      setDebtDateFrom(appliedDebtDateFrom);
+      setDebtDateTo(appliedDebtDateTo);
     }
     // Sync only when modal opens; appliedFilters are intentionally omitted to avoid overwriting form on every filter change
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -544,6 +561,24 @@ const DebtsPage: React.FC = () => {
             <option value="false">تصاعدي</option>
             <option value="true">تنازلي</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">تاريخ الدين من</label>
+          <input
+            type="date"
+            value={debtDateFrom}
+            onChange={(e) => setDebtDateFrom(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">تاريخ الدين إلى</label>
+          <input
+            type="date"
+            value={debtDateTo}
+            onChange={(e) => setDebtDateTo(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+          />
         </div>
       </div>
       <label className="flex items-center gap-2 cursor-pointer">
@@ -605,6 +640,26 @@ const DebtsPage: React.FC = () => {
   };
 
   const totalDebtAmount = debtsResponse?.totalDebtAmount ?? subscriberTotalDebt;
+  const totalDebtPaymentsIncome = debtsResponse?.totalDebtPaymentsIncome ?? 0;
+
+  const openDebtDetailsModal = async (debt: Debt) => {
+    setSelectedDebt(debt);
+    setShowViewDebtModal(true);
+    setDebtDetailsLoading(true);
+    try {
+      const full = await apiService.getDebt(debt.id);
+      setSelectedDebt({
+        ...debt,
+        ...full,
+        agentName: full.agentCompanyName || debt.agentName || 'غير محدد',
+        isPaid: full.status === DebtStatus.Paid,
+      });
+    } catch (err: unknown) {
+      showError('خطأ', ApiService.showError(err));
+    } finally {
+      setDebtDetailsLoading(false);
+    }
+  };
 
   const openAddDebtForSubscriber = (subscriberId: string, subscriberName?: string) => {
     if (!subscriberId) {
@@ -798,6 +853,17 @@ const DebtsPage: React.FC = () => {
               </div>
             </div>
           </div>
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 sm:p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">وارد الدين (التسديدات)</p>
+                <p className="text-base sm:text-lg font-bold text-green-700 dark:text-green-300">
+                  {formatNumber(Number(totalDebtPaymentsIncome), { suffix: ' د.ع' })}
+                </p>
+              </div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => setShowExcelExportModal(true)}
@@ -843,8 +909,7 @@ const DebtsPage: React.FC = () => {
                             if (subscriberDebt && subscriberDebt.debts.length > 0) {
                               // استخدام أول دين من هذا المشترك
                               const firstDebt = subscriberDebt.debts[0];
-                              setSelectedDebt(firstDebt);
-                              setShowViewDebtModal(true);
+                              openDebtDetailsModal(firstDebt);
                             }
                           }
                           setShowActionsDropdown(false);
@@ -1799,7 +1864,7 @@ const DebtsPage: React.FC = () => {
       {/* View Debt Details Modal */}
       {showViewDebtModal && selectedDebt && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 تفاصيل الدين
@@ -1816,6 +1881,10 @@ const DebtsPage: React.FC = () => {
             </div>
             
             <div className="p-6 space-y-4">
+              {debtDetailsLoading ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">جاري تحميل التفاصيل...</p>
+              ) : (
+                <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1838,20 +1907,30 @@ const DebtsPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  المبلغ
+                  اسم الدين
                 </label>
                 <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
-                  {formatNumber(selectedDebt.amount, { suffix: ' د.ع' })}
+                  {selectedDebt.originalDescription || (selectedDebt.description !== 'تم التسديد' ? selectedDebt.description : '—')}
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  ملاحظات الدين
-                </label>
-                <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
-                  {selectedDebt.description}
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    المبلغ المتبقي
+                  </label>
+                  <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                    {formatNumber(selectedDebt.amount, { suffix: ' د.ع' })}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    قيمة التسديد
+                  </label>
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 p-2 rounded">
+                    {formatNumber(selectedDebt.totalPaidAmount ?? selectedDebt.lastPaymentAmount ?? 0, { suffix: ' د.ع' })}
+                  </p>
+                </div>
               </div>
 
               {selectedDebt.materialName && (
@@ -1953,6 +2032,26 @@ const DebtsPage: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              {selectedDebt.paymentRecords && selectedDebt.paymentRecords.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    سجل التسديدات
+                  </label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {selectedDebt.paymentRecords.map((p) => (
+                      <div key={p.id} className="flex justify-between items-center text-sm bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                        <span>{formatDate(p.createdAt)}</span>
+                        <span className="font-medium text-green-700 dark:text-green-300">
+                          {formatNumber(p.amount, { suffix: ' د.ع' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+                </>
+              )}
             </div>
 
             <div className="flex justify-end p-6 border-t border-gray-200 dark:border-gray-700">
@@ -2047,6 +2146,9 @@ const DebtsPage: React.FC = () => {
                         المبلغ
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        قيمة التسديد
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         تاريخ التسديد
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -2090,6 +2192,11 @@ const DebtsPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {formatNumber(debt.amount, { suffix: ' د.ع' })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-700 dark:text-green-300">
+                          {(debt.totalPaidAmount ?? debt.lastPaymentAmount ?? 0) > 0
+                            ? formatNumber(debt.totalPaidAmount ?? debt.lastPaymentAmount ?? 0, { suffix: ' د.ع' })
+                            : '—'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {formatDueDateForDisplay(debt)}
@@ -2146,6 +2253,14 @@ const DebtsPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => openDebtDetailsModal(debt)}
+                              className="text-primary-600 hover:text-primary-800 dark:text-primary-400 flex items-center space-x-1"
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span>تفاصيل</span>
+                            </button>
                             {canManageDebts ? (
                               <>
                                 {!debt.isPaid && (
