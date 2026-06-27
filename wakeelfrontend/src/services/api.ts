@@ -3063,7 +3063,7 @@ class ApiService {
     if (params && 'ledgerKind' in params && params.ledgerKind) {
       queryParams.ledgerKind = String(params.ledgerKind);
     }
-    if (params && 'activationPaymentMethod' in params && params.activationPaymentMethod != null && params.activationPaymentMethod !== '') {
+    if (params && 'activationPaymentMethod' in params && params.activationPaymentMethod != null) {
       queryParams.activationPaymentMethod = Number(params.activationPaymentMethod);
     }
     if (options?.includePagination !== false) {
