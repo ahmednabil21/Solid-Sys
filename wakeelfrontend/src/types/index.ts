@@ -2290,6 +2290,7 @@ export interface Debt {
   paidDate?: string;
   createdAt: string;
   updatedAt?: string;
+  profileName?: string | null;
   subscriberName: string;
   agentName?: string;
   notes?: string;

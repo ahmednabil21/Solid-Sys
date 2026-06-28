@@ -14,6 +14,7 @@ import {
   buildRegionResellerFilterParams,
 } from '../utils/operationalFilters';
 import type { AgentReseller, Debt, DebtsListParams } from '../types';
+import { DebtStatus } from '../types';
 
 type Props = {
   open: boolean;
@@ -37,6 +38,16 @@ type Props = {
   formatNumber: (value: number, options?: { suffix?: string }) => string;
 };
 
+type SubscriberDebtGroup = {
+  subscriberId: string;
+  subscriberName: string;
+  profileName: string;
+  totalDebt: number;
+  unpaidDebt: number;
+  paidDebt: number;
+  debts: Debt[];
+};
+
 function getDatePart(isoOrDate?: string | null): string | null {
   if (!isoOrDate || typeof isoOrDate !== 'string') return null;
   const part = isoOrDate.split('T')[0];
@@ -55,24 +66,50 @@ function ymdToPaymentCreatedAtToUtc(ymd: string): string | undefined {
   return `${t}T23:59:59.999Z`;
 }
 
-function groupDebtsBySubscriber(debts: Debt[]) {
-  const grouped = debts.reduce((acc: Record<string, any>, debt: Debt) => {
+function resolvePaidDebtAmount(debt: Debt): number {
+  if (debt.status !== DebtStatus.Paid) return 0;
+  return debt.totalPaidAmount ?? debt.lastPaymentAmount ?? debt.amount ?? 0;
+}
+
+function resolveUnpaidDebtAmount(debt: Debt): number {
+  if (debt.status !== DebtStatus.Unpaid) return 0;
+  return debt.amount ?? 0;
+}
+
+function groupDebtsBySubscriber(debts: Debt[]): SubscriberDebtGroup[] {
+  const grouped = debts.reduce((acc: Record<string, SubscriberDebtGroup>, debt: Debt) => {
     const key = debt.subscriberId;
     if (!acc[key]) {
       acc[key] = {
         subscriberId: debt.subscriberId,
         subscriberName: debt.subscriberName,
+        profileName: debt.profileName?.trim() || '',
         totalDebt: 0,
         unpaidDebt: 0,
-        debts: [] as Debt[],
+        paidDebt: 0,
+        debts: [],
       };
     }
+    if (!acc[key].profileName && debt.profileName?.trim()) {
+      acc[key].profileName = debt.profileName.trim();
+    }
     acc[key].debts.push(debt);
-    acc[key].totalDebt += debt.amount;
-    if (debt.status === 0) acc[key].unpaidDebt += debt.amount;
+    const paidPart = resolvePaidDebtAmount(debt);
+    const unpaidPart = resolveUnpaidDebtAmount(debt);
+    acc[key].paidDebt += paidPart;
+    acc[key].unpaidDebt += unpaidPart;
+    acc[key].totalDebt += paidPart + unpaidPart;
     return acc;
   }, {});
   return Object.values(grouped);
+}
+
+type ExportMode = 'paid' | 'unpaid' | 'all';
+
+function resolveExportMode(status?: number): ExportMode {
+  if (status === DebtStatus.Paid) return 'paid';
+  if (status === DebtStatus.Unpaid) return 'unpaid';
+  return 'all';
 }
 
 const DebtsRegionExcelExport: React.FC<Props> = ({
@@ -95,6 +132,7 @@ const DebtsRegionExcelExport: React.FC<Props> = ({
   const [exporting, setExporting] = useState(false);
 
   const canExport = !!regionId && !!resellerId;
+  const exportMode = resolveExportMode(appliedFilters.status);
 
   const handleExport = async () => {
     if (!canExport) {
@@ -127,43 +165,66 @@ const DebtsRegionExcelExport: React.FC<Props> = ({
         return;
       }
 
-      const headers = ['المشترك', 'إجمالي الدين', 'تاريخ الدين', 'الدين غير المدفوع', 'عدد الديون', 'ملاحظات الدين', 'إطفاء/تشغيل'];
-      const dataRows = subscriberDebts.map((sd: any) => {
-        const earliestDebtDate = (sd.debts || []).reduce((min: string | null, d: Debt) => {
+      const headers = ['المشترك', 'الباقة', 'إجمالي الدين', 'تاريخ الدين'];
+      if (exportMode === 'paid' || exportMode === 'all') headers.push('الدين المدفوع');
+      if (exportMode === 'unpaid' || exportMode === 'all') headers.push('الدين غير المدفوع');
+      headers.push('عدد الديون', 'ملاحظات الدين', 'إطفاء/تشغيل');
+
+      const dataRows = subscriberDebts.map((sd) => {
+        const earliestDebtDate = sd.debts.reduce((min: string | null, d: Debt) => {
           const dDate = getDatePart(d.debtDate);
           if (!dDate) return min;
           return !min || dDate < min ? dDate : min;
         }, null as string | null);
         const debtDateStr = earliestDebtDate ? formatDate(new Date(earliestDebtDate + 'T12:00:00')) : '';
-        const descStr = (sd.debts || []).map((d: Debt) => d.description || '').filter(Boolean).join('، ') || '';
-        const offOn = sd.debts?.[0]?.offOn;
+        const descStr = sd.debts.map((d) => d.originalDescription || d.description || '').filter(Boolean).join('، ') || '';
+        const offOn = sd.debts[0]?.offOn;
         const offOnStr = offOn === 0 ? 'إطفاء' : 'تشغيل';
-        return [
+
+        const row: (string | number)[] = [
           sd.subscriberName ?? '',
-          sd.totalDebt ?? 0,
+          sd.profileName ?? '',
+          exportMode === 'paid' ? sd.paidDebt : exportMode === 'unpaid' ? sd.unpaidDebt : sd.totalDebt,
           debtDateStr,
-          sd.unpaidDebt ?? 0,
-          sd.debts?.length ?? 0,
-          descStr,
-          offOnStr,
         ];
+        if (exportMode === 'paid' || exportMode === 'all') row.push(sd.paidDebt);
+        if (exportMode === 'unpaid' || exportMode === 'all') row.push(sd.unpaidDebt);
+        row.push(sd.debts.length, descStr, offOnStr);
+        return row;
       });
 
-      const sumTotalDebt = dataRows.reduce((s, row) => s + (Number(row[1]) || 0), 0);
-      const sumUnpaidDebt = dataRows.reduce((s, row) => s + (Number(row[3]) || 0), 0);
-      const sumDebtCount = dataRows.reduce((s, row) => s + (Number(row[4]) || 0), 0);
-      const totalRow = ['المجموع', sumTotalDebt, '', sumUnpaidDebt, sumDebtCount, '', ''];
+      const sumTotalDebt = dataRows.reduce((s, row) => s + (Number(row[2]) || 0), 0);
+      let colIndex = 4;
+      const totalRow: (string | number)[] = ['المجموع', '', sumTotalDebt, ''];
+      if (exportMode === 'paid' || exportMode === 'all') {
+        const sumPaid = dataRows.reduce((s, row) => s + (Number(row[colIndex]) || 0), 0);
+        totalRow.push(sumPaid);
+        colIndex += 1;
+      }
+      if (exportMode === 'unpaid' || exportMode === 'all') {
+        const sumUnpaid = dataRows.reduce((s, row) => s + (Number(row[colIndex]) || 0), 0);
+        totalRow.push(sumUnpaid);
+        colIndex += 1;
+      }
+      const sumDebtCount = dataRows.reduce((s, row) => s + (Number(row[colIndex]) || 0), 0);
+      totalRow.push(sumDebtCount, '', '');
+
+      const colWidths = [22, 16, 16, 16];
+      if (exportMode === 'paid' || exportMode === 'all') colWidths.push(16);
+      if (exportMode === 'unpaid' || exportMode === 'all') colWidths.push(18);
+      colWidths.push(12, 28, 14);
 
       const regionLabel = regionName || 'منطقة';
       const resellerLabel = resellerName || 'رسيلر';
+      const modeLabel = exportMode === 'paid' ? 'مدفوع' : exportMode === 'unpaid' ? 'غير_مدفوع' : 'الكل';
       const blob = createXlsxBlob([headers, ...dataRows, totalRow], 'الديون', {
         alignCenter: true,
-        colWidths: [22, 16, 16, 18, 12, 28, 14],
+        colWidths,
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `ديون_${regionLabel}_${resellerLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `ديون_${modeLabel}_${regionLabel}_${resellerLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
       showSuccess('تم التصدير', `تم تنزيل ${formatNumber(subscriberDebts.length)} مشترك بنجاح.`);
@@ -176,6 +237,13 @@ const DebtsRegionExcelExport: React.FC<Props> = ({
   };
 
   if (!open) return null;
+
+  const exportModeHint =
+    exportMode === 'paid'
+      ? 'سيتم تضمين عمود «الدين المدفوع».'
+      : exportMode === 'unpaid'
+        ? 'سيتم تضمين عمود «الدين غير المدفوع».'
+        : 'سيتم تضمين عمودي «الدين المدفوع» و«الدين غير المدفوع».';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !exporting && onClose()}>
@@ -218,7 +286,8 @@ const DebtsRegionExcelExport: React.FC<Props> = ({
           )}
 
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            سيتم تنزيل ملف Excel يحتوي على جميع الديون للمنطقة والرسيلر المحددين مع تطبيق الفلاتر الحالية.
+            سيتم تنزيل ملف Excel يحتوي على: المشترك، الباقة، إجمالي الدين، و{exportModeHint}
+            {' '}مع صف «المجموع» في نهاية الجدول.
           </p>
 
           <div className="flex gap-2 pt-2">
