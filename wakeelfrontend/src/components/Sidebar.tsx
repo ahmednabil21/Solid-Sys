@@ -41,6 +41,7 @@ import {
   CircleDollarSign,
   Wrench,
   History,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -119,6 +120,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     hiddenWhenFeature?: string;
     /** يتطلب canAccessInvoices وخطة Standard (لعنصر رئيسي بدون أبناء) */
     requiresInvoiceAccess?: boolean;
+    /** يتطلب canAccessAccounts للموظف */
+    requiresAccountsAccess?: boolean;
   };
 
   const menuItems: SidebarMenuItem[] = [
@@ -240,6 +243,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
     },
     {
+      name: 'الاستلام والتسليم',
+      path: '/admin/receipt-handover',
+      icon: ArrowLeftRight,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+      requiresAccountsAccess: true,
+    },
+    {
       name: 'فواتير العملاء',
       path: '/admin/customer-invoices',
       icon: Receipt,
@@ -359,6 +369,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     if (
       item.requiresInvoiceAccess &&
       (user?.canAccessInvoices === false || user?.tenantPlanType === TenantPlanType.Vip)
+    ) {
+      return false;
+    }
+    if (
+      item.requiresAccountsAccess &&
+      user?.role === UserRole.Employee &&
+      user?.canAccessAccounts === false
     ) {
       return false;
     }

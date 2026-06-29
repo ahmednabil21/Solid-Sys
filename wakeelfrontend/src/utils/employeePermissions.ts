@@ -111,6 +111,12 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
     legacyCheck: () => true,
   },
   {
+    pathPrefix: '/admin/receipt-handover',
+    page: 'Accounts',
+    viewAction: 'view',
+    legacyCheck: (u) => u.canAccessAccounts !== false,
+  },
+  {
     pathPrefix: '/admin/customer-invoices',
     page: 'CustomerInvoices',
     anyAction: true,

@@ -2291,6 +2291,48 @@ export interface DailyHandoverCreateRequest {
 /** جسم PUT /Renewals/daily-handover/{id} — نفس حقول الإنشاء */
 export type DailyHandoverUpdateRequest = DailyHandoverCreateRequest;
 
+/** الاستلام والتسليم — GET /ReceiptHandover/context */
+export interface ReceiptHandoverReseller {
+  id: string;
+  name: string;
+  pendingIncomingIqd: number;
+}
+
+export interface ReceiptHandoverRegion {
+  id: string;
+  name: string;
+  resellers: ReceiptHandoverReseller[];
+}
+
+export interface ReceiptHandoverContext {
+  regions: ReceiptHandoverRegion[];
+}
+
+export interface ReceiptHandoverCreateRequest {
+  agentResellerId: string;
+  receivedAmount: number;
+  handedByEmployeeUserId: string;
+  notes?: string;
+  handoverDate?: string;
+}
+
+export interface ReceiptHandoverRecord {
+  id: string;
+  agentResellerId: string;
+  resellerName: string;
+  regionId: string;
+  regionName: string;
+  totalIncomingAmount: number;
+  receivedAmount: number;
+  remainingAmount: number;
+  handedByEmployeeUserId: string;
+  handedByEmployeeName: string;
+  recordedByUserName: string;
+  handoverDate: string;
+  notes?: string | null;
+  createdAt: string;
+}
+
 // Debt Types
 /** حالة إطفاء/تشغيل المشترك على الدين (من الباكند) */
 export enum DebtOffOn {

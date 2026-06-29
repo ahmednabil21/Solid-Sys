@@ -68,6 +68,9 @@ import {
   ActivityLogItem,
   ActivityType,
   ActivityTypeOption,
+  ReceiptHandoverContext,
+  ReceiptHandoverCreateRequest,
+  ReceiptHandoverRecord,
   AgentEmployeeCreateRequest,
   AgentEmployeeUpdateRequest,
   EmployeePermissionCatalog,
@@ -1468,6 +1471,43 @@ class ApiService {
   async getActivityTypes(): Promise<ActivityTypeOption[]> {
     const response: AxiosResponse<{ types: ActivityTypeOption[] }> = await this.api.get('/ActivityLog/activity-types');
     return response.data.types ?? [];
+  }
+
+  async getReceiptHandoverContext(agentId?: string): Promise<ReceiptHandoverContext> {
+    const params: Record<string, string> = {};
+    if (agentId?.trim()) params.agentId = agentId.trim();
+    const response: AxiosResponse<ReceiptHandoverContext> = await this.api.get('/ReceiptHandover/context', { params });
+    return response.data;
+  }
+
+  async getReceiptHandoverRecords(params: {
+    page: number;
+    pageSize: number;
+    agentId?: string;
+    regionId?: string;
+    agentResellerId?: string;
+  }): Promise<PaginatedResponse<ReceiptHandoverRecord>> {
+    const query: Record<string, string | number> = {
+      page: params.page,
+      pageSize: params.pageSize,
+    };
+    if (params.agentId) query.agentId = params.agentId;
+    if (params.regionId) query.regionId = params.regionId;
+    if (params.agentResellerId) query.agentResellerId = params.agentResellerId;
+    const response: AxiosResponse<PaginatedResponse<ReceiptHandoverRecord>> = await this.api.get('/ReceiptHandover/records', {
+      params: query,
+    });
+    return response.data;
+  }
+
+  async createReceiptHandover(
+    body: ReceiptHandoverCreateRequest,
+    agentId?: string
+  ): Promise<ReceiptHandoverRecord> {
+    const params: Record<string, string> = {};
+    if (agentId?.trim()) params.agentId = agentId.trim();
+    const response: AxiosResponse<ReceiptHandoverRecord> = await this.api.post('/ReceiptHandover', body, { params });
+    return response.data;
   }
 
   // Profile/Package endpoints
