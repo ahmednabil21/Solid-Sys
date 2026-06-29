@@ -40,6 +40,7 @@ import {
   Zap,
   CircleDollarSign,
   Wrench,
+  History,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -230,6 +231,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       name: 'الرصيد',
       path: '/admin/balance',
       icon: CircleDollarSign,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+    },
+    {
+      name: 'سجل الحركات',
+      path: '/admin/activity-log',
+      icon: History,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
     },
     {

@@ -67,6 +67,7 @@ import {
   ExcelImportResponse,
   ActivityLogItem,
   ActivityType,
+  ActivityTypeOption,
   AgentEmployeeCreateRequest,
   AgentEmployeeUpdateRequest,
   EmployeePermissionCatalog,
@@ -1435,9 +1436,8 @@ class ApiService {
 
   /**
    * سجل الحركات (GET /api/ActivityLog)
-   * - Agent: لا يرسل agentId (الباكند يستنتجه من التوكن)
+   * - Agent/SubAgent/Employee: لا يرسل agentId (الباكند يستنتجه من التوكن)
    * - Admin: يجب إرسال agentId
-   * - فلترة متقدمة: activityType (1–5), subscriberName, fromDate, toDate (yyyy-MM-dd)
    */
   async getActivityLog(params: {
     agentId?: string;
@@ -1445,6 +1445,7 @@ class ApiService {
     pageSize: number;
     activityType?: ActivityType;
     subscriberName?: string;
+    searchTerm?: string;
     fromDate?: string;
     toDate?: string;
   }): Promise<PaginatedResponse<ActivityLogItem>> {
@@ -1455,12 +1456,18 @@ class ApiService {
     if (params.agentId) queryParams.agentId = params.agentId;
     if (params.activityType != null) queryParams.activityType = params.activityType;
     if (params.subscriberName?.trim()) queryParams.subscriberName = params.subscriberName.trim();
+    if (params.searchTerm?.trim()) queryParams.searchTerm = params.searchTerm.trim();
     if (params.fromDate) queryParams.fromDate = params.fromDate.split('T')[0];
     if (params.toDate) queryParams.toDate = params.toDate.split('T')[0];
     const response: AxiosResponse<PaginatedResponse<ActivityLogItem>> = await this.api.get('/ActivityLog', {
       params: queryParams,
     });
     return response.data;
+  }
+
+  async getActivityTypes(): Promise<ActivityTypeOption[]> {
+    const response: AxiosResponse<{ types: ActivityTypeOption[] }> = await this.api.get('/ActivityLog/activity-types');
+    return response.data.types ?? [];
   }
 
   // Profile/Package endpoints

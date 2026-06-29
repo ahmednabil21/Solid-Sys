@@ -1946,20 +1946,43 @@ export interface SubscribersDashboardStats {
 
 /** نوع الحركة في سجل النشاط */
 export enum ActivityType {
-  ActivateSubscriber = 1,  // تفعيل مشترك
-  AddSubscriber = 2,       // إضافة مشترك
-  DeleteSubscriber = 3,    // حذف مشترك
-  UpdateSubscriber = 4,    // تعديل مشترك
-  PayDebt = 5              // تسديد دين
+  ActivateSubscriber = 1,
+  AddSubscriber = 2,
+  DeleteSubscriber = 3,
+  UpdateSubscriber = 4,
+  PayDebt = 5,
+  MaterialDisbursement = 6,
+  MaterialReturn = 7,
+  AddProfile = 8,
+  UpdateProfile = 9,
+  DeleteProfile = 10,
+  BalanceTopUp = 11,
+  BalanceUpdate = 12,
+  BalanceDelete = 13,
+  CustomerInvoiceJournalEntry = 14,
+  SyncSubscribers = 15,
+  DeleteActivation = 16,
+  AddDebt = 17,
+  UpdateDebt = 18,
+  DeleteDebt = 19,
+  ExcelImportActivations = 20,
+  ExcelImportSubscribers = 21,
+}
+
+export interface ActivityTypeOption {
+  value: number;
+  label: string;
 }
 
 export interface ActivityLogItem {
+  id: string;
   actorName: string;
   actorUsername: string;
   activityType: ActivityType;
   activityTypeName: string;
-  subscriberName: string;
-  subscriberUsername: string;
+  subscriberName?: string | null;
+  subscriberUsername?: string | null;
+  details?: string | null;
   createdAt: string;
 }
 

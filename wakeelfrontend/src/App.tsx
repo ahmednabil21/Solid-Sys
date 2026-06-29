@@ -36,6 +36,7 @@ const UsersPage = lazy(() => import('./pages/UsersPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const ReceiptsPage = lazy(() => import('./pages/ReceiptsPage'));
 const BalancePage = lazy(() => import('./pages/BalancePage'));
+const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'));
 const DebtsPage = lazy(() => import('./pages/DebtsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ExcelImportPage = lazy(() => import('./pages/ExcelImportPage'));
@@ -302,6 +303,13 @@ function App() {
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
                       <EmployeePageGuard path="/admin/balance">
                         <BalancePage />
+                      </EmployeePageGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="activity-log" element={
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/activity-log">
+                        <ActivityLogPage />
                       </EmployeePageGuard>
                     </ProtectedRoute>
                   } />

@@ -106,6 +106,11 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
     legacyCheck: (u) => u.canAccessAccounts !== false,
   },
   {
+    pathPrefix: '/admin/activity-log',
+    anyAction: true,
+    legacyCheck: () => true,
+  },
+  {
     pathPrefix: '/admin/customer-invoices',
     page: 'CustomerInvoices',
     anyAction: true,
