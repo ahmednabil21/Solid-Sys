@@ -900,8 +900,12 @@ const SubscribersPage: React.FC = () => {
 
   /** الوكيل والمدير الثانوي والموظف: جلب وكيل المستخدم (للموظف/المدير الثانوي يرجع الوكيل التابع له — نفس جلسة واتساب) */
   const isAgentOrSubAgentOrEmployee = user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
-  /** صلاحية مزامنة SAS من الاعتماديات المحفوظة (أدمن، وكيل، نائب وكيل) */
-  const canSyncSas = user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent;
+  /** مزامنة SAS/FTTH: وكيل، مدير ثانوي، أو موظف بصلاحية sync */
+  const canSyncSas =
+    user?.role === UserRole.Admin ||
+    user?.role === UserRole.Agent ||
+    user?.role === UserRole.SubAgent ||
+    hasPageAction(user, 'Subscribers', 'sync');
   const canExportSubscribersExcel =
     user?.role === UserRole.Admin ||
     user?.role === UserRole.Agent ||
