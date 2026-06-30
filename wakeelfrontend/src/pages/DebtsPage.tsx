@@ -18,6 +18,7 @@ import { showError, showSuccess, showInfo } from '../utils/notifications';
 import {
   buildRegionResellerFilterParams,
 } from '../utils/operationalFilters';
+import { hasPageAction } from '../utils/employeePermissions';
 import { 
   CreditCard,
   DollarSign,
@@ -72,8 +73,15 @@ const DebtsPage: React.FC = () => {
   const { formatNumber, formatDate } = useDigits();
   /** المدير الثانوي يملك نفس صلاحيات الوكيل في إدارة الديون */
   const canManageDebts = user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent;
-  const canEmployeeEditDebtNotesOnly = user?.role === UserRole.Employee && !!user?.canPayDebt;
+  const canAddDebt = canManageDebts || hasPageAction(user, 'Debts', 'add');
+  const canPayDebtAction = canManageDebts || hasPageAction(user, 'Debts', 'pay');
+  const canDeleteDebt = canManageDebts || hasPageAction(user, 'Debts', 'delete');
+  const canViewDebtDetails = canManageDebts || hasPageAction(user, 'Debts', 'view');
+  const canEmployeeEditDebtNotesOnly =
+    user?.role === UserRole.Employee &&
+    (!!user?.canPayDebt || hasPageAction(user, 'Debts', 'edit'));
   const canEditDebt = canManageDebts || canEmployeeEditDebtNotesOnly;
+  const showDebtRowActions = canPayDebtAction || canViewDebtDetails;
   const isAgentOrSubAgentOrEmployee =
     user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
 
@@ -891,7 +899,7 @@ const DebtsPage: React.FC = () => {
             {showActionsDropdown && (
               <div className="absolute top-full right-0 mt-2 min-w-[200px] w-max max-w-[280px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 z-50 py-1.5">
                 <div className="flex flex-col gap-0.5">
-                  {canManageDebts && (
+                  {canAddDebt && (
                     <button
                       onClick={() => {
                         openAddDebtChooser();
@@ -927,30 +935,32 @@ const DebtsPage: React.FC = () => {
                         <span>عرض تفاصيل الدين</span>
                       </button>
                   
-                      <button
-                        onClick={() => {
-                          if (selectedIds.length === 1) {
-                            const subscriberDebt = subscriberDebts.find((sd: any) => sd.subscriberId === selectedIds[0]) as any;
-                            if (subscriberDebt && subscriberDebt.unpaidDebt > 0) {
-                              const unpaidDebt = subscriberDebt.debts.find((d: any) => !d.isPaid);
-                              if (unpaidDebt) {
-                                setSelectedDebt(unpaidDebt);
-                                setPaymentData({
-                                  paymentAmount: unpaidDebt.amount,
-                                  notes: ''
-                                });
-                                setShowPayDebtModal(true);
+                      {canPayDebtAction && (
+                        <button
+                          onClick={() => {
+                            if (selectedIds.length === 1) {
+                              const subscriberDebt = subscriberDebts.find((sd: any) => sd.subscriberId === selectedIds[0]) as any;
+                              if (subscriberDebt && subscriberDebt.unpaidDebt > 0) {
+                                const unpaidDebt = subscriberDebt.debts.find((d: any) => !d.isPaid);
+                                if (unpaidDebt) {
+                                  setSelectedDebt(unpaidDebt);
+                                  setPaymentData({
+                                    paymentAmount: unpaidDebt.amount,
+                                    notes: ''
+                                  });
+                                  setShowPayDebtModal(true);
+                                }
                               }
                             }
-                          }
-                          setShowActionsDropdown(false);
-                        }}
-                        disabled={selectedIds.length !== 1}
-                        className="w-full text-right px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2 disabled:opacity-50"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        <span>دفع الدين</span>
-                      </button>
+                            setShowActionsDropdown(false);
+                          }}
+                          disabled={selectedIds.length !== 1}
+                          className="w-full text-right px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2 disabled:opacity-50"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          <span>دفع الدين</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={handleSendDebtAlertMessage}
@@ -1008,7 +1018,7 @@ const DebtsPage: React.FC = () => {
                         <span>إطفاء / تشغيل المشترك</span>
                       </button>
                       
-                      {canManageDebts && (
+                      {canDeleteDebt && (
                         <button
                           onClick={() => {
                             if (window.confirm(`هل أنت متأكد من حذف ${selectedIds.length} دين؟`)) {
@@ -1111,7 +1121,7 @@ const DebtsPage: React.FC = () => {
                 <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   إطفاء/تشغيل
                 </th>
-                {canManageDebts && (
+                {showDebtRowActions && (
                   <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     الإجراءات
                   </th>
@@ -1215,33 +1225,37 @@ const DebtsPage: React.FC = () => {
                       );
                     })()}
                   </td>
-                  {canManageDebts && (
+                  {showDebtRowActions && (
                     <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
                       <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                        <button
-                          onClick={() => {
-                            if (subscriberDebt.unpaidDebt > 0) {
-                              const unpaidDebt = subscriberDebt.debts.find((d: any) => d.status === 0 || !d.isPaid);
-                              if (unpaidDebt) {
-                                setSelectedDebt(unpaidDebt);
-                                setPaymentData({ paymentAmount: unpaidDebt.amount, notes: '' });
-                                setShowPayDebtModal(true);
+                        {canPayDebtAction && (
+                          <button
+                            onClick={() => {
+                              if (subscriberDebt.unpaidDebt > 0) {
+                                const unpaidDebt = subscriberDebt.debts.find((d: any) => d.status === 0 || !d.isPaid);
+                                if (unpaidDebt) {
+                                  setSelectedDebt(unpaidDebt);
+                                  setPaymentData({ paymentAmount: unpaidDebt.amount, notes: '' });
+                                  setShowPayDebtModal(true);
+                                }
                               }
-                            }
-                          }}
-                          disabled={subscriberDebt.unpaidDebt <= 0}
-                          className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 text-xs sm:text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span>تسديد</span>
-                        </button>
-                        <button
-                          onClick={() => handleViewSubscriberDebts(subscriberDebt.subscriberId)}
-                          className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 text-xs sm:text-sm text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md transition-colors"
-                        >
-                          <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span>عرض التفاصيل</span>
-                        </button>
+                            }}
+                            disabled={subscriberDebt.unpaidDebt <= 0}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 text-xs sm:text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span>تسديد</span>
+                          </button>
+                        )}
+                        {canViewDebtDetails && (
+                          <button
+                            onClick={() => handleViewSubscriberDebts(subscriberDebt.subscriberId)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 text-xs sm:text-sm text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md transition-colors"
+                          >
+                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span>عرض التفاصيل</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   )}
@@ -2088,34 +2102,34 @@ const DebtsPage: React.FC = () => {
               </h3>
               <div className="flex items-center gap-2">
                 {canManageDebts && selectedSubscriberForDebtsModalId && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => selectedSubscriberForDebtsModalId && handleOpenActivationTab(selectedSubscriberForDebtsModalId, selectedSubscriberDebts[0]?.subscriberName)}
-                      disabled={!!activationLinkLoadingForId}
-                      className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md transition-colors disabled:opacity-50"
-                    >
-                      {activationLinkLoadingForId === selectedSubscriberForDebtsModalId ? (
-                        <Power className="h-4 w-4 animate-pulse" />
-                      ) : (
-                        <Power className="h-4 w-4" />
-                      )}
-                      <span>إطفاء / تشغيل المشترك</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const subId = selectedSubscriberForDebtsModalId;
-                        const subName = selectedSubscriberDebts[0]?.subscriberName || '';
-                        openAddDebtForSubscriber(subId, subName);
-                        setShowSubscriberDebtsModal(false);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>إضافة دين</span>
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={() => selectedSubscriberForDebtsModalId && handleOpenActivationTab(selectedSubscriberForDebtsModalId, selectedSubscriberDebts[0]?.subscriberName)}
+                    disabled={!!activationLinkLoadingForId}
+                    className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md transition-colors disabled:opacity-50"
+                  >
+                    {activationLinkLoadingForId === selectedSubscriberForDebtsModalId ? (
+                      <Power className="h-4 w-4 animate-pulse" />
+                    ) : (
+                      <Power className="h-4 w-4" />
+                    )}
+                    <span>إطفاء / تشغيل المشترك</span>
+                  </button>
+                )}
+                {canAddDebt && selectedSubscriberForDebtsModalId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const subId = selectedSubscriberForDebtsModalId;
+                      const subName = selectedSubscriberDebts[0]?.subscriberName || '';
+                      openAddDebtForSubscriber(subId, subName);
+                      setShowSubscriberDebtsModal(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>إضافة دين</span>
+                  </button>
                 )}
                 <button
                   onClick={() => {
@@ -2270,44 +2284,42 @@ const DebtsPage: React.FC = () => {
                               <Eye className="h-4 w-4" />
                               <span>تفاصيل</span>
                             </button>
-                            {canManageDebts ? (
-                              <>
-                                {!debt.isPaid && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedDebt(debt);
-                                      setPaymentData({ paymentAmount: debt.amount, notes: '' });
-                                      setOpenedFromSubscriberDebts(true);
-                                      setShowPayDebtModal(true);
-                                      setShowSubscriberDebtsModal(false);
-                                    }}
-                                    className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 flex items-center space-x-1"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                    <span>تسديد</span>
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    if (window.confirm('هل أنت متأكد من حذف هذا الدين؟')) {
-                                      deleteDebtMutation.mutate(debt.id, {
-                                        onSuccess: () => {
-                                          setSelectedSubscriberDebts(prev => prev.filter((d: any) => d.id !== debt.id));
-                                          setSelectedSubscriberTotalDebt(prev => (prev != null ? prev - (debt.amount || 0) : null));
-                                          showSuccess('تم الحذف', 'تم حذف الدين.');
-                                        },
-                                      });
-                                    }
-                                  }}
-                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 flex items-center space-x-1"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  <span>حذف</span>
-                                </button>
-                                {debt.isPaid && <span className="text-gray-400 text-xs">مدفوع</span>}
-                              </>
-                            ) : (
-                              <span className="text-gray-400">—</span>
+                            {canPayDebtAction && !debt.isPaid && (
+                              <button
+                                onClick={() => {
+                                  setSelectedDebt(debt);
+                                  setPaymentData({ paymentAmount: debt.amount, notes: '' });
+                                  setOpenedFromSubscriberDebts(true);
+                                  setShowPayDebtModal(true);
+                                  setShowSubscriberDebtsModal(false);
+                                }}
+                                className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 flex items-center space-x-1"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                <span>تسديد</span>
+                              </button>
+                            )}
+                            {canDeleteDebt && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('هل أنت متأكد من حذف هذا الدين؟')) {
+                                    deleteDebtMutation.mutate(debt.id, {
+                                      onSuccess: () => {
+                                        setSelectedSubscriberDebts(prev => prev.filter((d: any) => d.id !== debt.id));
+                                        setSelectedSubscriberTotalDebt(prev => (prev != null ? prev - (debt.amount || 0) : null));
+                                        showSuccess('تم الحذف', 'تم حذف الدين.');
+                                      },
+                                    });
+                                  }
+                                }}
+                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 flex items-center space-x-1"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span>حذف</span>
+                              </button>
+                            )}
+                            {debt.isPaid && !canPayDebtAction && !canDeleteDebt && (
+                              <span className="text-gray-400 text-xs">مدفوع</span>
                             )}
                           </div>
                         </td>
