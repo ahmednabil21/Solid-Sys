@@ -543,8 +543,16 @@ const PackagesPage: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-primary-100 dark:bg-primary-900/20 rounded-lg">
-                    <Package className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                  <div className={`p-2 rounded-lg ${
+                    (pkg.typeAdd ?? ProfileTypeAdd.Normal) === ProfileTypeAdd.ProfileCustom
+                      ? 'bg-red-100 dark:bg-red-900/20'
+                      : 'bg-primary-100 dark:bg-primary-900/20'
+                  }`}>
+                    <Package className={`h-6 w-6 ${
+                      (pkg.typeAdd ?? ProfileTypeAdd.Normal) === ProfileTypeAdd.ProfileCustom
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-primary-600 dark:text-primary-400'
+                    }`} />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
