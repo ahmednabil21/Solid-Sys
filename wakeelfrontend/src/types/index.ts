@@ -1571,6 +1571,8 @@ export interface Profile {
   cashbackEnabled?: boolean;
   renewalPeriod: number; // فترة التجديد بالأيام
   packageType?: ProfilePackageType;
+  /** اعتيادي = كاشباك محسوب، مخصص = كاشباك يدوي */
+  typeAdd?: ProfileTypeAdd;
   /** مواد مرتبطة بباقة «عرض خاص» (عند packageType = SpecialOffer) */
   includedMaterialIds?: string[] | null;
   isActive: boolean;
@@ -1591,6 +1593,7 @@ export interface ProfileCreateRequest {
   cashbackEnabled?: boolean;
   renewalPeriod: number; // فترة التجديد بالأيام
   packageType?: ProfilePackageType;
+  typeAdd?: ProfileTypeAdd;
   includedMaterialIds?: string[];
   isActive?: boolean;
   agentResellerId?: string;
@@ -1606,6 +1609,7 @@ export interface ProfileUpdateRequest {
   cashbackEnabled?: boolean;
   renewalPeriod: number; // فترة التجديد بالأيام
   packageType?: ProfilePackageType;
+  typeAdd?: ProfileTypeAdd;
   includedMaterialIds?: string[];
   isActive: boolean;
   agentResellerId?: string;
@@ -1617,6 +1621,12 @@ export enum ProfilePackageType {
   Extension = 2,
   /** عرض خاص — أسعار + مواد اختيارية تُصرف عند التفعيل */
   SpecialOffer = 3,
+}
+
+/** طريقة إضافة الباقة: اعتيادي (كاشباك محسوب) أو مخصص (كاشباك يدوي) */
+export enum ProfileTypeAdd {
+  Normal = 1,
+  ProfileCustom = 2,
 }
 
 export enum ActivationType {

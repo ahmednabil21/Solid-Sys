@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService, ApiService } from '../services/api';
-import { Profile, ProfileCreateRequest, ProfileUpdateRequest, PaginatedResponse, AgentReseller, AgentRegion, ProfilePackageType, Material } from '../types';
+import { Profile, ProfileCreateRequest, ProfileUpdateRequest, PaginatedResponse, AgentReseller, AgentRegion, ProfilePackageType, ProfileTypeAdd, Material } from '../types';
 import { showSuccess, showError } from '../utils/notifications';
 import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useDigits } from '../contexts/DigitsContext';
@@ -47,6 +47,7 @@ const PackagesPage: React.FC = () => {
   const [editFormRegionId, setEditFormRegionId] = useState<string>('');
   const [editFormResellerId, setEditFormResellerId] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addProfileType, setAddProfileType] = useState<ProfileTypeAdd>(ProfileTypeAdd.Normal);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPackage, setEditingPackage] = useState<Profile | null>(null);
   const queryClient = useQueryClient();
@@ -60,6 +61,7 @@ const PackagesPage: React.FC = () => {
     cashbackEnabled: true,
     renewalPeriod: 30, // فترة التجديد بالأيام
     packageType: ProfilePackageType.Subscription,
+    typeAdd: ProfileTypeAdd.Normal,
     includedMaterialIds: [],
     isActive: true,
   });
@@ -74,6 +76,7 @@ const PackagesPage: React.FC = () => {
     cashbackEnabled: true,
     renewalPeriod: 30, // فترة التجديد بالأيام
     packageType: ProfilePackageType.Subscription,
+    typeAdd: ProfileTypeAdd.Normal,
     includedMaterialIds: [],
     isActive: true
   });
@@ -115,7 +118,44 @@ const PackagesPage: React.FC = () => {
     [myResellers, editFormRegionId]
   );
 
-  const packages = profilesResponse?.data ?? [];
+  const isCustomAdd = addProfileType === ProfileTypeAdd.ProfileCustom;
+  const isCustomEdit = (editFormData.typeAdd ?? ProfileTypeAdd.Normal) === ProfileTypeAdd.ProfileCustom;
+
+  const openAddModal = (type: ProfileTypeAdd) => {
+    setAddProfileType(type);
+    setFormData({
+      name: '',
+      originalPrice: 0,
+      salePrice: 0,
+      balanceDeductionAmount: 0,
+      returnPrice: 0,
+      cashbackEnabled: true,
+      renewalPeriod: 30,
+      packageType: ProfilePackageType.Subscription,
+      typeAdd: type,
+      includedMaterialIds: [],
+      isActive: true,
+    });
+    setFormRegionId('');
+    setFormResellerId('');
+    setShowAddModal(true);
+  };
+
+  const resetAddForm = () => {
+    setFormData({
+      name: '',
+      originalPrice: 0,
+      salePrice: 0,
+      balanceDeductionAmount: 0,
+      returnPrice: 0,
+      cashbackEnabled: true,
+      renewalPeriod: 30,
+      packageType: ProfilePackageType.Subscription,
+      typeAdd: ProfileTypeAdd.Normal,
+      includedMaterialIds: [],
+      isActive: true,
+    });
+  };
 
   const showMaterialsPickerAdd =
     showAddModal && formData.packageType === ProfilePackageType.SpecialOffer;
@@ -128,6 +168,8 @@ const PackagesPage: React.FC = () => {
     enabled: showMaterialsPickerAdd || showMaterialsPickerEdit,
   });
   const materialsList = materialsResponse?.data ?? [];
+
+  const packages = profilesResponse?.data ?? [];
 
   const packageTypeBadge = (t?: ProfilePackageType) => {
     if (t === ProfilePackageType.Extension) return 'تمديد';
@@ -154,19 +196,7 @@ const PackagesPage: React.FC = () => {
       setFormRegionId('');
       setFormResellerId('');
       showSuccess('تم الإضافة بنجاح', 'تم إضافة الباقة الجديدة بنجاح');
-      // Reset form
-      setFormData({
-        name: '',
-        originalPrice: 0,
-        salePrice: 0,
-        balanceDeductionAmount: 0,
-        returnPrice: 0,
-        cashbackEnabled: true,
-        renewalPeriod: 30,
-        packageType: ProfilePackageType.Subscription,
-        includedMaterialIds: [],
-        isActive: true,
-      });
+      resetAddForm();
     },
     onError: (error: unknown) => {
       showError('خطأ في الإضافة', ApiService.showError(error));
@@ -192,6 +222,7 @@ const PackagesPage: React.FC = () => {
         cashbackEnabled: true,
         renewalPeriod: 30,
         packageType: ProfilePackageType.Subscription,
+        typeAdd: ProfileTypeAdd.Normal,
         includedMaterialIds: [],
         isActive: true
       });
@@ -230,9 +261,12 @@ const PackagesPage: React.FC = () => {
     }
     const payload: ProfileCreateRequest = {
       ...formData,
-      returnPrice: formData.cashbackEnabled !== false
-        ? computeReturnPrice(formData.originalPrice, formData.salePrice)
-        : 0,
+      typeAdd: addProfileType,
+      returnPrice: isCustomAdd
+        ? (formData.cashbackEnabled !== false ? (formData.returnPrice ?? 0) : 0)
+        : (formData.cashbackEnabled !== false
+          ? computeReturnPrice(formData.originalPrice, formData.salePrice)
+          : 0),
       regionId: formRegionId,
       agentResellerId: formResellerId,
       includedMaterialIds:
@@ -316,6 +350,7 @@ const PackagesPage: React.FC = () => {
       cashbackEnabled: pkg.cashbackEnabled !== false,
       renewalPeriod: pkg.renewalPeriod || 30,
       packageType: pkg.packageType ?? ProfilePackageType.Subscription,
+      typeAdd: pkg.typeAdd ?? ProfileTypeAdd.Normal,
       includedMaterialIds: [...(pkg.includedMaterialIds ?? [])],
       isActive: pkg.isActive
     });
@@ -331,9 +366,11 @@ const PackagesPage: React.FC = () => {
     if (editingPackage) {
       const data: ProfileUpdateRequest = {
         ...editFormData,
-        returnPrice: editFormData.cashbackEnabled !== false
-          ? computeReturnPrice(editFormData.originalPrice, editFormData.salePrice)
-          : 0,
+        returnPrice: isCustomEdit
+          ? (editFormData.cashbackEnabled !== false ? (editFormData.returnPrice ?? 0) : 0)
+          : (editFormData.cashbackEnabled !== false
+            ? computeReturnPrice(editFormData.originalPrice, editFormData.salePrice)
+            : 0),
         regionId: editFormRegionId,
         agentResellerId: editFormResellerId,
         includedMaterialIds:
@@ -391,13 +428,22 @@ const PackagesPage: React.FC = () => {
             عرض وإدارة جميع الباقات المتاحة
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          <span>إضافة باقة</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openAddModal(ProfileTypeAdd.Normal)}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            <span>إضافة باقة</span>
+          </button>
+          <button
+            onClick={() => openAddModal(ProfileTypeAdd.ProfileCustom)}
+            className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            <span>باقة مخصصة</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -507,6 +553,9 @@ const PackagesPage: React.FC = () => {
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {[pkg.regionName, pkg.agentResellerName].filter(Boolean).join(' — ') || pkg.agentCompanyName || 'غير محدد'}
                       {' · '}{packageTypeBadge(pkg.packageType)}
+                      {(pkg.typeAdd ?? ProfileTypeAdd.Normal) === ProfileTypeAdd.ProfileCustom && (
+                        <span className="text-red-600 dark:text-red-400"> · مخصصة</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -608,7 +657,7 @@ const PackagesPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                إضافة باقة جديدة
+                {isCustomAdd ? 'إضافة باقة مخصصة' : 'إضافة باقة جديدة'}
               </h2>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -763,6 +812,27 @@ const PackagesPage: React.FC = () => {
               </div>
 
               {formData.cashbackEnabled !== false && formData.packageType !== ProfilePackageType.Extension && (
+              isCustomAdd ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  مبلغ الكاشباك (د.ع) *
+                </label>
+                <input
+                  type="number"
+                  name="returnPrice"
+                  value={formData.returnPrice ?? 0}
+                  onChange={handleInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="أدخل مبلغ الكاشباك يدوياً"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  يُدخل يدوياً — لا يُحسب من فرق السعرين
+                </p>
+              </div>
+              ) : (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الكاشباك (د.ع)
@@ -774,6 +844,7 @@ const PackagesPage: React.FC = () => {
                   يُحسب تلقائياً: السعر على المشترك − السعر على الوكيل
                 </p>
               </div>
+              )
               )}
 
               {formData.packageType === ProfilePackageType.SpecialOffer && (
@@ -877,7 +948,7 @@ const PackagesPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                تعديل الباقة
+                {isCustomEdit ? 'تعديل باقة مخصصة' : 'تعديل الباقة'}
               </h2>
               <button
                 onClick={() => {
@@ -1035,6 +1106,27 @@ const PackagesPage: React.FC = () => {
               </div>
 
               {editFormData.cashbackEnabled !== false && editFormData.packageType !== ProfilePackageType.Extension && (
+              isCustomEdit ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  مبلغ الكاشباك (د.ع) *
+                </label>
+                <input
+                  type="number"
+                  name="returnPrice"
+                  value={editFormData.returnPrice ?? 0}
+                  onChange={handleEditInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="أدخل مبلغ الكاشباك يدوياً"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  يُدخل يدوياً — لا يُحسب من فرق السعرين
+                </p>
+              </div>
+              ) : (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الكاشباك (د.ع)
@@ -1046,6 +1138,7 @@ const PackagesPage: React.FC = () => {
                   يُحسب تلقائياً: السعر على المشترك − السعر على الوكيل
                 </p>
               </div>
+              )
               )}
 
               {editFormData.packageType === ProfilePackageType.SpecialOffer && (
