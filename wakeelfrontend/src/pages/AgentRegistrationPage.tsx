@@ -25,6 +25,7 @@ const FIXED_LOGIN_PASSWORD = '12345';
 function ensureWktSuffix(raw: string): string {
   const t = raw.trim();
   if (!t) return '';
+  
   if (t.toLowerCase().endsWith('@wkt')) return t;
   return `${t}@wkt`;
 }
