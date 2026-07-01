@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasPageAction } from '../utils/employeePermissions';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ProfileTypeAdd, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -482,6 +482,16 @@ function filterAutoSyncFtthRowsWithDeviceUsername(
 ): CashbackSynchronizationFtthResponse {
   const data = (res.data ?? []).filter((row) => resolveAutoSyncRowUsername(row) !== '');
   return { ...res, data, count: data.length };
+}
+
+function formatRenewalProfileOptionLabel(profile: Profile, formatNumber: (n: number, opts?: { suffix?: string }) => string): string {
+  if (profile.packageType === ProfilePackageType.Extension) {
+    return `${profile.name} - تمديد مجاني (${profile.renewalPeriod || 30} يوم)`;
+  }
+  if (profile.packageType === ProfilePackageType.SpecialOffer) {
+    return `${profile.name} - ${formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} — عرض خاص (${profile.renewalPeriod || 30} يوم)`;
+  }
+  return `${profile.name} - ${formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} (${profile.renewalPeriod || 30} يوم)`;
 }
 
 const SubscribersPage: React.FC = () => {
@@ -1084,6 +1094,19 @@ const SubscribersPage: React.FC = () => {
     if (subReseller) return active.filter((p) => (p.agentResellerId ?? '').trim() === subReseller);
     return active.filter((p) => !(p.agentResellerId ?? '').trim());
   }, [renewalProfiles, selectedSubscriber?.agentResellerId]);
+  const normalProfilesForRenewal = React.useMemo(
+    () => profilesList.filter((p) => (p.typeAdd ?? ProfileTypeAdd.Normal) !== ProfileTypeAdd.ProfileCustom),
+    [profilesList],
+  );
+  const customProfilesForRenewal = React.useMemo(
+    () => profilesList.filter((p) => p.typeAdd === ProfileTypeAdd.ProfileCustom),
+    [profilesList],
+  );
+  const selectedRenewalProfile = React.useMemo(
+    () => profilesList.find((p) => p.id === renewalData.newProfileId) ?? null,
+    [profilesList, renewalData.newProfileId],
+  );
+  const isRenewalProfileCustom = selectedRenewalProfile?.typeAdd === ProfileTypeAdd.ProfileCustom;
   const renewalInfo = React.useMemo(
     () =>
       selectedSubscriber
@@ -2391,6 +2414,12 @@ const SubscribersPage: React.FC = () => {
         return updated;
       });
     }
+  };
+
+  const handleRenewalProfileSelect = (profileId: string) => {
+    handleRenewalInputChange({
+      target: { name: 'newProfileId', value: profileId, type: 'text' },
+    } as React.ChangeEvent<HTMLInputElement>);
   };
 
   const handleRenewalSubmit = async (e: React.FormEvent) => {
@@ -4280,25 +4309,47 @@ const SubscribersPage: React.FC = () => {
               <form onSubmit={handleRenewalSubmit} className="p-6 space-y-6">
               {/* Renewal Options */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Profile Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    الباقة الجديدة *
-                  </label>
-                  <select
-                    name="newProfileId"
-                    value={renewalData.newProfileId}
-                    onChange={handleRenewalInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="">اختر الباقة</option>
-                    {renewalInfo.availableProfiles?.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.name} - {profile.packageType === ProfilePackageType.Extension ? 'تمديد مجاني' : profile.packageType === ProfilePackageType.SpecialOffer ? `${formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} — عرض خاص` : formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} ({profile.renewalPeriod || 30} يوم)
+                {/* Profile Selection — اعتيادية ومخصصة منفصلتان */}
+                <div className={customProfilesForRenewal.length > 0 ? 'md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {customProfilesForRenewal.length > 0 ? 'الباقة الاعتيادية' : 'الباقة الجديدة *'}
+                    </label>
+                    <select
+                      value={isRenewalProfileCustom ? '' : renewalData.newProfileId}
+                      onChange={(e) => handleRenewalProfileSelect(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="">
+                        {customProfilesForRenewal.length > 0 ? 'اختر باقة اعتيادية' : 'اختر الباقة'}
                       </option>
-                    ))}
-                  </select>
+                      {normalProfilesForRenewal.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {formatRenewalProfileOptionLabel(profile, formatNumber)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {customProfilesForRenewal.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-2">
+                        الباقة المخصصة *
+                      </label>
+                      <select
+                        value={isRenewalProfileCustom ? renewalData.newProfileId : ''}
+                        onChange={(e) => handleRenewalProfileSelect(e.target.value)}
+                        className="w-full px-3 py-2 border border-red-300 dark:border-red-700 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="">اختر باقة مخصصة</option>
+                        {customProfilesForRenewal.map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {formatRenewalProfileOptionLabel(profile, formatNumber)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {ftthCompareSyncContext && (
