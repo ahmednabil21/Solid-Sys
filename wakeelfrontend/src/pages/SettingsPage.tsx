@@ -736,6 +736,7 @@ function SettingsPage() {
   const [resellerTelegramChatId, setResellerTelegramChatId] = useState('');
   const [resellerPassword, setResellerPassword] = useState('');
   const [resellerDisplayOrder, setResellerDisplayOrder] = useState(0);
+  const [resellerFtthPartnerId, setResellerFtthPartnerId] = useState('');
   const [resellerRegionId, setResellerRegionId] = useState('');
   const [waSelectedResellerId, setWaSelectedResellerId] = useState('');
   useEffect(() => {
@@ -1208,6 +1209,7 @@ function SettingsPage() {
     setResellerPassword('');
     setResellerDisplayOrder(r.displayOrder ?? 0);
     setResellerRegionId(r.regionId ?? '');
+    setResellerFtthPartnerId(r.serviceType === ServiceType.Ftth ? (r.ftthPartnerId ?? '') : '');
   };
   const handleSaveReseller = () => {
     if (!resellerName.trim()) {
@@ -1218,6 +1220,12 @@ function SettingsPage() {
       showError('خطأ', 'رابط الرسيلر (BaseUrl) مطلوب.');
       return;
     }
+    if (resellerServiceType === ServiceType.Ftth && !resellerFtthPartnerId.trim()) {
+      showError('خطأ', 'معرف الشريك FTTH (partnerId) مطلوب لرسيلر FTTH.');
+      return;
+    }
+    const ftthPartnerIdPayload =
+      resellerServiceType === ServiceType.Ftth ? resellerFtthPartnerId.trim() : null;
     if (resellerFormId) {
       updateResellerMutation.mutate({
         id: resellerFormId,
@@ -1229,6 +1237,7 @@ function SettingsPage() {
           telegramChatId: resellerTelegramChatId.trim() || null,
           password: resellerPassword.trim() || undefined,
           displayOrder: resellerDisplayOrder,
+          ftthPartnerId: ftthPartnerIdPayload,
         },
       });
     } else {
@@ -1245,6 +1254,7 @@ function SettingsPage() {
         telegramChatId: resellerTelegramChatId.trim() || undefined,
         password: resellerPassword.trim() || undefined,
         displayOrder: resellerDisplayOrder,
+        ftthPartnerId: ftthPartnerIdPayload ?? undefined,
       });
     }
   };
@@ -2505,6 +2515,7 @@ function SettingsPage() {
                       setResellerPassword('');
                       setResellerRegionId(myRegions[0]?.id ?? '');
                       setResellerDisplayOrder(myResellers.length);
+                      setResellerFtthPartnerId('');
                     }}
                     disabled={myRegions.length === 0}
                     className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm disabled:opacity-50"
@@ -2543,6 +2554,11 @@ function SettingsPage() {
                                     </span>
                                   )}
                                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{r.baseUrl}</p>
+                                  {r.serviceType === ServiceType.Ftth && r.ftthPartnerId?.trim() && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      partnerId: {r.ftthPartnerId}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap justify-end">
                                   {(r.serviceType === ServiceType.Sas || r.serviceType === ServiceType.Earthlink) && (
@@ -2653,7 +2669,11 @@ function SettingsPage() {
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">نوع الخدمة</label>
                             <select
                               value={resellerServiceType}
-                              onChange={(e) => setResellerServiceType(Number(e.target.value) as ServiceType)}
+                              onChange={(e) => {
+                                const next = Number(e.target.value) as ServiceType;
+                                setResellerServiceType(next);
+                                if (next !== ServiceType.Ftth) setResellerFtthPartnerId('');
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
                             >
                               <option value={ServiceType.Sas}>SAS</option>
@@ -2661,6 +2681,24 @@ function SettingsPage() {
                               <option value={ServiceType.Earthlink}>Earthlink</option>
                             </select>
                           </div>
+                          {resellerServiceType === ServiceType.Ftth && (
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                معرف الشريك FTTH (partnerId) *
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={resellerFtthPartnerId}
+                                onChange={(e) => setResellerFtthPartnerId(e.target.value)}
+                                placeholder="مثل: 2864647"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                              />
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                يُستخدم تلقائياً عند مزامنة المشتركين عبر الرصيد (compare).
+                              </p>
+                            </div>
+                          )}
                           <div className="sm:col-span-2">
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">رابط الرسيلر *</label>
                             <input

@@ -1154,6 +1154,8 @@ export interface AgentResellerCreateRequest {
   telegramChatId?: string | null;
   password?: string | null;
   displayOrder?: number;
+  /** معرف الشريك FTTH (partnerId) — لرسيلر FTTH فقط */
+  ftthPartnerId?: string | null;
   whatsAppSessionId?: string | null;
 }
 
@@ -1170,6 +1172,8 @@ export interface AgentResellerUpdateRequest {
   telegramChatId?: string | null;
   password?: string | null;
   displayOrder?: number;
+  /** معرف الشريك FTTH (partnerId) — لرسيلر FTTH فقط */
+  ftthPartnerId?: string | null;
 }
 
 /** جسم POST /providers/sas/ftth-subscribers-export — اعتماديات FTTH (أو {} إن وُجدت على الرسيلر في الباكند) */

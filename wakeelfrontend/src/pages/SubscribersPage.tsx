@@ -253,7 +253,9 @@ function buildSyntheticSubscriberFromFtthRow(
 }
 
 function resolveFtthPartnerId(resellers: AgentReseller[], resellerId: string): string {
-  return resellers.find((r) => r.id === resellerId)?.ftthPartnerId?.trim() ?? '';
+  const reseller = resellers.find((r) => r.id === resellerId);
+  if (!reseller || reseller.serviceType !== ServiceType.Ftth) return '';
+  return reseller.ftthPartnerId?.trim() ?? '';
 }
 
 // (SAS Python activation) تم تعليقها مؤقتاً — لا يتم تنفيذ أي منطق هنا حالياً.
@@ -359,8 +361,6 @@ const FTTH_COMPARE_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   day: '2-digit',
 };
 
-const DEFAULT_FTTH_COMPARE_PARTNER_ID = '2864647';
-
 const FTTH_COMPARE_PAYMENT_BADGE_STYLES: Record<string, string> = {
   'مشترك جديد':
     'bg-blue-100 text-blue-700 dark:bg-blue-900/45 dark:text-blue-200 ring-1 ring-blue-400/50',
@@ -377,8 +377,7 @@ const FTTH_COMPARE_PAYMENT_BADGE_STYLES: Record<string, string> = {
 };
 
 function resolveFtthComparePartnerId(resellers: AgentReseller[], resellerId: string): string {
-  const fromReseller = resolveFtthPartnerId(resellers, resellerId);
-  return fromReseller || DEFAULT_FTTH_COMPARE_PARTNER_ID;
+  return resolveFtthPartnerId(resellers, resellerId);
 }
 
 function resolveFtthTransactionAmountValue(
@@ -591,7 +590,7 @@ const SubscribersPage: React.FC = () => {
   const [ftthCompareResult, setFtthCompareResult] = useState<FtthSubscriptionsCompareResponse | null>(null);
   const [ftthCompareRegionId, setFtthCompareRegionId] = useState('');
   const [ftthCompareResellerId, setFtthCompareResellerId] = useState('');
-  const [ftthComparePartnerId, setFtthComparePartnerId] = useState(DEFAULT_FTTH_COMPARE_PARTNER_ID);
+  const [ftthComparePartnerId, setFtthComparePartnerId] = useState('');
   const [ftthCompareDays, setFtthCompareDays] = useState(7);
   const [autoSyncSaveServiceFeesId, setAutoSyncSaveServiceFeesId] = useState('');
   const [autoSyncSaveServiceFeesPrice, setAutoSyncSaveServiceFeesPrice] = useState<number | undefined>(undefined);
@@ -6052,10 +6051,15 @@ const SubscribersPage: React.FC = () => {
                   type="text"
                   inputMode="numeric"
                   value={ftthComparePartnerId}
-                  onChange={(e) => setFtthComparePartnerId(e.target.value)}
-                  placeholder={DEFAULT_FTTH_COMPARE_PARTNER_ID}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                  readOnly
+                  placeholder="يُعبّأ من إعدادات رسيلر FTTH"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-800 focus:outline-none dark:text-white text-sm"
                 />
+                {!ftthComparePartnerId.trim() && ftthCompareResellerId && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    أضف partnerId لرسيلر FTTH من الإعدادات ← الرسيلرز والروابط.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">عدد الأيام</label>
