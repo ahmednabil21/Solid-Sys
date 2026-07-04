@@ -13,18 +13,6 @@ import ListPageWithFilters from '../components/layout/ListPageWithFilters';
 import DebtsRegionExcelExport from '../components/DebtsRegionExcelExport';
 import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 import { useOperationalFilters } from '../hooks/useOperationalFilters';
-
-function debtPaymentMethodLabel(pm?: number | null): string {
-  if (Number(pm) === ActivationPaymentMethod.Cash) return 'كاش';
-  if (Number(pm) === ActivationPaymentMethod.Master) return 'ماستر';
-  return '—';
-}
-
-const defaultDebtPaymentData = (): DebtPaymentRequest => ({
-  paymentAmount: 0,
-  notes: '',
-  paymentMethod: ActivationPaymentMethod.Cash,
-});
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { showError, showSuccess, showInfo } from '../utils/notifications';
 import {
@@ -48,6 +36,18 @@ import {
   Check,
   Power
 } from 'lucide-react';
+
+function debtPaymentMethodLabel(pm?: number | null): string {
+  if (Number(pm) === ActivationPaymentMethod.Cash) return 'كاش';
+  if (Number(pm) === ActivationPaymentMethod.Master) return 'ماستر';
+  return '—';
+}
+
+const defaultDebtPaymentData = (): DebtPaymentRequest => ({
+  paymentAmount: 0,
+  notes: '',
+  paymentMethod: ActivationPaymentMethod.Cash,
+});
 
 /** استخراج جزء التاريخ YYYY-MM-DD من ISO دون تحويل التوقيت (لتجنب تغيّر اليوم حسب timezone) */
 function getDatePart(isoOrDate?: string | null): string | null {
