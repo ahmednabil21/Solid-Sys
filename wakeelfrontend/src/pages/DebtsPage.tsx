@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService, ApiService } from '../services/api';
-import { Debt, DebtCreateRequest, DebtUpdateRequest, DebtPaymentRequest, UserRole, PaginatedResponse, DebtsListResponse, Subscriber, DebtStatus, DebtsListParams, ServiceType, EARTHLINK_USER_MANAGEMENT_URL, DebtOffOn } from '../types';
+import { Debt, DebtCreateRequest, DebtUpdateRequest, DebtPaymentRequest, UserRole, PaginatedResponse, DebtsListResponse, Subscriber, DebtStatus, DebtsListParams, ServiceType, EARTHLINK_USER_MANAGEMENT_URL, DebtOffOn, ActivationPaymentMethod } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
@@ -13,6 +13,18 @@ import ListPageWithFilters from '../components/layout/ListPageWithFilters';
 import DebtsRegionExcelExport from '../components/DebtsRegionExcelExport';
 import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 import { useOperationalFilters } from '../hooks/useOperationalFilters';
+
+function debtPaymentMethodLabel(pm?: number | null): string {
+  if (Number(pm) === ActivationPaymentMethod.Cash) return 'كاش';
+  if (Number(pm) === ActivationPaymentMethod.Master) return 'ماستر';
+  return '—';
+}
+
+const defaultDebtPaymentData = (): DebtPaymentRequest => ({
+  paymentAmount: 0,
+  notes: '',
+  paymentMethod: ActivationPaymentMethod.Cash,
+});
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { showError, showSuccess, showInfo } from '../utils/notifications';
 import {
@@ -183,10 +195,7 @@ const DebtsPage: React.FC = () => {
     dueDate: new Date().toISOString().split('T')[0],
     notes: ''
   });
-  const [paymentData, setPaymentData] = useState<DebtPaymentRequest>({
-    paymentAmount: 0,
-    notes: ''
-  });
+  const [paymentData, setPaymentData] = useState<DebtPaymentRequest>(defaultDebtPaymentData);
 
   const queryClient = useQueryClient();
   // Close dropdown when clicking outside
@@ -946,7 +955,8 @@ const DebtsPage: React.FC = () => {
                                   setSelectedDebt(unpaidDebt);
                                   setPaymentData({
                                     paymentAmount: unpaidDebt.amount,
-                                    notes: ''
+                                    notes: '',
+                                    paymentMethod: ActivationPaymentMethod.Cash,
                                   });
                                   setShowPayDebtModal(true);
                                 }
@@ -1235,7 +1245,7 @@ const DebtsPage: React.FC = () => {
                                 const unpaidDebt = subscriberDebt.debts.find((d: any) => d.status === 0 || !d.isPaid);
                                 if (unpaidDebt) {
                                   setSelectedDebt(unpaidDebt);
-                                  setPaymentData({ paymentAmount: unpaidDebt.amount, notes: '' });
+                                  setPaymentData({ paymentAmount: unpaidDebt.amount, notes: '', paymentMethod: ActivationPaymentMethod.Cash });
                                   setShowPayDebtModal(true);
                                 }
                               }
@@ -1713,6 +1723,23 @@ const DebtsPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  نوع الدفع *
+                </label>
+                <select
+                  value={paymentData.paymentMethod}
+                  onChange={(e) => setPaymentData((prev) => ({
+                    ...prev,
+                    paymentMethod: Number(e.target.value) as ActivationPaymentMethod,
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value={ActivationPaymentMethod.Cash}>كاش</option>
+                  <option value={ActivationPaymentMethod.Master}>ماستر</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الدفع *
                 </label>
                 <input
@@ -1945,6 +1972,14 @@ const DebtsPage: React.FC = () => {
                     {formatNumber(selectedDebt.totalPaidAmount ?? selectedDebt.lastPaymentAmount ?? 0, { suffix: ' د.ع' })}
                   </p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    نوع الدفع
+                  </label>
+                  <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                    {debtPaymentMethodLabel(selectedDebt.lastPaymentMethod)}
+                  </p>
+                </div>
               </div>
 
               {selectedDebt.materialName && (
@@ -2063,8 +2098,11 @@ const DebtsPage: React.FC = () => {
                   </label>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {selectedDebt.paymentRecords.map((p) => (
-                      <div key={p.id} className="flex justify-between items-center text-sm bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                      <div key={p.id} className="flex justify-between items-center gap-3 text-sm bg-gray-50 dark:bg-gray-700 p-2 rounded">
                         <span>{formatDate(p.createdAt)}</span>
+                        <span className="text-gray-600 dark:text-gray-300">
+                          {debtPaymentMethodLabel(p.paymentMethod)}
+                        </span>
                         <span className="font-medium text-green-700 dark:text-green-300">
                           {formatNumber(p.amount, { suffix: ' د.ع' })}
                         </span>
@@ -2175,6 +2213,9 @@ const DebtsPage: React.FC = () => {
                         تاريخ الدين
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        نوع الدفع
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         تاريخ استلام الدين
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -2223,6 +2264,9 @@ const DebtsPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {formatDebtDateForDisplay(debt)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {debtPaymentMethodLabel(debt.lastPaymentMethod)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {debt.paymentCreatedAt
@@ -2288,7 +2332,7 @@ const DebtsPage: React.FC = () => {
                               <button
                                 onClick={() => {
                                   setSelectedDebt(debt);
-                                  setPaymentData({ paymentAmount: debt.amount, notes: '' });
+                                  setPaymentData({ paymentAmount: debt.amount, notes: '', paymentMethod: ActivationPaymentMethod.Cash });
                                   setOpenedFromSubscriberDebts(true);
                                   setShowPayDebtModal(true);
                                   setShowSubscriberDebtsModal(false);

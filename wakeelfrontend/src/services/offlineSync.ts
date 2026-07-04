@@ -331,11 +331,12 @@ export function buildCreateRenewalPayload(renewalData: RenewalData): Record<stri
 /** بناء payload عملية PayDebt لمطابقة الباكند */
 export function buildPayDebtPayload(
   debtId: string,
-  paymentData: { paymentAmount: number; notes?: string }
+  paymentData: { paymentAmount: number; paymentMethod: number; notes?: string }
 ): Record<string, unknown> {
   return {
     debtId,
     paymentAmount: paymentData.paymentAmount,
+    paymentMethod: paymentData.paymentMethod,
     notes: paymentData.notes ?? '',
   };
 }

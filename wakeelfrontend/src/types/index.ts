@@ -2393,6 +2393,8 @@ export interface Debt {
   paymentCreatedAt?: string | null;
   /** مبلغ آخر تسديد */
   lastPaymentAmount?: number;
+  /** نوع دفع آخر تسديد: 1 كاش، 2 ماستر */
+  lastPaymentMethod?: ActivationPaymentMethod | number | null;
   /** مجموع كل التسديدات على هذا الدين */
   totalPaidAmount?: number;
   paymentRecords?: DebtPaymentRecord[];
@@ -2403,6 +2405,8 @@ export interface DebtPaymentRecord {
   amount: number;
   createdAt: string;
   performedByUserName?: string | null;
+  /** نوع الدفع: 1 كاش، 2 ماستر */
+  paymentMethod?: ActivationPaymentMethod | number;
 }
 
 export interface DebtCreateRequest {
@@ -2428,6 +2432,8 @@ export interface DebtUpdateRequest {
 
 export interface DebtPaymentRequest {
   paymentAmount: number;
+  /** نوع الدفع: 1 كاش، 2 ماستر */
+  paymentMethod: ActivationPaymentMethod | number;
   notes?: string;
 }
 
@@ -2660,6 +2666,8 @@ export interface AccountsLedgerEntryBase {
   executedByUserId?: string;
   executedByFullName?: string;
   receiptNumber?: string;
+  /** نوع الدفع: 1 كاش، 2 ماستر */
+  paymentMethod?: ActivationPaymentMethod | number;
 }
 
 export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {

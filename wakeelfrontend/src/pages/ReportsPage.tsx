@@ -737,7 +737,7 @@ const ReportsPage: React.FC = () => {
                               <td className="whitespace-nowrap font-mono text-xs">{row.username || '—'}</td>
                               <td>{renewal?.profileName || '—'}</td>
                               <td className="whitespace-nowrap">
-                                {renewal ? activationPaymentMethodLabel(renewal.paymentMethod) : '—'}
+                                {activationPaymentMethodLabel(row.paymentMethod)}
                               </td>
                               <td className="whitespace-nowrap font-medium">
                                 {renewal
