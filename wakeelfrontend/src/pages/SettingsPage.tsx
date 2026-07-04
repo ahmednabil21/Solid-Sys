@@ -294,7 +294,7 @@ function SettingsPage() {
     },
   });
 
-  const pollResellerWhatsAppStatus = (resellerId: string) => {
+  const pollRegionWhatsAppStatus = (regionId: string) => {
     clearWaStatusPoll();
     setWaStatusLoading(true);
     setWaError(null);
@@ -308,13 +308,12 @@ function SettingsPage() {
         return;
       }
       try {
-        const s = await apiService.getResellerWhatsAppStatus(resellerId);
+        const s = await apiService.getRegionWhatsAppStatus(regionId);
         setWaStatus(s);
         if (s.isLoggedIn) {
           clearWaStatusPoll();
           setWaStatusLoading(false);
           setWaSuccessInfo('واتساب مرتبط بنجاح.');
-          queryClient.invalidateQueries({ queryKey: ['myResellers'] });
           queryClient.invalidateQueries({ queryKey: ['myRegions'] });
         }
       } catch {
@@ -738,14 +737,14 @@ function SettingsPage() {
   const [resellerDisplayOrder, setResellerDisplayOrder] = useState(0);
   const [resellerFtthPartnerId, setResellerFtthPartnerId] = useState('');
   const [resellerRegionId, setResellerRegionId] = useState('');
-  const [waSelectedResellerId, setWaSelectedResellerId] = useState('');
+  const [waSelectedRegionId, setWaSelectedRegionId] = useState('');
   useEffect(() => {
-    if (!waSelectedResellerId && myResellers.length > 0) {
-      setWaSelectedResellerId(myResellers[0].id);
+    if (!waSelectedRegionId && myRegions.length > 0) {
+      setWaSelectedRegionId(myRegions[0].id);
     }
-  }, [myResellers, waSelectedResellerId]);
+  }, [myRegions, waSelectedRegionId]);
 
-  const waSelectedReseller = myResellers.find((r) => r.id === waSelectedResellerId) ?? null;
+  const waSelectedRegion = myRegions.find((r) => r.id === waSelectedRegionId) ?? null;
   // مودال إعلان مميز أثناء سحب المشتركين من SAS في الخلفية (يُعرض عند انتهاء مهلة الاتصال لمدة 5 دقائق كحد أقصى)
   const [showSasSyncPromoModal, setShowSasSyncPromoModal] = useState(false);
   useEffect(() => {
@@ -1123,13 +1122,12 @@ function SettingsPage() {
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
-  const updateResellerWhatsAppSessionMutation = useMutation({
-    mutationFn: ({ resellerId, sessionId }: { resellerId: string; sessionId: string }) =>
-      apiService.updateResellerWhatsAppSession(resellerId, { whatsAppSessionId: sessionId.trim() }),
+  const updateRegionWhatsAppSessionMutation = useMutation({
+    mutationFn: ({ regionId, sessionId }: { regionId: string; sessionId: string }) =>
+      apiService.updateRegionWhatsAppSession(regionId, { whatsAppSessionId: sessionId.trim() }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myResellers'] });
       queryClient.invalidateQueries({ queryKey: ['myRegions'] });
-      showSuccess('تم الحفظ', 'تم حفظ معرف جلسة واتساب للرسيلر بنجاح.');
+      showSuccess('تم الحفظ', 'تم حفظ معرف جلسة واتساب للمنطقة بنجاح.');
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
@@ -2423,6 +2421,11 @@ function SettingsPage() {
                         <li key={region.id} className="py-3 flex items-center justify-between gap-4">
                           <div>
                             <span className="font-medium text-gray-900 dark:text-white">{region.name}</span>
+                            {region.whatsAppSessionId?.trim() && (
+                              <span className="mr-2 text-xs px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                واتساب
+                              </span>
+                            )}
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                               {(region.resellers?.length ?? myResellers.filter((r) => r.regionId === region.id).length) || 0} رسيلر
                             </p>
@@ -2548,11 +2551,6 @@ function SettingsPage() {
                                   <span className="mr-2 text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                                     {serviceTypeLabel(r.serviceType)}
                                   </span>
-                                  {r.whatsAppSessionId?.trim() && (
-                                    <span className="mr-2 text-xs px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                                      واتساب
-                                    </span>
-                                  )}
                                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{r.baseUrl}</p>
                                   {r.serviceType === ServiceType.Ftth && r.ftthPartnerId?.trim() && (
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -3603,24 +3601,24 @@ function SettingsPage() {
               {isEmployee ? (
                 <>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    جلسة واتساب تابعة للرسيلر/الوكيل؛ إرسال الرسائل يستخدم جلسة الرسيلر المرتبط بالمشترك.
+                    جلسة واتساب تابعة للمنطقة؛ إرسال الرسائل يستخدم جلسة منطقة المشترك.
                   </p>
-                  {myAgentLoading ? (
+                  {myAgentLoading || regionsLoading ? (
                     <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل البيانات...</div>
                   ) : (
                     <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700/50 space-y-2">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرسيلر</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة</p>
                       <select
-                        value={waSelectedResellerId}
-                        onChange={(e) => setWaSelectedResellerId(e.target.value)}
+                        value={waSelectedRegionId}
+                        onChange={(e) => setWaSelectedRegionId(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
                       >
-                        {myResellers.map((r) => (
+                        {myRegions.map((r) => (
                           <option key={r.id} value={r.id}>{r.name}</option>
                         ))}
                       </select>
                       <p className="text-sm text-gray-900 dark:text-white font-mono">
-                        {waSelectedReseller?.whatsAppSessionId?.trim() || myAgent?.whatsAppSessionId?.trim() || '— لا توجد جلسة محفوظة'}
+                        {waSelectedRegion?.whatsAppSessionId?.trim() || myAgent?.whatsAppSessionId?.trim() || '— لا توجد جلسة محفوظة'}
                       </p>
                     </div>
                   )}
@@ -3628,28 +3626,28 @@ function SettingsPage() {
               ) : (
                 <>
           
-              {myAgentLoading ? (
+              {myAgentLoading || regionsLoading ? (
                 <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل البيانات...</div>
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرسيلر *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
                     <select
-                      value={waSelectedResellerId}
+                      value={waSelectedRegionId}
                       onChange={(e) => {
-                        setWaSelectedResellerId(e.target.value);
+                        setWaSelectedRegionId(e.target.value);
                         setWaError(null);
                         setPairCode(null);
                         setWaStatus(null);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                     >
-                      {myResellers.length === 0 ? (
-                        <option value="">— أضف رسيلر أولاً —</option>
+                      {myRegions.length === 0 ? (
+                        <option value="">— أضف منطقة أولاً —</option>
                       ) : (
-                        myResellers.map((r) => (
+                        myRegions.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {r.name}{r.regionName ? ` (${r.regionName})` : ''}
+                            {r.name}
                           </option>
                         ))
                       )}
@@ -3674,14 +3672,14 @@ function SettingsPage() {
                     <button
                       type="button"
                       disabled={
-                        !waSelectedResellerId ||
+                        !waSelectedRegionId ||
                         !pairPhoneOverride.trim() ||
                         waPairLoading ||
                         waStatusLoading
                       }
                       onClick={async () => {
-                        if (!waSelectedResellerId) {
-                          showError('خطأ', 'اختر الرسيلر أولاً.');
+                        if (!waSelectedRegionId) {
+                          showError('خطأ', 'اختر المنطقة أولاً.');
                           return;
                         }
                         const phoneParam = normalizeWhatsAppDeviceId(pairPhoneOverride);
@@ -3697,15 +3695,15 @@ function SettingsPage() {
                         clearWaStatusPoll();
                         setWaPairLoading(true);
                         try {
-                          const currentSessionId = (waSelectedReseller?.whatsAppSessionId || '').trim();
+                          const currentSessionId = (waSelectedRegion?.whatsAppSessionId || '').trim();
                           if (!currentSessionId || currentSessionId !== phoneParam) {
-                            await updateResellerWhatsAppSessionMutation.mutateAsync({
-                              resellerId: waSelectedResellerId,
+                            await updateRegionWhatsAppSessionMutation.mutateAsync({
+                              regionId: waSelectedRegionId,
                               sessionId: phoneParam,
                             });
                           }
-                          await apiService.postResellerWhatsAppDevice(waSelectedResellerId);
-                          const res = await apiService.postResellerWhatsAppPairCode(waSelectedResellerId, phoneParam);
+                          await apiService.postRegionWhatsAppDevice(waSelectedRegionId);
+                          const res = await apiService.postRegionWhatsAppPairCode(waSelectedRegionId, phoneParam);
                           setPairCode(res.pairCode || '');
                           setPairHint(
                             'اذهب إلى واتساب > الأجهزة المرتبطة > ربط عبر رقم الهاتف > أدخل الكود'
@@ -3735,18 +3733,18 @@ function SettingsPage() {
                     <button
                       type="button"
                       disabled={
-                        !waSelectedResellerId ||
-                        !(waSelectedReseller?.whatsAppSessionId?.trim()) ||
+                        !waSelectedRegionId ||
+                        !(waSelectedRegion?.whatsAppSessionId?.trim()) ||
                         waPairLoading ||
                         waStatusLoading ||
                         waCheckStatusLoading
                       }
                       onClick={async () => {
-                        if (!waSelectedResellerId) return;
+                        if (!waSelectedRegionId) return;
                         setWaError(null);
                         try {
                           setWaCheckStatusLoading(true);
-                          const s = await apiService.getResellerWhatsAppStatus(waSelectedResellerId);
+                          const s = await apiService.getRegionWhatsAppStatus(waSelectedRegionId);
                           setWaStatus(s);
                           if (s.isLoggedIn) {
                             setWaSuccessInfo('واتساب مرتبط حالياً.');
@@ -3775,17 +3773,17 @@ function SettingsPage() {
                     <button
                       type="button"
                       disabled={
-                        !waSelectedResellerId ||
+                        !waSelectedRegionId ||
                         !pairCode ||
                         waStatusLoading ||
                         waCheckStatusLoading
                       }
                       onClick={async () => {
-                        if (!waSelectedResellerId) return;
+                        if (!waSelectedRegionId) return;
                         setWaStatus(null);
                         setWaError(null);
                         setWaSuccessInfo(null);
-                        pollResellerWhatsAppStatus(waSelectedResellerId);
+                        pollRegionWhatsAppStatus(waSelectedRegionId);
                       }}
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >

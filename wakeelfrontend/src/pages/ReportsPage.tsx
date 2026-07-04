@@ -12,6 +12,7 @@ import { useOperationalFilters } from '../hooks/useOperationalFilters';
 import { useAuth } from '../contexts/AuthContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { useConfirmation } from '../contexts/ConfirmationContext';
+import { hasPageAction } from '../utils/employeePermissions';
 import {
   Agent,
   AccountsLedgerEntry,
@@ -142,7 +143,8 @@ const ReportsPage: React.FC = () => {
   const canDeleteLedger =
     user?.role === UserRole.Admin ||
     user?.role === UserRole.Agent ||
-    user?.role === UserRole.MainAgent;
+    user?.role === UserRole.MainAgent ||
+    hasPageAction(user, 'Accounts', 'delete');
   const canAccessAccounts =
     user?.role !== UserRole.Employee || user?.canAccessAccounts !== false;
 

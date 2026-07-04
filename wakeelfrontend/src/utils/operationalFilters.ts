@@ -1,4 +1,4 @@
-import type { AgentReseller } from '../types';
+import type { AgentReseller, AgentRegion } from '../types';
 import { ServiceType } from '../types';
 
 export const OPERATIONAL_REGION_STORAGE_KEY = 'selectedOperationalRegionId';
@@ -106,17 +106,17 @@ export function saveStoredOperationalResellerId(resellerId: string): void {
   }
 }
 
-/** يتحقق من جلسة واتساب للرسيلr أو أي رسيلr أو جلسة الوكيل (للتوافق) */
+/** يتحقق من جلسة واتساب للمنطقة أو أي منطقة أو جلسة الوكيل (للتوافق) */
 export function hasOperationalWhatsAppSession(
-  resellers: AgentReseller[],
-  resellerId?: string | null,
+  regions: AgentRegion[],
+  regionId?: string | null,
   agentSessionId?: string | null
 ): boolean {
-  const trimmedResellerId = (resellerId ?? '').trim();
-  if (trimmedResellerId) {
-    const match = resellers.find((r) => r.id === trimmedResellerId);
+  const trimmedRegionId = (regionId ?? '').trim();
+  if (trimmedRegionId) {
+    const match = regions.find((r) => r.id === trimmedRegionId);
     if (match?.whatsAppSessionId?.trim()) return true;
   }
-  if (resellers.some((r) => r.whatsAppSessionId?.trim())) return true;
+  if (regions.some((r) => r.whatsAppSessionId?.trim())) return true;
   return !!(agentSessionId ?? '').trim();
 }

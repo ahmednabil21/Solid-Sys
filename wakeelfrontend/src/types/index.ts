@@ -1088,6 +1088,7 @@ export interface AgentRegion {
   agentId?: string;
   name: string;
   displayOrder?: number;
+  whatsAppSessionId?: string | null;
   resellers?: AgentReseller[];
 }
 
@@ -1162,6 +1163,8 @@ export interface AgentResellerCreateRequest {
 export interface ResellerWhatsAppSessionRequest {
   whatsAppSessionId: string;
 }
+
+export type RegionWhatsAppSessionRequest = ResellerWhatsAppSessionRequest;
 
 /** طلب تعديل رسيلر — PUT /Agents/me/resellers/{id}. إن حذفت password أو أرسلت فارغاً لا تُغيّر كلمة المرور. */
 export interface AgentResellerUpdateRequest {
@@ -1692,6 +1695,8 @@ export interface MaterialDisburseRequest {
   quantity: number;
   /** قيمة افتراضية 0 — يمكن عدم إرساله أو 0 عند عدم وجود مبلغ مدفوع */
   pricePaidBySubscriber?: number;
+  /** نسبة الخصم من سعر المادة (0–100) */
+  discountPercent?: number;
   notes?: string;
 }
 
@@ -1710,6 +1715,7 @@ export interface MaterialDisbursement {
   disbursementType: number;
   quantity: number;
   unitSubscriberPrice: number;
+  discountPercent?: number;
   pricePaidBySubscriber: number;
   materialDebt: number;
   notes: string;

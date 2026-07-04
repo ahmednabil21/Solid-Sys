@@ -212,13 +212,13 @@ const SubscriberDetailsPage: React.FC = () => {
     queryKey: ['myAgent'],
     queryFn: () => apiService.getMyAgent(),
   });
-  const { data: myResellers = [] } = useQuery({
-    queryKey: ['myResellers'],
-    queryFn: () => apiService.getMyResellers(),
+  const { data: myRegions = [] } = useQuery({
+    queryKey: ['myRegions'],
+    queryFn: () => apiService.getMyRegions(),
   });
   const hasWhatsAppSession = hasOperationalWhatsAppSession(
-    myResellers,
-    subscriber?.agentResellerId,
+    myRegions,
+    subscriber?.regionId,
     myAgent?.whatsAppSessionId
   );
 

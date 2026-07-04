@@ -12,6 +12,7 @@ import {
   buildRegionResellerFilterParams,
 } from '../utils/operationalFilters';
 import { RenewalReceipt, UserRole } from '../types';
+import { hasPageAction } from '../utils/employeePermissions';
 import { WakeelBadge } from '../components/table/WakeelBadge';
 import { formatReceiptPrintDate, resolveReceiptPrintAmounts } from '../utils/receiptPrint';
 import {
@@ -78,7 +79,8 @@ const ReceiptsPage: React.FC = () => {
   const canDeleteRenewal =
     user?.role === UserRole.Admin ||
     user?.role === UserRole.Agent ||
-    user?.role === UserRole.SubAgent;
+    user?.role === UserRole.SubAgent ||
+    hasPageAction(user, 'Activations', 'delete');
 
   const deleteRenewalMutation = useMutation({
     mutationFn: (renewalId: string) => apiService.deleteRenewal(renewalId),

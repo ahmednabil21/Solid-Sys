@@ -30,6 +30,7 @@ interface MaterialInvoicePrintData {
   unitSubscriberPrice?: number;
   pricePaidBySubscriber: number;
   materialDebt?: number;
+  discountPercent?: number;
   notes?: string;
   createdAt: string;
   disbursementType: number;
@@ -41,6 +42,12 @@ interface PosCartItem {
   materialId: string;
   quantity: number;
   pricePaidBySubscriber: number;
+  discountPercent: number;
+}
+
+function effectiveMaterialUnitPrice(subscriberPrice: number, discountPercent = 0): number {
+  const pct = Math.min(100, Math.max(0, discountPercent));
+  return subscriberPrice * (1 - pct / 100);
 }
 
 const MaterialsDisbursementPage: React.FC = () => {
@@ -99,14 +106,18 @@ const MaterialsDisbursementPage: React.FC = () => {
     disbursementType: DisbursementType.Replacement,
     quantity: 0,
     pricePaidBySubscriber: 0,
+    discountPercent: 0,
     notes: '',
   });
   const [materialSearch, setMaterialSearch] = useState('');
   const [subscriberSearch, setSubscriberSearch] = useState('');
+  const [posSubscriberSearch, setPosSubscriberSearch] = useState('');
   const [showMaterialDropdown, setShowMaterialDropdown] = useState(false);
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false);
+  const [showPosSubscriberDropdown, setShowPosSubscriberDropdown] = useState(false);
   const materialDropdownRef = useRef<HTMLDivElement>(null);
   const subscriberDropdownRef = useRef<HTMLDivElement>(null);
+  const posSubscriberDropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const [lastDisbursementForPrint, setLastDisbursementForPrint] = useState<MaterialInvoicePrintData | null>(null);
   const [showSuccessPrintModal, setShowSuccessPrintModal] = useState(false);
@@ -211,6 +222,9 @@ const MaterialsDisbursementPage: React.FC = () => {
       if (subscriberDropdownRef.current && !subscriberDropdownRef.current.contains(e.target as Node)) {
         setShowSubscriberDropdown(false);
       }
+      if (posSubscriberDropdownRef.current && !posSubscriberDropdownRef.current.contains(e.target as Node)) {
+        setShowPosSubscriberDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -218,6 +232,15 @@ const MaterialsDisbursementPage: React.FC = () => {
 
   const selectedMaterial = list.find((m) => m.id === disburseForm.materialId);
   const selectedSubscriber = subscribers.find((s) => s.id === (isPosMode ? selectedSubscriberIdForPos : disburseForm.subscriberId));
+
+  const filteredPosSubscribers = React.useMemo(() => {
+    const q = posSubscriberSearch.trim().toLowerCase();
+    if (!q) return subscribers;
+    return subscribers.filter((s) => {
+      const label = `${s.fullName || ''} ${s.firstName || ''} ${s.lastName || ''} ${s.username || ''} ${s.phoneNumber || ''}`.toLowerCase();
+      return label.includes(q);
+    });
+  }, [subscribers, posSubscriberSearch]);
 
   const disburseMutation = useMutation({
     mutationFn: (data: MaterialDisburseRequest) =>
@@ -232,6 +255,7 @@ const MaterialsDisbursementPage: React.FC = () => {
         subscriberPhone: created?.subscriberPhone ?? selectedSubscriber?.phoneNumber,
         quantity: created?.quantity ?? disburseForm.quantity ?? 0,
         unitSubscriberPrice: created?.unitSubscriberPrice ?? selectedMaterial?.subscriberPrice,
+        discountPercent: created?.discountPercent ?? disburseForm.discountPercent ?? 0,
         pricePaidBySubscriber: created?.pricePaidBySubscriber ?? disburseForm.pricePaidBySubscriber ?? 0,
         materialDebt: created?.materialDebt,
         notes: created?.notes ?? (disburseForm.notes?.trim() || undefined),
@@ -247,6 +271,7 @@ const MaterialsDisbursementPage: React.FC = () => {
         disbursementType: DisbursementType.Replacement,
         quantity: 0,
         pricePaidBySubscriber: 0,
+        discountPercent: 0,
         notes: '',
       });
       showSuccess('تم الصرف', 'تم تسجيل بيع/صرف المادة بنجاح');
@@ -278,6 +303,7 @@ const MaterialsDisbursementPage: React.FC = () => {
               disbursementType: DisbursementType.Sale,
               quantity: line.item.quantity,
               pricePaidBySubscriber: line.item.pricePaidBySubscriber || 0,
+              discountPercent: line.item.discountPercent || 0,
               notes: '',
             },
             isAdmin ? (selectedAgentId || undefined) : undefined
@@ -298,6 +324,7 @@ const MaterialsDisbursementPage: React.FC = () => {
             subscriberPhone: lastCreated.subscriberPhone ?? selectedSubscriber?.phoneNumber,
             quantity: lastCreated.quantity ?? 0,
             unitSubscriberPrice: lastCreated.unitSubscriberPrice,
+            discountPercent: lastCreated.discountPercent,
             pricePaidBySubscriber: lastCreated.pricePaidBySubscriber ?? 0,
             materialDebt: lastCreated.materialDebt,
             notes: lastCreated.notes ?? undefined,
@@ -334,6 +361,7 @@ const MaterialsDisbursementPage: React.FC = () => {
       disbursementType: disburseForm.disbursementType,
       quantity: disburseForm.quantity ?? 0,
       pricePaidBySubscriber: disburseForm.pricePaidBySubscriber ?? 0,
+      discountPercent: disburseForm.discountPercent ?? 0,
       notes: disburseForm.notes?.trim() || undefined,
     });
   };
@@ -347,7 +375,11 @@ const MaterialsDisbursementPage: React.FC = () => {
     const { name, value } = e.target;
     setDisburseForm((prev) => ({
       ...prev,
-      [name]: name === 'materialId' || name === 'subscriberId' || name === 'notes' ? value : Number(value) || 0,
+      [name]: name === 'materialId' || name === 'subscriberId' || name === 'notes'
+        ? value
+        : name === 'discountPercent'
+          ? Math.min(100, Math.max(0, Number(value) || 0))
+          : Number(value) || 0,
     }));
   };
 
@@ -357,7 +389,7 @@ const MaterialsDisbursementPage: React.FC = () => {
       if (existing) {
         return prev.map((i) => (i.materialId === materialId ? { ...i, quantity: i.quantity + 1 } : i));
       }
-      return [...prev, { materialId, quantity: 1, pricePaidBySubscriber: 0 }];
+      return [...prev, { materialId, quantity: 1, pricePaidBySubscriber: 0, discountPercent: 0 }];
     });
   };
 
@@ -371,6 +403,16 @@ const MaterialsDisbursementPage: React.FC = () => {
 
   const setCartItemPaid = (materialId: string, paid: number) => {
     setCartItems((prev) => prev.map((i) => (i.materialId === materialId ? { ...i, pricePaidBySubscriber: Math.max(0, paid) } : i)));
+  };
+
+  const setCartItemDiscount = (materialId: string, discountPercent: number) => {
+    setCartItems((prev) =>
+      prev.map((i) =>
+        i.materialId === materialId
+          ? { ...i, discountPercent: Math.min(100, Math.max(0, discountPercent)) }
+          : i
+      )
+    );
   };
 
   const removeCartItem = (materialId: string) => {
@@ -392,7 +434,10 @@ const MaterialsDisbursementPage: React.FC = () => {
   const cartTotal = React.useMemo(
     () =>
       cartDetailedItems.reduce(
-        (sum, line) => sum + (line.item.quantity * (line.material.subscriberPrice ?? 0)),
+        (sum, line) =>
+          sum +
+          line.item.quantity *
+            effectiveMaterialUnitPrice(line.material.subscriberPrice ?? 0, line.item.discountPercent ?? 0),
         0
       ),
     [cartDetailedItems]
@@ -501,7 +546,10 @@ const MaterialsDisbursementPage: React.FC = () => {
     if (!printWindow) return;
     const dateBaghdad = formatBaghdadDateOnly(data.createdAt ? data.createdAt : new Date()) || '—';
     const timeBaghdad = formatBaghdadTimeOnly(data.createdAt ? data.createdAt : new Date()) || '—';
-    const totalAmount = (data.quantity * (data.unitSubscriberPrice ?? 0)) || data.pricePaidBySubscriber;
+    const totalAmount =
+      (data.quantity *
+        effectiveMaterialUnitPrice(data.unitSubscriberPrice ?? 0, data.discountPercent ?? 0)) ||
+      data.pricePaidBySubscriber;
     const typeLabel = disbursementTypeLabel(data.disbursementType);
 
     const printContent = `
@@ -596,6 +644,16 @@ const MaterialsDisbursementPage: React.FC = () => {
             <div class="info-row">
               <span class="label">سعر الوحدة:</span>
               <span class="value">${formatNumber(data.unitSubscriberPrice, { suffix: ' د.ع' })}</span>
+            </div>
+            ` : ''}
+            ${(data.discountPercent ?? 0) > 0 ? `
+            <div class="info-row">
+              <span class="label">الخصم:</span>
+              <span class="value">${formatNumber(data.discountPercent ?? 0, { suffix: '%' })}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">السعر بعد الخصم:</span>
+              <span class="value">${formatNumber(effectiveMaterialUnitPrice(data.unitSubscriberPrice ?? 0, data.discountPercent ?? 0), { suffix: ' د.ع' })}</span>
             </div>
             ` : ''}
           </div>
@@ -802,6 +860,9 @@ const MaterialsDisbursementPage: React.FC = () => {
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         سعر الوحدة: {formatNumber(material.subscriberPrice ?? 0, { suffix: ' د.ع' })}
+                        {(item.discountPercent ?? 0) > 0 && (
+                          <> — بعد خصم {item.discountPercent}%: {formatNumber(effectiveMaterialUnitPrice(material.subscriberPrice ?? 0, item.discountPercent ?? 0), { suffix: ' د.ع' })}</>
+                        )}
                       </p>
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => setCartItemQty(material.id, item.quantity - 1)} className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700">-</button>
@@ -814,9 +875,18 @@ const MaterialsDisbursementPage: React.FC = () => {
                         />
                         <button type="button" onClick={() => setCartItemQty(material.id, item.quantity + 1)} className="w-7 h-7 rounded bg-primary-600 text-white">+</button>
                         <span className="text-xs text-gray-500 dark:text-gray-400 mr-auto">
-                          الإجمالي: {formatNumber(item.quantity * (material.subscriberPrice ?? 0), { suffix: ' د.ع' })}
+                          الإجمالي: {formatNumber(item.quantity * effectiveMaterialUnitPrice(material.subscriberPrice ?? 0, item.discountPercent ?? 0), { suffix: ' د.ع' })}
                         </span>
                       </div>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={item.discountPercent || ''}
+                        onChange={(e) => setCartItemDiscount(material.id, Number(e.target.value) || 0)}
+                        placeholder="قيمة الخصم %"
+                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                      />
                       <input
                         type="number"
                         min={0}
@@ -828,20 +898,83 @@ const MaterialsDisbursementPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <div>
+                <div ref={posSubscriberDropdownRef}>
                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">المشترك (اختياري)</label>
-                  <select
-                    value={selectedSubscriberIdForPos || ''}
-                    onChange={(e) => setSelectedSubscriberIdForPos(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="">بدون مشترك</option>
-                    {subscribers.slice(0, 200).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.fullName || `${(s.firstName || '').trim()} ${(s.lastName || '').trim()}`.trim() || s.username}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPosSubscriberDropdown((v) => !v);
+                        if (!showPosSubscriberDropdown) setPosSubscriberSearch('');
+                      }}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-right flex items-center justify-between"
+                    >
+                      <span className="truncate text-sm">
+                        {selectedSubscriber
+                          ? `${selectedSubscriber.fullName || `${(selectedSubscriber.firstName || '').trim()} ${(selectedSubscriber.lastName || '').trim()}`.trim() || selectedSubscriber.username} — ${selectedSubscriber.phoneNumber || ''}`
+                          : 'بدون مشترك'}
+                      </span>
+                      <Search className="h-4 w-4 text-gray-400 flex-shrink-0 mr-2" />
+                    </button>
+                    {showPosSubscriberDropdown && (
+                      <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg max-h-64 flex flex-col">
+                        <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                              type="text"
+                              value={posSubscriberSearch}
+                              onChange={(e) => setPosSubscriberSearch(e.target.value)}
+                              placeholder="بحث بالاسم أو رقم الهاتف..."
+                              className="w-full pl-3 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-600 dark:text-white text-right"
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+                        <ul className="overflow-y-auto py-1 max-h-48">
+                          <li>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedSubscriberIdForPos('');
+                                setShowPosSubscriberDropdown(false);
+                                setPosSubscriberSearch('');
+                              }}
+                              className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                                !selectedSubscriberIdForPos ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              بدون مشترك
+                            </button>
+                          </li>
+                          {filteredPosSubscribers.length === 0 ? (
+                            <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">لا توجد نتائج</li>
+                          ) : (
+                            filteredPosSubscribers.map((s) => {
+                              const label = s.fullName || `${(s.firstName || '').trim()} ${(s.lastName || '').trim()}`.trim() || s.username;
+                              return (
+                                <li key={s.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedSubscriberIdForPos(s.id);
+                                      setShowPosSubscriberDropdown(false);
+                                      setPosSubscriberSearch('');
+                                    }}
+                                    className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                                      selectedSubscriberIdForPos === s.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
+                                    }`}
+                                  >
+                                    {label} — {s.phoneNumber || ''}
+                                  </button>
+                                </li>
+                              );
+                            })
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-2 text-sm flex items-center justify-between">
                   <span className="text-gray-600 dark:text-gray-300">إجمالي الفاتورة</span>
@@ -1073,6 +1206,7 @@ const MaterialsDisbursementPage: React.FC = () => {
                             subscriberPhone: d.subscriberPhone,
                             quantity: d.quantity ?? 0,
                             unitSubscriberPrice: d.unitSubscriberPrice,
+                            discountPercent: d.discountPercent ?? 0,
                             pricePaidBySubscriber: d.pricePaidBySubscriber ?? 0,
                             materialDebt: d.materialDebt,
                             notes: d.notes ?? undefined,
@@ -1275,7 +1409,7 @@ const MaterialsDisbursementPage: React.FC = () => {
                   <option value={DisbursementType.Sale}>بيع</option>
                 </select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الكمية *</label>
                   <input
@@ -1289,6 +1423,24 @@ const MaterialsDisbursementPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                     placeholder="0"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">قيمة الخصم من سعر المادة (%)</label>
+                  <input
+                    type="number"
+                    name="discountPercent"
+                    value={disburseForm.discountPercent || ''}
+                    onChange={handleDisburseInputChange}
+                    min={0}
+                    max={100}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="0"
+                  />
+                  {selectedMaterial && (disburseForm.discountPercent ?? 0) > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      السعر بعد الخصم: {formatNumber(effectiveMaterialUnitPrice(selectedMaterial.subscriberPrice ?? 0, disburseForm.discountPercent ?? 0), { suffix: ' د.ع' })}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">المبلغ المدفوع من المشترك (د.ع)</label>

@@ -1025,7 +1025,7 @@ const SubscribersPage: React.FC = () => {
     return types.size > 1;
   }, [myResellers]);
   const [pendingActivateSubscriberId, setPendingActivateSubscriberId] = useState<string | null>(null);
-  const hasWhatsAppSession = hasOperationalWhatsAppSession(myResellers, selectedOperationalResellerId, myAgent?.whatsAppSessionId);
+  const hasWhatsAppSession = hasOperationalWhatsAppSession(myRegions, selectedOperationalRegionId, myAgent?.whatsAppSessionId);
 
   useEffect(() => {
     if (!isAgentOrSubAgentOrEmployee) return;

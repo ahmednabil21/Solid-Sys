@@ -144,6 +144,7 @@ import {
   ServiceFeesCreateRequest,
   ServiceFeesUpdateRequest,
   ResellerWhatsAppSessionRequest,
+  RegionWhatsAppSessionRequest,
   MainAgentDashboardDto,
   AgentRegistrationRequest,
   AgentRegistrationRegisterResponse,
@@ -874,6 +875,52 @@ class ApiService {
 
   async getResellerWhatsAppStatus(resellerId: string): Promise<WhatsAppStatusResponse> {
     const response = await this.api.get<WhatsAppStatusResponse>(`/Agents/me/resellers/${resellerId}/whatsapp/status`);
+    const d = response.data as WhatsAppStatusResponse & {
+      DeviceId?: string;
+      IsConnected?: boolean;
+      IsLoggedIn?: boolean;
+    };
+    return {
+      deviceId: d.deviceId ?? d.DeviceId ?? '',
+      isConnected: d.isConnected ?? d.IsConnected ?? false,
+      isLoggedIn: d.isLoggedIn ?? d.IsLoggedIn ?? false,
+    };
+  }
+
+  async updateRegionWhatsAppSession(regionId: string, data: RegionWhatsAppSessionRequest): Promise<void> {
+    await this.api.put(`/Agents/me/regions/${regionId}/whatsapp-session`, data);
+  }
+
+  async postRegionWhatsAppDevice(regionId: string): Promise<WhatsAppDeviceResponse> {
+    const response = await this.api.post<WhatsAppDeviceResponse>(`/Agents/me/regions/${regionId}/whatsapp/device`);
+    const d = response.data as WhatsAppDeviceResponse & { Message?: string; DeviceId?: string };
+    return {
+      message: d?.message ?? d?.Message,
+      deviceId: d?.deviceId ?? d?.DeviceId,
+    };
+  }
+
+  async postRegionWhatsAppPairCode(regionId: string, phone?: string): Promise<WhatsAppPairCodeResponse> {
+    const trimmed = phone?.trim();
+    const response = await this.api.post<WhatsAppPairCodeResponse>(
+      `/Agents/me/regions/${regionId}/whatsapp/pair-code`,
+      undefined,
+      trimmed ? { params: { phone: trimmed } } : undefined
+    );
+    const d = response.data as WhatsAppPairCodeResponse & {
+      PairCode?: string;
+      DeviceId?: string;
+      Hint?: string;
+    };
+    return {
+      pairCode: d.pairCode ?? d.PairCode ?? '',
+      deviceId: d.deviceId ?? d.DeviceId ?? '',
+      hint: d.hint ?? d.Hint,
+    };
+  }
+
+  async getRegionWhatsAppStatus(regionId: string): Promise<WhatsAppStatusResponse> {
+    const response = await this.api.get<WhatsAppStatusResponse>(`/Agents/me/regions/${regionId}/whatsapp/status`);
     const d = response.data as WhatsAppStatusResponse & {
       DeviceId?: string;
       IsConnected?: boolean;
