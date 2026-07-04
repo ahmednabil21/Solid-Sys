@@ -548,6 +548,17 @@ const SubscribersPage: React.FC = () => {
   const renewalProfileIdForAmountSyncRef = useRef<string>('');
   /** واصل = المبلغ كامل؛ غير واصل = إدخال المبلغ الواصل يدوياً */
   const [renewalAmountFullyReceived, setRenewalAmountFullyReceived] = useState(true);
+  const RENEWAL_MODAL_STEPS = [
+    { id: 1, label: 'اختيار الباقة' },
+    { id: 2, label: 'نوع التفعيل' },
+    { id: 3, label: 'نوع الدفع' },
+    { id: 4, label: 'تفعيل' },
+  ] as const;
+  const [renewalModalStep, setRenewalModalStep] = useState<number>(1);
+  const [renewalActivationTypeChosen, setRenewalActivationTypeChosen] = useState(false);
+  const [renewalPaymentTypeChosen, setRenewalPaymentTypeChosen] = useState(false);
+  const [showRenewalConfirmModal, setShowRenewalConfirmModal] = useState(false);
+  const [pendingRenewalSubmit, setPendingRenewalSubmit] = useState<RenewalData | null>(null);
   const columnSettingsRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -1107,6 +1118,11 @@ const SubscribersPage: React.FC = () => {
     [profilesList, renewalData.newProfileId],
   );
   const isRenewalProfileCustom = selectedRenewalProfile?.typeAdd === ProfileTypeAdd.ProfileCustom;
+  const isRenewalExtensionProfile = selectedRenewalProfile?.packageType === ProfilePackageType.Extension;
+  const renewalActivationChannel = renewalData.activationChannel ?? RenewalActivationChannel.Normal;
+  const isRenewalCustomerWalletChannel = renewalActivationChannel === RenewalActivationChannel.CustomerWallet;
+  const renewalSkipsActivationTypeStep = isRenewalExtensionProfile;
+  const renewalSkipsPaymentStep = isRenewalExtensionProfile || isRenewalCustomerWalletChannel;
   const renewalInfo = React.useMemo(
     () =>
       selectedSubscriber
@@ -1202,8 +1218,18 @@ const SubscribersPage: React.FC = () => {
       setActivationServiceFeesFullyPaid({});
       setFtthCompareSyncContext(null);
       setFtthSyncPeriods([]);
+      setRenewalModalStep(1);
+      setRenewalActivationTypeChosen(false);
+      setRenewalPaymentTypeChosen(false);
+      setShowRenewalConfirmModal(false);
+      setPendingRenewalSubmit(null);
     } else {
       setRenewalAmountFullyReceived(true);
+      setRenewalModalStep(1);
+      setRenewalActivationTypeChosen(false);
+      setRenewalPaymentTypeChosen(false);
+      setShowRenewalConfirmModal(false);
+      setPendingRenewalSubmit(null);
     }
   }, [showRenewalModal]);
 
@@ -2301,6 +2327,8 @@ const SubscribersPage: React.FC = () => {
   };
 
   const handleActivationChannelChange = (channel: RenewalActivationChannel) => {
+    setRenewalActivationTypeChosen(true);
+    setRenewalPaymentTypeChosen(channel === RenewalActivationChannel.CustomerWallet);
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
     const salePrice = selectedProfile?.salePrice || 0;
     if (channel === RenewalActivationChannel.CustomerWallet) {
@@ -2327,6 +2355,7 @@ const SubscribersPage: React.FC = () => {
   };
 
   const applyDeferredActivationPayment = () => {
+    setRenewalPaymentTypeChosen(true);
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
     if (!selectedProfile) return;
     const salePrice = selectedProfile.salePrice || 0;
@@ -2417,15 +2446,83 @@ const SubscribersPage: React.FC = () => {
   };
 
   const handleRenewalProfileSelect = (profileId: string) => {
+    resetRenewalLaterStepChoices();
+    setRenewalData((prev) => ({
+      ...prev,
+      activationChannel: RenewalActivationChannel.Normal,
+      activationPaymentMethod: ActivationPaymentMethod.Cash,
+    }));
     handleRenewalInputChange({
       target: { name: 'newProfileId', value: profileId, type: 'text' },
     } as React.ChangeEvent<HTMLInputElement>);
   };
 
-  const handleRenewalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const selectedProfile = renewalInfo?.availableProfiles?.find(p => p.id === renewalData.newProfileId);
-    const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+  const resolveNextRenewalModalStep = (
+    current: number,
+    skipsActivation: boolean,
+    skipsPayment: boolean,
+  ): number => {
+    let next = current + 1;
+    if (next > 4) return 4;
+    if (next === 2 && skipsActivation) next = 3;
+    if (next === 3 && skipsPayment) next = 4;
+    return next;
+  };
+
+  const resolvePrevRenewalModalStep = (
+    current: number,
+    skipsActivation: boolean,
+    skipsPayment: boolean,
+  ): number => {
+    let prev = current - 1;
+    if (prev < 1) return 1;
+    if (prev === 3 && skipsPayment) prev = 2;
+    if (prev === 2 && skipsActivation) prev = 1;
+    return prev;
+  };
+
+  const canProceedRenewalModalStep = (): boolean => {
+    switch (renewalModalStep) {
+      case 1:
+        return !!renewalData.newProfileId;
+      case 2:
+        return renewalActivationTypeChosen;
+      case 3:
+        return renewalPaymentTypeChosen;
+      default:
+        return true;
+    }
+  };
+
+  const handleRenewalModalNext = () => {
+    if (!canProceedRenewalModalStep()) {
+      if (renewalModalStep === 1) showError('اختيار الباقة', 'يرجى اختيار الباقة أولاً.');
+      else if (renewalModalStep === 2) showError('نوع التفعيل', 'يرجى اختيار نوع التفعيل أولاً.');
+      else if (renewalModalStep === 3) showError('نوع الدفع', 'يرجى اختيار نوع الدفع أولاً.');
+      return;
+    }
+    setRenewalModalStep((step) =>
+      resolveNextRenewalModalStep(step, renewalSkipsActivationTypeStep, renewalSkipsPaymentStep),
+    );
+  };
+
+  const handleRenewalModalBack = () => {
+    setRenewalModalStep((step) =>
+      resolvePrevRenewalModalStep(step, renewalSkipsActivationTypeStep, renewalSkipsPaymentStep),
+    );
+  };
+
+  const resetRenewalLaterStepChoices = () => {
+    setRenewalActivationTypeChosen(false);
+    setRenewalPaymentTypeChosen(false);
+    setRenewalModalStep(1);
+  };
+
+  const buildEnhancedRenewalData = (): RenewalData | null => {
+    const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
+    if (!selectedProfile) return null;
+
+    const isExtension = selectedProfile.packageType === ProfilePackageType.Extension;
     const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
     const isCustomerWallet =
       (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
@@ -2441,7 +2538,7 @@ const SubscribersPage: React.FC = () => {
     });
     const firstServiceFee = serviceFeesItems[0];
 
-    const enhancedRenewalData: RenewalData = {
+    return {
       ...renewalData,
       notes: '',
       paymentStatus: isExtension
@@ -2453,13 +2550,13 @@ const SubscribersPage: React.FC = () => {
             : renewalAmountFullyReceived
               ? PaymentStatus.Paid
               : renewalData.paymentStatus,
-      overrideSalePrice: isExtension ? 0 : renewalData.overrideSalePrice || selectedProfile?.salePrice || 0,
+      overrideSalePrice: isExtension ? 0 : renewalData.overrideSalePrice || selectedProfile.salePrice || 0,
       amountPaid: isExtension || isDeferred || isCustomerWallet ? 0 : renewalData.amountPaid,
       remainingAmount: isExtension || isCustomerWallet ? 0 : renewalData.remainingAmount,
       debtDescription: isExtension || isCustomerWallet ? '' : renewalData.debtDescription,
       debtDueDate: isExtension || isCustomerWallet ? '' : renewalData.debtDueDate,
       currentExpirationDate: renewalInfo?.expirationDate,
-      renewalPeriod: selectedProfile?.renewalPeriod || 30,
+      renewalPeriod: selectedProfile.renewalPeriod || 30,
       serviceFeesItems: serviceFeesItems.length > 0 ? serviceFeesItems : undefined,
       serviceFeesId: firstServiceFee?.serviceFeesId,
       serviceFeesPrice: firstServiceFee?.serviceFeesPrice,
@@ -2479,11 +2576,13 @@ const SubscribersPage: React.FC = () => {
         ? ftthSyncPeriods[0]?.newExpirationDate
         : renewalData.newExpirationDate,
     };
+  };
 
+  const executeRenewalSubmission = async (enhancedRenewalData: RenewalData) => {
     if (ftthCompareSyncContext && pendingFtthCompareRowIndex != null) {
       try {
         await submitFtthCompareSyncFlow(enhancedRenewalData);
-      } catch (error: any) {
+      } catch (error: unknown) {
         const errorMessage = ApiService.showError(error);
         showError('خطأ في مزامنة التفعيل', errorMessage);
         setShowFtthCompareModal(true);
@@ -2492,6 +2591,30 @@ const SubscribersPage: React.FC = () => {
     }
 
     createRenewalMutation.mutate(enhancedRenewalData);
+  };
+
+  const handleRenewalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (renewalModalStep !== 4) {
+      handleRenewalModalNext();
+      return;
+    }
+
+    const enhancedRenewalData = buildEnhancedRenewalData();
+    if (!enhancedRenewalData) {
+      showError('تفعيل المشترك', 'يرجى اختيار الباقة.');
+      return;
+    }
+
+    setPendingRenewalSubmit(enhancedRenewalData);
+    setShowRenewalConfirmModal(true);
+  };
+
+  const handleRenewalConfirmSubmit = async () => {
+    if (!pendingRenewalSubmit) return;
+    setShowRenewalConfirmModal(false);
+    await executeRenewalSubmission(pendingRenewalSubmit);
+    setPendingRenewalSubmit(null);
   };
 
   // دالة لإنشاء QR Code كـ base64
@@ -4307,10 +4430,43 @@ const SubscribersPage: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleRenewalSubmit} className="p-6 space-y-6">
-              {/* Renewal Options */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Profile Selection — اعتيادية ومخصصة منفصلتان */}
-                <div className={customProfilesForRenewal.length > 0 ? 'md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
+              {/* مراحل التفعيل */}
+              <nav aria-label="مراحل التفعيل" className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
+                <ol className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {RENEWAL_MODAL_STEPS.map((step) => {
+                    const isActive = renewalModalStep === step.id;
+                    const isCompleted = renewalModalStep > step.id;
+                    const isSkipped =
+                      (step.id === 2 && renewalSkipsActivationTypeStep) ||
+                      (step.id === 3 && renewalSkipsPaymentStep);
+                    return (
+                      <li
+                        key={step.id}
+                        className={`rounded-lg border px-3 py-2 text-center text-xs sm:text-sm transition-colors ${
+                          isActive
+                            ? 'border-primary-500 bg-primary-50 text-primary-800 dark:border-primary-400 dark:bg-primary-950/40 dark:text-primary-200 font-semibold'
+                            : isCompleted
+                              ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950/30 dark:text-green-200'
+                              : isSkipped
+                                ? 'border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-500'
+                                : 'border-gray-200 bg-white text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                        }`}
+                      >
+                        <span className="block font-bold tabular-nums">{step.id}</span>
+                        <span className="block mt-0.5 leading-snug">{step.label}</span>
+                        {isSkipped && renewalModalStep >= 4 && (
+                          <span className="block mt-1 text-[10px] opacity-80">تخطي</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </nav>
+
+              {renewalModalStep === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 1 — اختيار الباقة</h3>
+                <div className={customProfilesForRenewal.length > 0 ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       {customProfilesForRenewal.length > 0 ? 'الباقة الاعتيادية' : 'الباقة الجديدة *'}
@@ -4352,6 +4508,194 @@ const SubscribersPage: React.FC = () => {
                   )}
                 </div>
 
+                {renewalData.newProfileId && (
+                  <div className="flex items-start justify-end pt-1">
+                    <div className="group relative inline-flex">
+                      <button
+                        type="button"
+                        className="rounded-full p-1.5 text-blue-600 outline-none ring-offset-2 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:ring-offset-gray-900"
+                        aria-label="معلومات التجديد والتفعيل"
+                      >
+                        <Info className="h-5 w-5 shrink-0" aria-hidden />
+                      </button>
+                      <div
+                        role="tooltip"
+                        className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-md border border-gray-200 bg-white p-3 text-start text-xs leading-relaxed text-gray-700 opacity-0 shadow-lg transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        {(() => {
+                          const p = renewalInfo.availableProfiles?.find((pr) => pr.id === renewalData.newProfileId);
+                          const period = p?.renewalPeriod || 30;
+                          const isExt = p?.packageType === ProfilePackageType.Extension;
+                          return (
+                            <div className="space-y-1.5">
+                              <p>
+                                <strong>فترة التجديد:</strong> {period} يوم
+                              </p>
+                              <p>
+                                <strong>نوع التفعيل:</strong> {isExt ? 'تمديد' : 'اشتراك'}
+                              </p>
+                              <p>
+                                <strong>تاريخ الانتهاء الجديد:</strong> سيتم إضافة فترة التجديد إلى تاريخ انتهاء المشترك الحالي
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isRenewalExtensionProfile && renewalData.newProfileId && (
+                  <p className="text-sm text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-3">
+                    باقة تمديد — سيتم تخطي مرحلتي نوع التفعيل ونوع الدفع والانتقال مباشرة إلى مرحلة التفعيل.
+                  </p>
+                )}
+              </div>
+              )}
+
+              {renewalModalStep === 2 && !renewalSkipsActivationTypeStep && renewalData.newProfileId && (
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 2 — نوع التفعيل</h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    طريقة التفعيل *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleActivationChannelChange(RenewalActivationChannel.Normal)}
+                      className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                        renewalActivationChannel === RenewalActivationChannel.Normal
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-indigo-300 dark:hover:border-indigo-500'
+                      }`}
+                    >
+                      اعتيادي
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleActivationChannelChange(RenewalActivationChannel.CustomerWallet)}
+                      className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                        isRenewalCustomerWalletChannel
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-indigo-300 dark:hover:border-indigo-500'
+                      }`}
+                    >
+                      محفظة الزبون
+                    </button>
+                  </div>
+                </div>
+                {isRenewalCustomerWalletChannel && (
+                  <p className="text-sm text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/30 px-4 py-3">
+                    محفظة الزبون — سيتم تخطي مرحلة نوع الدفع والانتقال إلى مرحلة التفعيل.
+                  </p>
+                )}
+              </div>
+              )}
+
+              {renewalModalStep === 3 && !renewalSkipsPaymentStep && renewalData.newProfileId && (
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 3 — نوع الدفع</h3>
+                {(() => {
+                  const selectedProfile = renewalInfo.availableProfiles?.find(
+                    (p) => p.id === renewalData.newProfileId
+                  );
+                  const isDeferredPayment =
+                    renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+                  return (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        طريقة الدفع *
+                      </label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRenewalPaymentTypeChosen(true);
+                            const salePrice = selectedProfile?.salePrice || 0;
+                            setRenewalData((prev) => ({
+                              ...prev,
+                              activationChannel: RenewalActivationChannel.Normal,
+                              activationPaymentMethod: ActivationPaymentMethod.Cash,
+                              ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+                            }));
+                          }}
+                          className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                            (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) ===
+                              ActivationPaymentMethod.Cash && !isDeferredPayment
+                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                          }`}
+                        >
+                          كاش
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRenewalPaymentTypeChosen(true);
+                            const salePrice = selectedProfile?.salePrice || 0;
+                            setRenewalData((prev) => ({
+                              ...prev,
+                              activationChannel: RenewalActivationChannel.Normal,
+                              activationPaymentMethod: ActivationPaymentMethod.Master,
+                              ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+                            }));
+                          }}
+                          className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                            renewalData.activationPaymentMethod === ActivationPaymentMethod.Master
+                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                          }`}
+                        >
+                          ماستر
+                        </button>
+                        <button
+                          type="button"
+                          onClick={applyDeferredActivationPayment}
+                          className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                            isDeferredPayment
+                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                          }`}
+                        >
+                          آجل
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              )}
+
+              {renewalModalStep === 4 && (
+              <div className="space-y-6">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 4 — تفعيل</h3>
+              <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/60 dark:bg-primary-950/20 px-4 py-3 text-sm space-y-1">
+                <p className="font-semibold text-gray-900 dark:text-white">ملخص الاختيارات</p>
+                <p><span className="text-gray-500 dark:text-gray-400">الباقة:</span> {selectedRenewalProfile?.name ?? '—'}</p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">نوع التفعيل:</span>{' '}
+                  {isRenewalExtensionProfile
+                    ? 'تمديد (اعتيادي)'
+                    : isRenewalCustomerWalletChannel
+                      ? 'محفظة الزبون'
+                      : 'اعتيادي'}
+                </p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">نوع الدفع:</span>{' '}
+                  {isRenewalExtensionProfile
+                    ? 'كاش'
+                    : isRenewalCustomerWalletChannel
+                      ? 'محفظة زبون'
+                      : renewalData.activationPaymentMethod === ActivationPaymentMethod.Master
+                        ? 'ماستر'
+                        : renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred
+                          ? 'آجل'
+                          : 'كاش'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {ftthCompareSyncContext && (
                   <div className="md:col-span-2 space-y-3">
                     {ftthCompareSyncContext.isNewSubscriber && (
@@ -4667,149 +5011,6 @@ const SubscribersPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Renewal Period Info — أيقونة فقط؛ النص في تلميح عند التمرير أو التركيز */}
-                {renewalData.newProfileId && (
-                  <div className="flex items-start justify-end pt-1">
-                    <div className="group relative inline-flex">
-                      <button
-                        type="button"
-                        className="rounded-full p-1.5 text-blue-600 outline-none ring-offset-2 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:ring-offset-gray-900"
-                        aria-label="معلومات التجديد والتفعيل"
-                      >
-                        <Info className="h-5 w-5 shrink-0" aria-hidden />
-                      </button>
-                      <div
-                        role="tooltip"
-                        className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-md border border-gray-200 bg-white p-3 text-start text-xs leading-relaxed text-gray-700 opacity-0 shadow-lg transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                      >
-                        {(() => {
-                          const p = renewalInfo.availableProfiles?.find((pr) => pr.id === renewalData.newProfileId);
-                          const period = p?.renewalPeriod || 30;
-                          const isExt = p?.packageType === ProfilePackageType.Extension;
-                          return (
-                            <div className="space-y-1.5">
-                              <p>
-                                <strong>فترة التجديد:</strong> {period} يوم
-                              </p>
-                              <p>
-                                <strong>نوع التفعيل:</strong> {isExt ? 'تمديد' : 'اشتراك'}
-                              </p>
-                              <p>
-                                <strong>تاريخ الانتهاء الجديد:</strong> سيتم إضافة فترة التجديد إلى تاريخ انتهاء المشترك الحالي
-                              </p>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {(() => {
-                  const selectedProfile = renewalInfo.availableProfiles?.find(
-                    (p) => p.id === renewalData.newProfileId
-                  );
-                  const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
-                  const activationChannel = renewalData.activationChannel ?? RenewalActivationChannel.Normal;
-                  const isCustomerWalletChannel = activationChannel === RenewalActivationChannel.CustomerWallet;
-                  const isDeferredPayment =
-                    renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
-                  if (isExtension || !renewalData.newProfileId) return null;
-                  return (
-                    <>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          طريقة التفعيل *
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => handleActivationChannelChange(RenewalActivationChannel.Normal)}
-                            className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
-                              activationChannel === RenewalActivationChannel.Normal
-                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
-                                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-indigo-300 dark:hover:border-indigo-500'
-                            }`}
-                          >
-                            اعتيادي
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleActivationChannelChange(RenewalActivationChannel.CustomerWallet)}
-                            className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
-                              isCustomerWalletChannel
-                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
-                                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-indigo-300 dark:hover:border-indigo-500'
-                            }`}
-                          >
-                            محفظة الزبون
-                          </button>
-                        </div>
-                      </div>
-
-                      {activationChannel === RenewalActivationChannel.Normal && (
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            طريقة الدفع *
-                          </label>
-                          <div className="grid grid-cols-3 gap-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const salePrice = selectedProfile?.salePrice || 0;
-                                setRenewalData((prev) => ({
-                                  ...prev,
-                                  activationChannel: RenewalActivationChannel.Normal,
-                                  activationPaymentMethod: ActivationPaymentMethod.Cash,
-                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
-                                }));
-                              }}
-                              className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
-                                (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) ===
-                                  ActivationPaymentMethod.Cash && !isDeferredPayment
-                                  ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
-                              }`}
-                            >
-                              كاش
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const salePrice = selectedProfile?.salePrice || 0;
-                                setRenewalData((prev) => ({
-                                  ...prev,
-                                  activationChannel: RenewalActivationChannel.Normal,
-                                  activationPaymentMethod: ActivationPaymentMethod.Master,
-                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
-                                }));
-                              }}
-                              className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
-                                renewalData.activationPaymentMethod === ActivationPaymentMethod.Master
-                                  ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
-                              }`}
-                            >
-                              ماستر
-                            </button>
-                            <button
-                              type="button"
-                              onClick={applyDeferredActivationPayment}
-                              className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
-                                isDeferredPayment
-                                  ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
-                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
-                              }`}
-                            >
-                              آجل
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-
                 {(() => {
                   const selectedProfile = renewalInfo.availableProfiles?.find(
                     (p) => p.id === renewalData.newProfileId
@@ -5093,8 +5294,23 @@ const SubscribersPage: React.FC = () => {
                 </div>
               )}
 
+              </div>
+              )}
+
               {/* Form Actions */}
-              <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div>
+                  {renewalModalStep > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleRenewalModalBack}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                    >
+                      السابق
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
                 <button
                   type="button"
                     onClick={() => { setSelectedSubscriberForRenewal(null); setShowRenewalModal(false); setRenewalViaSasTab(false); }}
@@ -5102,6 +5318,16 @@ const SubscribersPage: React.FC = () => {
                 >
                   إلغاء
                 </button>
+                {renewalModalStep < 4 ? (
+                  <button
+                    type="button"
+                    onClick={handleRenewalModalNext}
+                    disabled={!canProceedRenewalModalStep()}
+                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    التالي
+                  </button>
+                ) : (
                 <button
                   type="submit"
                   disabled={createRenewalMutation.isPending || ftthSyncSubmitting}
@@ -5119,9 +5345,147 @@ const SubscribersPage: React.FC = () => {
                     </>
                   )}
                 </button>
+                )}
+                </div>
               </div>
             </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* تأكيد التفعيل */}
+      {showRenewalConfirmModal && pendingRenewalSubmit && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60]">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">تأكيد التفعيل</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRenewalConfirmModal(false);
+                  setPendingRenewalSubmit(null);
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">هل أنت متأكد من تنفيذ التفعيل؟</p>
+
+              <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-4 space-y-2 text-sm">
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">المشترك:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {renewalInfo?.subscriberName || selectedSubscriber?.fullName || '—'}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">الباقة:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">{selectedRenewalProfile?.name ?? '—'}</span>
+                </p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">نوع التفعيل:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {isRenewalExtensionProfile
+                      ? 'تمديد (اعتيادي)'
+                      : isRenewalCustomerWalletChannel
+                        ? 'محفظة الزبون'
+                        : 'اعتيادي'}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">نوع الدفع:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {isRenewalExtensionProfile
+                      ? 'كاش'
+                      : isRenewalCustomerWalletChannel
+                        ? 'محفظة زبون'
+                        : pendingRenewalSubmit.activationPaymentMethod === ActivationPaymentMethod.Master
+                          ? 'ماستر'
+                          : pendingRenewalSubmit.activationPaymentMethod === ActivationPaymentMethod.Deferred
+                            ? 'آجل'
+                            : 'كاش'}
+                  </span>
+                </p>
+                {!isRenewalExtensionProfile && (
+                  <>
+                    <p>
+                      <span className="text-gray-500 dark:text-gray-400">سعر الاشتراك:</span>{' '}
+                      <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                        {formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}
+                      </span>
+                    </p>
+                    {!isRenewalCustomerWalletChannel &&
+                      pendingRenewalSubmit.activationPaymentMethod !== ActivationPaymentMethod.Deferred && (
+                      <p>
+                        <span className="text-gray-500 dark:text-gray-400">حالة الواصل:</span>{' '}
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {renewalAmountFullyReceived
+                            ? 'واصل — المبلغ كامل'
+                            : `غير واصل — ${formatNumber(pendingRenewalSubmit.amountPaid ?? 0, { suffix: ' د.ع' })}`}
+                        </span>
+                      </p>
+                    )}
+                    {(pendingRenewalSubmit.remainingAmount ?? 0) > 0 && (
+                      <p>
+                        <span className="text-gray-500 dark:text-gray-400">دين الاشتراك:</span>{' '}
+                        <span className="font-medium tabular-nums text-amber-700 dark:text-amber-300">
+                          {formatNumber(pendingRenewalSubmit.remainingAmount ?? 0, { suffix: ' د.ع' })}
+                        </span>
+                      </p>
+                    )}
+                    {enabledActivationServiceFees.length > 0 && (
+                      <p>
+                        <span className="text-gray-500 dark:text-gray-400">أجور الخدمة:</span>{' '}
+                        <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                          {formatNumber(activationServiceFeesTotal, { suffix: ' د.ع' })}
+                        </span>
+                      </p>
+                    )}
+                    <p>
+                      <span className="text-gray-500 dark:text-gray-400">إجمالي الفاتورة:</span>{' '}
+                      <span className="font-bold tabular-nums text-primary-700 dark:text-primary-300">
+                        {formatNumber(renewalInvoiceTotalWithServiceFees, { suffix: ' د.ع' })}
+                      </span>
+                    </p>
+                  </>
+                )}
+                {ftthCompareSyncContext && ftthSyncPeriods.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-600 space-y-1">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">فترات FTTH:</p>
+                    {ftthSyncPeriods.map((period, idx) => (
+                      <p key={`${period.label}-${idx}`} className="text-xs text-gray-600 dark:text-gray-400">
+                        {period.label}: {period.renewalDate || '—'} → {period.newExpirationDate || '—'}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRenewalConfirmModal(false);
+                  setPendingRenewalSubmit(null);
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+              >
+                لا
+              </button>
+              <button
+                type="button"
+                onClick={handleRenewalConfirmSubmit}
+                disabled={createRenewalMutation.isPending || ftthSyncSubmitting}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {(createRenewalMutation.isPending || ftthSyncSubmitting) ? 'جاري التفعيل...' : 'نعم، تأكيد'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1725,17 +1725,36 @@ const DebtsPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   نوع الدفع *
                 </label>
-                <select
-                  value={paymentData.paymentMethod}
-                  onChange={(e) => setPaymentData((prev) => ({
-                    ...prev,
-                    paymentMethod: Number(e.target.value) as ActivationPaymentMethod,
-                  }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value={ActivationPaymentMethod.Cash}>كاش</option>
-                  <option value={ActivationPaymentMethod.Master}>ماستر</option>
-                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentData((prev) => ({
+                      ...prev,
+                      paymentMethod: ActivationPaymentMethod.Cash,
+                    }))}
+                    className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                      paymentData.paymentMethod === ActivationPaymentMethod.Cash
+                        ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                    }`}
+                  >
+                    كاش
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentData((prev) => ({
+                      ...prev,
+                      paymentMethod: ActivationPaymentMethod.Master,
+                    }))}
+                    className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
+                      paymentData.paymentMethod === ActivationPaymentMethod.Master
+                        ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                    }`}
+                  >
+                    ماستر
+                  </button>
+                </div>
               </div>
 
               <div>
