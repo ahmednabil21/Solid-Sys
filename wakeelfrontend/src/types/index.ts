@@ -2769,8 +2769,8 @@ export interface AccountsListParams {
   agentId?: string;
 }
 
-/** معاملات GET /api/Accounts/export/excel (بدون page/pageSize/subscriberName) */
-export type AccountsExportParams = Omit<AccountsListParams, 'page' | 'pageSize' | 'subscriberName'>;
+/** معاملات GET /api/Accounts/export/excel (بدون page/pageSize — نفس فلاتر الجدول) */
+export type AccountsExportParams = Omit<AccountsListParams, 'page' | 'pageSize'>;
 
 // --- مصاريف المكتب (Office Expenses) ---
 export interface OfficeExpense {

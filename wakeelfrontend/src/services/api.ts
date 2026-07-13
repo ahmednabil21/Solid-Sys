@@ -3177,7 +3177,7 @@ class ApiService {
 
   async exportAccountsToExcel(params?: AccountsExportParams): Promise<Blob> {
     const response = await this.api.get('/Accounts/export/excel', {
-      params: this.buildAccountsQueryParams(params, { includePagination: false, includeSubscriberName: false }),
+      params: this.buildAccountsQueryParams(params, { includePagination: false }),
       responseType: 'blob',
     });
     return response.data;

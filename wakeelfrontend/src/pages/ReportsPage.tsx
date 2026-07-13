@@ -400,14 +400,8 @@ const ReportsPage: React.FC = () => {
   const handleExportAccountsExcel = async () => {
     try {
       setIsExportingAccounts(true);
-      const blob = await apiService.exportAccountsToExcel({
-        agentId: isAdmin ? (selectedAgentId || undefined) : undefined,
-        fromDate: appliedFromDate || undefined,
-        toDate: appliedToDate || undefined,
-        ...accountsRegionResellerFilter,
-        packageType: appliedPackageType ? Number(appliedPackageType) : undefined,
-        executedByUserId: appliedExecutedByUserId.trim() || undefined,
-      });
+      const { page: _page, pageSize: _pageSize, ...exportFilters } = buildAccountsParams();
+      const blob = await apiService.exportAccountsToExcel(exportFilters);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -416,7 +410,7 @@ const ReportsPage: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showSuccess('تم التصدير', 'تم تنزيل ملف Excel للتفعيلات.');
+      showSuccess('تم التصدير', 'تم تنزيل ملف Excel بنفس نتائج الجدول.');
     } catch (err: unknown) {
       showError('خطأ في التصدير', ApiService.showError(err));
     } finally {
