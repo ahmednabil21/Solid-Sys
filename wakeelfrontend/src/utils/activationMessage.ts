@@ -23,11 +23,10 @@ export const PLACEHOLDERS = [
   { key: 'DaysUntilExpiry', label: 'الأيام المتبقية', token: '{{DaysUntilExpiry}}' },
   { key: 'ProfileName', label: 'الباقة', token: '{{ProfileName}}' },
   { key: 'AgentCompanyName', label: 'اسم الشركة', token: '{{AgentCompanyName}}' },
+  { key: 'TotalAmount', label: 'المبلغ الإجمالي (باقة + أجور)', token: '{{TotalAmount}}' },
+  { key: 'PaidAmount', label: 'المبلغ المدفوع', token: '{{PaidAmount}}' },
+  { key: 'DebtAmount', label: 'مبلغ الدين', token: '{{DebtAmount}}' },
   { key: 'DebtDueDate', label: 'تاريخ التسديد', token: '{{DebtDueDate}}' },
-  { key: 'DebtAmount', label: 'المبلغ الدين', token: '{{DebtAmount}}' },
-  { key: 'TotalAmount', label: 'المبلغ الكلي', token: '{{TotalAmount}}' },
-  { key: 'SubscriptionAmount', label: 'مبلغ الاشتراك', token: '{{SubscriptionAmount}}' },
-  { key: 'ServiceFeesAmount', label: 'مبلغ الأجور', token: '{{ServiceFeesAmount}}' },
 ] as const;
 
 export interface ActivationMessageData {
@@ -37,6 +36,8 @@ export interface ActivationMessageData {
   expirationDate: string;
   companyName: string;
   totalAmount?: string;
+  paidAmount?: string;
+  debtAmount?: string;
   subscriptionAmount?: string;
   serviceFeesAmount?: string;
 }
@@ -91,10 +92,12 @@ export function buildActivationMessageFromTemplate(
   out = out.replace(/\{\{companyName\}\}/gi, data.companyName);
   out = out.replace(/\{\{CompanyName\}\}/g, data.companyName);
   out = out.replace(/\{\{AgentCompanyName\}\}/g, data.companyName);
-  out = out.replace(/\{\{DebtAmount\}\}/g, '0');
-  out = out.replace(/\{\{debtAmount\}\}/gi, '0');
+  out = out.replace(/\{\{DebtAmount\}\}/g, data.debtAmount ?? '0');
+  out = out.replace(/\{\{debtAmount\}\}/gi, data.debtAmount ?? '0');
   out = out.replace(/\{\{TotalAmount\}\}/g, data.totalAmount ?? '0');
   out = out.replace(/\{\{totalAmount\}\}/gi, data.totalAmount ?? '0');
+  out = out.replace(/\{\{PaidAmount\}\}/g, data.paidAmount ?? '0');
+  out = out.replace(/\{\{paidAmount\}\}/gi, data.paidAmount ?? '0');
   out = out.replace(/\{\{SubscriptionAmount\}\}/g, data.subscriptionAmount ?? '0');
   out = out.replace(/\{\{subscriptionAmount\}\}/gi, data.subscriptionAmount ?? '0');
   out = out.replace(/\{\{ServiceFeesAmount\}\}/g, data.serviceFeesAmount ?? '0');
@@ -137,8 +140,10 @@ export const DEFAULT_ACTIVATION_TEMPLATE = `تم تفعيل/تجديد الاش�
 اسم الشركة: {{AgentCompanyName}}
 الباقة: {{ProfileName}}
 الأيام المتبقية: {{DaysUntilExpiry}} يوم
+المبلغ الإجمالي: {{TotalAmount}}
+المبلغ المدفوع: {{PaidAmount}}
+مبلغ الدين: {{DebtAmount}}
 تاريخ التسديد: {{DebtDueDate}}
-المبلغ الدين: {{DebtAmount}}
 رابط التطبيق: ${SUBSCRIBER_INFO_LINK}`;
 
 /** القالب الافتراضي لرسالة التنبيه */
@@ -163,8 +168,10 @@ export const DETAILS_PLACEHOLDERS = [
   { key: 'ExpirationDate', label: 'تاريخ الانتهاء', token: '{{ExpirationDate}}' },
   { key: 'DaysUntilExpiry', label: 'الأيام المتبقية', token: '{{DaysUntilExpiry}}' },
   { key: 'AgentCompanyName', label: 'اسم الشركة', token: '{{AgentCompanyName}}' },
+  { key: 'TotalAmount', label: 'المبلغ الإجمالي (باقة + أجور)', token: '{{TotalAmount}}' },
+  { key: 'PaidAmount', label: 'المبلغ المدفوع', token: '{{PaidAmount}}' },
+  { key: 'DebtAmount', label: 'مبلغ الدين', token: '{{DebtAmount}}' },
   { key: 'DebtDueDate', label: 'تاريخ التسديد', token: '{{DebtDueDate}}' },
-  { key: 'DebtAmount', label: 'المبلغ الدين', token: '{{DebtAmount}}' },
 ] as const;
 
 /** بيانات رسالة التفاصيل/الدين (يجب أن يستبدل الباكند نفس المتغيرات عند الإرسال) */
@@ -180,6 +187,8 @@ export interface DetailsMessageData {
   companyName: string;
   debtDueDate: string;
   debtAmount: string;
+  totalAmount?: string;
+  paidAmount?: string;
 }
 
 /**
@@ -211,6 +220,10 @@ export function buildDetailsMessageFromTemplate(template: string, data: DetailsM
   out = out.replace(/\{\{debtDueDate\}\}/gi, data.debtDueDate);
   out = out.replace(/\{\{DebtAmount\}\}/g, data.debtAmount);
   out = out.replace(/\{\{debtAmount\}\}/gi, data.debtAmount);
+  out = out.replace(/\{\{TotalAmount\}\}/g, data.totalAmount ?? '0');
+  out = out.replace(/\{\{totalAmount\}\}/gi, data.totalAmount ?? '0');
+  out = out.replace(/\{\{PaidAmount\}\}/g, data.paidAmount ?? '0');
+  out = out.replace(/\{\{paidAmount\}\}/gi, data.paidAmount ?? '0');
   return out;
 }
 
@@ -223,8 +236,10 @@ export const DEFAULT_DETAILS_TEMPLATE = `تفاصيل المشترك
 تاريخ الانتهاء: {{ExpirationDate}}
 الأيام المتبقية: {{DaysUntilExpiry}} يوم
 اسم الشركة: {{AgentCompanyName}}
+المبلغ الإجمالي: {{TotalAmount}}
+المبلغ المدفوع: {{PaidAmount}}
+مبلغ الدين: {{DebtAmount}}
 تاريخ التسديد: {{DebtDueDate}}
-المبلغ الدين: {{DebtAmount}}
 رابط التطبيق: ${SUBSCRIBER_INFO_LINK}`;
 
 /**

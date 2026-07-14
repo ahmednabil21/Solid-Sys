@@ -2204,16 +2204,22 @@ class ApiService {
     });
   }
 
-  /** إرسال رسالة الدين او التفاصيل فقط عبر wwebjs-api */
-  async sendWhatsAppDetails(subscriberId: string): Promise<void> {
+  /** إرسال رسالة الدين او التفاصيل فقط عبر wwebjs-api. paidAmount = المبلغ المسدَّد الإجمالي. */
+  async sendWhatsAppDetails(subscriberId: string, paidAmount?: number): Promise<void> {
+    const params =
+      paidAmount != null && paidAmount > 0 ? { paidAmount } : undefined;
     await this.api.post(`/subscribers/${subscriberId}/send-whatsapp-details`, undefined, {
+      params,
       timeout: ApiService.WHATSAPP_SEND_TIMEOUT_MS,
     });
   }
 
   /** إرسال تنبيه تسديد الدين عبر القالب المستقل DebtAlertMessage */
-  async sendWhatsAppDebtAlert(subscriberId: string): Promise<void> {
+  async sendWhatsAppDebtAlert(subscriberId: string, paidAmount?: number): Promise<void> {
+    const params =
+      paidAmount != null && paidAmount > 0 ? { paidAmount } : undefined;
     await this.api.post(`/subscribers/${subscriberId}/send-whatsapp-debt-alert`, undefined, {
+      params,
       timeout: ApiService.WHATSAPP_SEND_TIMEOUT_MS,
     });
   }

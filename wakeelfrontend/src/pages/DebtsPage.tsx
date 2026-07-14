@@ -49,6 +49,63 @@ const defaultDebtPaymentData = (): DebtPaymentRequest => ({
   paymentMethod: ActivationPaymentMethod.Cash,
 });
 
+function isMaterialDebtRow(debt: Debt): boolean {
+  return !!(debt.materialName || debt.materialDebtAmount != null || debt.materialDisbursementDate);
+}
+
+function isServiceFeeDebtRow(debt: Debt): boolean {
+  if (isMaterialDebtRow(debt)) return false;
+  const desc = `${debt.originalDescription || ''} ${debt.description || ''}`;
+  return desc.includes('دين أجور خدمة');
+}
+
+function debtTypeLabelAr(debt: Debt): string {
+  if (isMaterialDebtRow(debt)) return 'دين مواد';
+  if (isServiceFeeDebtRow(debt)) return 'دين أجور خدمة';
+  return 'دين اشتراك';
+}
+
+/** يجمع دين الاشتراك ودين الأجور غير المسددين لنفس المشترك في مودال تسديد واحد. */
+function resolveDebtsForCombinedPay(clicked: Debt, subscriberDebts: Debt[]): Debt[] {
+  if (isMaterialDebtRow(clicked)) return [clicked];
+
+  const unpaid = subscriberDebts.filter(
+    (d) => Number(d.amount) > 0 && (d.status === DebtStatus.Unpaid || d.status === 0 || d.isPaid === false)
+  );
+
+  const feeDebts = unpaid.filter(isServiceFeeDebtRow);
+  const subscriptionDebts = unpaid.filter((d) => !isMaterialDebtRow(d) && !isServiceFeeDebtRow(d));
+  const combined = [...subscriptionDebts, ...feeDebts];
+  if (combined.length === 0) return [clicked];
+
+  const byId = new Map(combined.map((d) => [d.id, d]));
+  if (!byId.has(clicked.id)) byId.set(clicked.id, clicked);
+  return Array.from(byId.values());
+}
+
+function allocateCombinedDebtPayments(
+  debts: Debt[],
+  totalPayment: number
+): Array<{ debt: Debt; amount: number }> {
+  let remaining = Math.max(0, Number(totalPayment) || 0);
+  const ordered = [...debts].sort((a, b) => {
+    const aRank = isServiceFeeDebtRow(a) ? 0 : 1;
+    const bRank = isServiceFeeDebtRow(b) ? 0 : 1;
+    return aRank - bRank;
+  });
+  const allocations: Array<{ debt: Debt; amount: number }> = [];
+  for (const debt of ordered) {
+    if (remaining <= 0) break;
+    const due = Math.max(0, Number(debt.amount) || 0);
+    const pay = Math.min(due, remaining);
+    if (pay > 0) {
+      allocations.push({ debt, amount: pay });
+      remaining -= pay;
+    }
+  }
+  return allocations;
+}
+
 /** استخراج جزء التاريخ YYYY-MM-DD من ISO دون تحويل التوقيت (لتجنب تغيّر اليوم حسب timezone) */
 function getDatePart(isoOrDate?: string | null): string | null {
   if (!isoOrDate || typeof isoOrDate !== 'string') return null;
@@ -133,6 +190,7 @@ const DebtsPage: React.FC = () => {
   const [showViewDebtModal, setShowViewDebtModal] = useState(false);
   const [showSubscriberDebtsModal, setShowSubscriberDebtsModal] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [selectedDebtsForPay, setSelectedDebtsForPay] = useState<Debt[]>([]);
   const [selectedSubscriberDebts, setSelectedSubscriberDebts] = useState<Debt[]>([]);
   const [selectedSubscriberTotalDebt, setSelectedSubscriberTotalDebt] = useState<number | null>(null);
   const [selectedSubscriberForDebtsModalId, setSelectedSubscriberForDebtsModalId] = useState<string | null>(null);
@@ -149,7 +207,11 @@ const DebtsPage: React.FC = () => {
   const [offOnModalSubscriberId, setOffOnModalSubscriberId] = useState<string | null>(null);
   const [offOnModalSubscriberName, setOffOnModalSubscriberName] = useState<string>('');
   const [offOnModalSubmitting, setOffOnModalSubmitting] = useState(false);
-  const [postDebtPaymentWhatsApp, setPostDebtPaymentWhatsApp] = useState<{ subscriberId: string; subscriberName?: string | null } | null>(null);
+  const [postDebtPaymentWhatsApp, setPostDebtPaymentWhatsApp] = useState<{
+    subscriberId: string;
+    subscriberName?: string | null;
+    paidAmount?: number;
+  } | null>(null);
   const [sendingDebtDetailsWhatsApp, setSendingDebtDetailsWhatsApp] = useState(false);
   const [sendingDebtAlertBulk, setSendingDebtAlertBulk] = useState(false);
 
@@ -416,6 +478,29 @@ const DebtsPage: React.FC = () => {
 
   // Convert grouped debts to array for display
   const subscriberDebts = Object.values(groupedDebts);
+
+  const openPayDebtModal = (debt: Debt, fromSubscriberDetails = false) => {
+    const group = subscriberDebts.find((sd: any) => sd.subscriberId === debt.subscriberId) as
+      | { debts?: Debt[] }
+      | undefined;
+    const sourceDebts =
+      fromSubscriberDetails && selectedSubscriberDebts.length > 0
+        ? selectedSubscriberDebts
+        : group?.debts?.length
+          ? group.debts
+          : [debt];
+    const combined = resolveDebtsForCombinedPay(debt, sourceDebts);
+    setSelectedDebt(combined[0] ?? debt);
+    setSelectedDebtsForPay(combined);
+    const total = combined.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    setPaymentData({
+      paymentAmount: total,
+      notes: '',
+      paymentMethod: ActivationPaymentMethod.Cash,
+    });
+    setOpenedFromSubscriberDebts(fromSubscriberDetails);
+    setShowPayDebtModal(true);
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -744,45 +829,101 @@ const DebtsPage: React.FC = () => {
   });
 
   const payDebtMutation = useMutation({
-    mutationFn: async ({ id, paymentData }: { id: string; paymentData: DebtPaymentRequest }) => {
-      if (!online) {
-        await queueOperation('PayDebt', buildPayDebtPayload(id, paymentData));
-        return { id, ...paymentData, status: 1, _offlineQueued: true } as unknown as Debt & { _offlineQueued?: boolean };
+    mutationFn: async ({
+      debts,
+      paymentData,
+    }: {
+      debts: Debt[];
+      paymentData: DebtPaymentRequest;
+    }) => {
+      const allocations = allocateCombinedDebtPayments(debts, paymentData.paymentAmount);
+      if (allocations.length === 0) {
+        throw new Error('لا يوجد مبلغ صالح للتسديد.');
       }
-      return apiService.payDebt(id, paymentData);
+
+      if (!online) {
+        for (const { debt, amount } of allocations) {
+          await queueOperation(
+            'PayDebt',
+            buildPayDebtPayload(debt.id, { ...paymentData, paymentAmount: amount })
+          );
+        }
+        const totalPaid = allocations.reduce((s, a) => s + a.amount, 0);
+        return {
+          _offlineQueued: true,
+          totalPaid,
+          subscriberId: debts[0]?.subscriberId,
+          subscriberName: debts[0]?.subscriberName,
+        } as {
+          _offlineQueued?: boolean;
+          totalPaid: number;
+          subscriberId?: string;
+          subscriberName?: string | null;
+          updatedDebts: Debt[];
+        };
+      }
+
+      const updatedDebts: Debt[] = [];
+      for (const { debt, amount } of allocations) {
+        const updated = await apiService.payDebt(debt.id, {
+          ...paymentData,
+          paymentAmount: amount,
+        });
+        updatedDebts.push(updated);
+      }
+      const totalPaid = allocations.reduce((s, a) => s + a.amount, 0);
+      return {
+        totalPaid,
+        subscriberId: debts[0]?.subscriberId,
+        subscriberName: debts[0]?.subscriberName,
+        updatedDebts,
+      };
     },
-    onSuccess: async (updatedDebt: Debt & { _offlineQueued?: boolean }, variables) => {
-      const isOfflineQueued = (updatedDebt as any)?._offlineQueued === true;
-      if (isOfflineQueued) {
+    onSuccess: async (result: {
+      _offlineQueued?: boolean;
+      totalPaid: number;
+      subscriberId?: string;
+      subscriberName?: string | null;
+      updatedDebts?: Debt[];
+    }) => {
+      if (result._offlineQueued) {
         showSuccess('تم الحفظ محلياً', 'سيتم رفع تسديد الدين عند عودة الاتصال');
         await refreshPendingCount();
+      } else if (result.updatedDebts?.length) {
+        queryClient.setQueriesData(
+          { queryKey: ['debts', user?.id, user?.role], exact: false },
+          (old: DebtsListResponse | undefined) => {
+            if (!old?.data) return old;
+            const byId = new Map(result.updatedDebts!.map((d) => [d.id, d]));
+            return {
+              ...old,
+              data: old.data.map((d: Debt) => (byId.has(d.id) ? { ...d, ...byId.get(d.id)! } : d)),
+            };
+          }
+        );
       }
-      // دمج الاستجابة (بما فيها paymentCreatedAt) في كاش قائمة الديون لعرض تاريخ الاستلام فوراً دون إبطال القائمة (لأن الباكند يُرجع paymentCreatedAt null في القوائم)
-      queryClient.setQueriesData(
-        { queryKey: ['debts', user?.id, user?.role], exact: false },
-        (old: DebtsListResponse | undefined) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((d: Debt) => d.id === updatedDebt.id ? { ...d, ...updatedDebt } : d),
-          };
-        }
-      );
       queryClient.invalidateQueries({ queryKey: ['debts'] });
       queryClient.invalidateQueries({ queryKey: ['debt-totals'] });
       setShowPayDebtModal(false);
+      const paidSubscriberId = result.subscriberId ?? selectedDebt?.subscriberId;
+      const paidSubscriberName = result.subscriberName ?? selectedDebt?.subscriberName;
       setSelectedDebt(null);
-      const paidSubscriberId = updatedDebt?.subscriberId ?? selectedDebt?.subscriberId;
-      const paidSubscriberName = updatedDebt?.subscriberName ?? selectedDebt?.subscriberName;
+      setSelectedDebtsForPay([]);
       if (paidSubscriberId) {
-        setPostDebtPaymentWhatsApp({ subscriberId: paidSubscriberId, subscriberName: paidSubscriberName });
+        setPostDebtPaymentWhatsApp({
+          subscriberId: paidSubscriberId,
+          subscriberName: paidSubscriberName,
+          paidAmount: result.totalPaid,
+        });
       }
 
-      // إذا كان المودال فُتح من مودال تفاصيل ديون المشترك، أعد فتحه
-      if (openedFromSubscriberDebts && selectedDebt) {
-        handleViewSubscriberDebts(selectedDebt.subscriberId);
+      if (openedFromSubscriberDebts && paidSubscriberId) {
+        handleViewSubscriberDebts(paidSubscriberId);
         setOpenedFromSubscriberDebts(false);
       }
+    },
+    onError: (err: unknown) => {
+      showError('خطأ', ApiService.showError(err));
     },
   });
 
@@ -951,15 +1092,7 @@ const DebtsPage: React.FC = () => {
                               const subscriberDebt = subscriberDebts.find((sd: any) => sd.subscriberId === selectedIds[0]) as any;
                               if (subscriberDebt && subscriberDebt.unpaidDebt > 0) {
                                 const unpaidDebt = subscriberDebt.debts.find((d: any) => !d.isPaid);
-                                if (unpaidDebt) {
-                                  setSelectedDebt(unpaidDebt);
-                                  setPaymentData({
-                                    paymentAmount: unpaidDebt.amount,
-                                    notes: '',
-                                    paymentMethod: ActivationPaymentMethod.Cash,
-                                  });
-                                  setShowPayDebtModal(true);
-                                }
+                                if (unpaidDebt) openPayDebtModal(unpaidDebt);
                               }
                             }
                             setShowActionsDropdown(false);
@@ -1243,11 +1376,7 @@ const DebtsPage: React.FC = () => {
                             onClick={() => {
                               if (subscriberDebt.unpaidDebt > 0) {
                                 const unpaidDebt = subscriberDebt.debts.find((d: any) => d.status === 0 || !d.isPaid);
-                                if (unpaidDebt) {
-                                  setSelectedDebt(unpaidDebt);
-                                  setPaymentData({ paymentAmount: unpaidDebt.amount, notes: '', paymentMethod: ActivationPaymentMethod.Cash });
-                                  setShowPayDebtModal(true);
-                                }
+                                if (unpaidDebt) openPayDebtModal(unpaidDebt);
                               }
                             }}
                             disabled={subscriberDebt.unpaidDebt <= 0}
@@ -1665,17 +1794,17 @@ const DebtsPage: React.FC = () => {
       )}
 
       {/* Pay Debt Modal */}
-      {showPayDebtModal && selectedDebt && (
+      {showPayDebtModal && selectedDebt && selectedDebtsForPay.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                دفع الدين
+                {selectedDebtsForPay.length > 1 ? 'تسديد ديون المشترك' : 'دفع الدين'}
               </h2>
               <button
                 onClick={() => {
                   setShowPayDebtModal(false);
-                  // إذا كان المودال فُتح من مودال تفاصيل ديون المشترك، أعد فتحه
+                  setSelectedDebtsForPay([]);
                   if (openedFromSubscriberDebts && selectedDebt) {
                     handleViewSubscriberDebts(selectedDebt.subscriberId);
                     setOpenedFromSubscriberDebts(false);
@@ -1689,17 +1818,34 @@ const DebtsPage: React.FC = () => {
 
             <form onSubmit={(e) => {
               e.preventDefault();
-              payDebtMutation.mutate({ id: selectedDebt.id, paymentData });
+              payDebtMutation.mutate({ debts: selectedDebtsForPay, paymentData });
             }} className="p-6 space-y-4">
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
                   تفاصيل الدين
                 </h3>
-                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                   <div>المشترك: {selectedDebt.subscriberName}</div>
                   <div>الوكيل: {selectedDebt.agentName}</div>
-                  <div>المبلغ: {formatNumber(selectedDebt.amount, { suffix: ' د.ع' })}</div>
-                  <div>ملاحظات الدين: {selectedDebt.description}</div>
+                  {selectedDebtsForPay.map((d) => (
+                    <div
+                      key={d.id}
+                      className="rounded-md border border-gray-200 dark:border-gray-600 bg-white/60 dark:bg-gray-800/60 p-2 space-y-0.5"
+                    >
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{debtTypeLabelAr(d)}</div>
+                      <div>المبلغ: {formatNumber(d.amount, { suffix: ' د.ع' })}</div>
+                      <div>ملاحظات: {d.description || '—'}</div>
+                    </div>
+                  ))}
+                  {selectedDebtsForPay.length > 1 && (
+                    <div className="pt-2 border-t border-gray-200 dark:border-gray-600 font-semibold text-gray-900 dark:text-white">
+                      الإجمالي:{' '}
+                      {formatNumber(
+                        selectedDebtsForPay.reduce((s, d) => s + (Number(d.amount) || 0), 0),
+                        { suffix: ' د.ع' }
+                      )}
+                    </div>
+                  )}
                   {selectedDebt.materialName && (
                     <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 space-y-0.5">
                       <div className="font-medium text-gray-700 dark:text-gray-300">دين مواد</div>
@@ -1767,9 +1913,9 @@ const DebtsPage: React.FC = () => {
                   onChange={(e) => setPaymentData(prev => ({ ...prev, paymentAmount: Number(e.target.value) }))}
                   required
                   min="0"
-                  max={selectedDebt.amount}
+                  max={selectedDebtsForPay.reduce((s, d) => s + (Number(d.amount) || 0), 0)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="مبلغ الدفع"
+                  placeholder="مبلغ الدفع الإجمالي"
                 />
               </div>
 
@@ -1791,7 +1937,7 @@ const DebtsPage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setShowPayDebtModal(false);
-                    // إذا كان المودال فُتح من مودال تفاصيل ديون المشترك، أعد فتحه
+                    setSelectedDebtsForPay([]);
                     if (openedFromSubscriberDebts && selectedDebt) {
                       handleViewSubscriberDebts(selectedDebt.subscriberId);
                       setOpenedFromSubscriberDebts(false);
@@ -1835,6 +1981,15 @@ const DebtsPage: React.FC = () => {
               <span className="font-medium text-gray-900 dark:text-white">
                 {postDebtPaymentWhatsApp.subscriberName || '—'}
               </span>
+              {postDebtPaymentWhatsApp.paidAmount != null && postDebtPaymentWhatsApp.paidAmount > 0 && (
+                <>
+                  {' '}
+                  بمبلغ{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {formatNumber(postDebtPaymentWhatsApp.paidAmount, { suffix: ' د.ع' })}
+                  </span>
+                </>
+              )}
               . يمكنك الآن إرسال رسالة الدين/التفاصيل من هنا.
             </p>
             <div className="flex justify-end gap-2">
@@ -1851,7 +2006,10 @@ const DebtsPage: React.FC = () => {
                 onClick={async () => {
                   try {
                     setSendingDebtDetailsWhatsApp(true);
-                    await apiService.sendWhatsAppDetails(postDebtPaymentWhatsApp.subscriberId);
+                    await apiService.sendWhatsAppDetails(
+                      postDebtPaymentWhatsApp.subscriberId,
+                      postDebtPaymentWhatsApp.paidAmount
+                    );
                     showSuccess('واتساب', 'تم إرسال رسالة الدين/التفاصيل بنجاح.');
                     setPostDebtPaymentWhatsApp(null);
                   } catch (err: any) {
@@ -2350,10 +2508,7 @@ const DebtsPage: React.FC = () => {
                             {canPayDebtAction && !debt.isPaid && (
                               <button
                                 onClick={() => {
-                                  setSelectedDebt(debt);
-                                  setPaymentData({ paymentAmount: debt.amount, notes: '', paymentMethod: ActivationPaymentMethod.Cash });
-                                  setOpenedFromSubscriberDebts(true);
-                                  setShowPayDebtModal(true);
+                                  openPayDebtModal(debt, true);
                                   setShowSubscriberDebtsModal(false);
                                 }}
                                 className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 flex items-center space-x-1"
