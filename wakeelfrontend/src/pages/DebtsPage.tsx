@@ -70,7 +70,9 @@ function resolveDebtsForCombinedPay(clicked: Debt, subscriberDebts: Debt[]): Deb
   if (isMaterialDebtRow(clicked)) return [clicked];
 
   const unpaid = subscriberDebts.filter(
-    (d) => Number(d.amount) > 0 && (d.status === DebtStatus.Unpaid || d.status === 0 || d.isPaid === false)
+    (d) =>
+      Number(d.amount) > 0 &&
+      (d.status === DebtStatus.Unpaid || d.status === DebtStatus.Partial || d.isPaid === false)
   );
 
   const feeDebts = unpaid.filter(isServiceFeeDebtRow);
