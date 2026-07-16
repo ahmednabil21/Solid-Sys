@@ -61,6 +61,12 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
     legacyCheck: (u) => u.canAccessAccounts !== false,
   },
   {
+    pathPrefix: '/admin/monthly-reports',
+    page: 'Accounts',
+    viewAction: 'view',
+    legacyCheck: (u) => u.canAccessAccounts !== false,
+  },
+  {
     pathPrefix: '/admin/packages',
     page: 'Packages',
     viewAction: 'view',

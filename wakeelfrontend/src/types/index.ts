@@ -2772,6 +2772,61 @@ export interface AccountsListParams {
 /** معاملات GET /api/Accounts/export/excel (بدون page/pageSize — نفس فلاتر الجدول) */
 export type AccountsExportParams = Omit<AccountsListParams, 'page' | 'pageSize'>;
 
+/** نوع فاتورة التقرير الشهري */
+export type MonthlyReportInvoiceType = 'subscriptionPackage' | 'serviceFees';
+
+export interface MonthlyReportRow {
+  id: string;
+  renewalId: string;
+  subscriberId: string;
+  subscriberName: string;
+  /** تاريخ التفعيل / أصل الاشتراك */
+  activationDate: string;
+  /** واصل | غير واصل */
+  paymentStatus: string;
+  isPaid: boolean;
+  paymentMethod?: number | null;
+  paymentMethodLabelAr?: string;
+  amount: number;
+  /** تاريخ وارد الاشتراك / استلام المبلغ */
+  amountReceivedDate?: string | null;
+  invoiceType: MonthlyReportInvoiceType | string;
+  invoiceTypeLabelAr: string;
+}
+
+export interface MonthlyReportItemsPage {
+  data: MonthlyReportRow[];
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+/** استجابة GET /api/MonthlyReport */
+export interface MonthlyReportResponse {
+  totalIncome: number;
+  subscriptionIncome: number;
+  serviceFeesIncome: number;
+  unpaidSubscriptionDebt: number;
+  serviceFeesDebt: number;
+  items: MonthlyReportItemsPage;
+}
+
+export interface MonthlyReportListParams {
+  fromDate?: string;
+  toDate?: string;
+  regionId?: string;
+  resellerId?: string;
+  subscriberName?: string;
+  invoiceType?: MonthlyReportInvoiceType | string;
+  paymentMethod?: ActivationPaymentMethod | number;
+  page?: number;
+  pageSize?: number;
+  agentId?: string;
+}
+
 // --- مصاريف المكتب (Office Expenses) ---
 export interface OfficeExpense {
   id: string;

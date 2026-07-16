@@ -58,6 +58,8 @@ import {
   AccountsListParams,
   AccountsExportParams,
   AccountsLedgerKind,
+  MonthlyReportResponse,
+  MonthlyReportListParams,
   DailyHandoverCreateRequest,
   DailyHandoverUpdateRequest,
   DailyHandoverRecipient,
@@ -3177,6 +3179,24 @@ class ApiService {
   async getAccounts(params?: AccountsListParams): Promise<AccountsResponse> {
     const response: AxiosResponse<AccountsResponse> = await this.api.get('/Accounts', {
       params: this.buildAccountsQueryParams(params),
+    });
+    return response.data;
+  }
+
+  async getMonthlyReport(params?: MonthlyReportListParams): Promise<MonthlyReportResponse> {
+    const queryParams: Record<string, string | number> = {};
+    if (params?.fromDate) queryParams.fromDate = params.fromDate;
+    if (params?.toDate) queryParams.toDate = params.toDate;
+    if (params?.regionId) queryParams.regionId = params.regionId;
+    if (params?.resellerId) queryParams.resellerId = params.resellerId;
+    if (params?.subscriberName?.trim()) queryParams.subscriberName = params.subscriberName.trim();
+    if (params?.invoiceType) queryParams.invoiceType = String(params.invoiceType);
+    if (params?.paymentMethod != null) queryParams.paymentMethod = Number(params.paymentMethod);
+    if (params?.page !== undefined) queryParams.page = params.page;
+    if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
+    if (params?.agentId?.trim()) queryParams.agentId = params.agentId.trim();
+    const response: AxiosResponse<MonthlyReportResponse> = await this.api.get('/MonthlyReport', {
+      params: queryParams,
     });
     return response.data;
   }

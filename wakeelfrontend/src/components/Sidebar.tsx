@@ -21,6 +21,7 @@ import {
   UserCog,
   UserPlus,
   BarChart3,
+  CalendarDays,
   CreditCard,
   FileSpreadsheet,
   Receipt,
@@ -192,6 +193,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
     },
     {
+      name: 'التقارير الشهرية',
+      path: '/admin/monthly-reports',
+      icon: CalendarDays,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+    },
+    {
       name: 'الباقات',
       path: '/admin/packages',
       icon: Package,
@@ -304,6 +311,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     '/admin/packages',
     '/admin/activity-log',
     '/admin/reports',
+    '/admin/monthly-reports',
     '/admin/expenses/office',
     '/admin/settings',
   ];

@@ -34,6 +34,7 @@ const PackagesPage = lazy(() => import('./pages/PackagesPage'));
 const AgentsPage = lazy(() => import('./pages/AgentsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const MonthlyReportsPage = lazy(() => import('./pages/MonthlyReportsPage'));
 const ReceiptsPage = lazy(() => import('./pages/ReceiptsPage'));
 const BalancePage = lazy(() => import('./pages/BalancePage'));
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'));
@@ -288,6 +289,15 @@ function App() {
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
                       <EmployeePageGuard path="/admin/reports">
                         <ReportsPage />
+                      </EmployeePageGuard>
+                    </ProtectedRoute>
+                  } />
+
+                  {/* التقارير الشهرية */}
+                  <Route path="monthly-reports" element={
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/monthly-reports">
+                        <MonthlyReportsPage />
                       </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
