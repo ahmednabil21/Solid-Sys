@@ -5,6 +5,11 @@ import {
   OfficeExpense,
   OfficeExpenseCreateRequest,
   OfficeExpenseUpdateRequest,
+  ExpenseWithdrawalCreateRequest,
+  ExpenseWithdrawalRequest,
+  ExpenseWithdrawalStatus,
+  ReceiptHandoverRegion,
+  ReceiptHandoverReseller,
   UserRole,
 } from '../types';
 import { showSuccess, showError } from '../utils/notifications';
@@ -20,7 +25,14 @@ import {
   Wallet,
   CheckCircle,
   DollarSign,
+  Building2,
+  Store,
+  HandCoins,
+  Clock3,
+  XCircle,
 } from 'lucide-react';
+import Pagination from '../components/Pagination';
+import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 
 const DASHBOARD_OFFICE_EXPENSES_AGENT_KEY = 'wakeel_office_expenses_agentId';
 
@@ -39,6 +51,20 @@ const OfficeExpensesPage: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [appliedFromDate, setAppliedFromDate] = useState('');
   const [appliedToDate, setAppliedToDate] = useState('');
+  const [selectedRegionId, setSelectedRegionId] = useState('');
+  const [selectedReseller, setSelectedReseller] = useState<ReceiptHandoverReseller | null>(null);
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [withdrawalsPage, setWithdrawalsPage] = useState(1);
+  const [withdrawalsPageSize, setWithdrawalsPageSize] = useState<number>(
+    STANDARD_PAGE_SIZE_OPTIONS[0]
+  );
+  const [withdrawalForm, setWithdrawalForm] = useState<ExpenseWithdrawalCreateRequest>({
+    agentResellerId: '',
+    amount: 0,
+    reason: '',
+    expenseDate: new Date().toISOString().split('T')[0],
+    notes: '',
+  });
 
   const [formData, setFormData] = useState<OfficeExpenseCreateRequest>({
     name: '',
@@ -103,6 +129,56 @@ const OfficeExpensesPage: React.FC = () => {
   });
   const totalNetSalary = (salarySheetResponse?.data ?? []).reduce((s: number, e: { netSalary?: number }) => s + (e.netSalary ?? 0), 0);
 
+  const { data: withdrawalContext, isLoading: withdrawalContextLoading } = useQuery({
+    queryKey: ['expense-withdrawal-context', effectiveAgentId ?? 'self'],
+    queryFn: () =>
+      apiService.getExpenseWithdrawalContext(isAdmin ? effectiveAgentId || undefined : undefined),
+    enabled: canLoadData,
+    refetchInterval: 15000,
+  });
+
+  const withdrawalRegions = useMemo(
+    () => withdrawalContext?.regions ?? [],
+    [withdrawalContext?.regions]
+  );
+  const selectedRegion: ReceiptHandoverRegion | undefined = useMemo(
+    () => withdrawalRegions.find((region) => region.id === selectedRegionId),
+    [withdrawalRegions, selectedRegionId]
+  );
+  const currentSelectedReseller = useMemo(
+    () =>
+      selectedRegion?.resellers.find((reseller) => reseller.id === selectedReseller?.id) ??
+      selectedReseller,
+    [selectedRegion, selectedReseller]
+  );
+
+  const { data: withdrawalRequestsResponse, isLoading: withdrawalsLoading } = useQuery({
+    queryKey: [
+      'expense-withdrawal-requests',
+      effectiveAgentId ?? 'self',
+      selectedRegionId || null,
+      selectedReseller?.id ?? null,
+      appliedFromDate || null,
+      appliedToDate || null,
+      withdrawalsPage,
+      withdrawalsPageSize,
+    ],
+    queryFn: () =>
+      apiService.getExpenseWithdrawalRequests({
+        agentId: isAdmin ? effectiveAgentId || undefined : undefined,
+        regionId: selectedRegionId || undefined,
+        resellerId: selectedReseller?.id || undefined,
+        fromDate: appliedFromDate || undefined,
+        toDate: appliedToDate || undefined,
+        page: withdrawalsPage,
+        pageSize: withdrawalsPageSize,
+      }),
+    enabled: canLoadData,
+    refetchInterval: 15000,
+  });
+
+  const withdrawalRequests = withdrawalRequestsResponse?.data ?? [];
+
   const createMutation = useMutation({
     mutationFn: (data: OfficeExpenseCreateRequest) =>
       apiService.createOfficeExpense(data, isAdmin ? effectiveAgentId : undefined),
@@ -157,6 +233,35 @@ const OfficeExpensesPage: React.FC = () => {
     },
     onError: (err: unknown) => {
       showError('خطأ في التسديد', ApiService.showError(err));
+    },
+  });
+
+  const withdrawalMutation = useMutation({
+    mutationFn: (data: ExpenseWithdrawalCreateRequest) =>
+      apiService.createExpenseWithdrawalRequest(
+        data,
+        isAdmin ? effectiveAgentId || undefined : undefined
+      ),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['expense-withdrawal-context'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-withdrawal-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['receiptHandoverContext'] });
+      setShowWithdrawalModal(false);
+      setWithdrawalForm({
+        agentResellerId: selectedReseller?.id ?? '',
+        amount: 0,
+        reason: '',
+        expenseDate: new Date().toISOString().split('T')[0],
+        notes: '',
+      });
+      if (result.request.whatsAppSent) {
+        showSuccess('تم إرسال الطلب', result.message);
+      } else {
+        showError('تم إنشاء الطلب دون إرسال واتساب', result.message);
+      }
+    },
+    onError: (err: unknown) => {
+      showError('تعذر إنشاء طلب الصرف', ApiService.showError(err));
     },
   });
 
@@ -223,6 +328,62 @@ const OfficeExpensesPage: React.FC = () => {
     payMutation.mutate(exp.id);
   };
 
+  const handleRegionSelect = (region: ReceiptHandoverRegion) => {
+    setSelectedRegionId(region.id);
+    setSelectedReseller(null);
+    setWithdrawalsPage(1);
+  };
+
+  const handleResellerSelect = (reseller: ReceiptHandoverReseller) => {
+    setSelectedReseller(reseller);
+    setWithdrawalsPage(1);
+  };
+
+  const openWithdrawalModal = () => {
+    if (!currentSelectedReseller || currentSelectedReseller.pendingIncomingIqd <= 0) return;
+    setWithdrawalForm({
+      agentResellerId: currentSelectedReseller.id,
+      amount: 0,
+      reason: '',
+      expenseDate: new Date().toISOString().split('T')[0],
+      notes: '',
+    });
+    setShowWithdrawalModal(true);
+  };
+
+  const handleWithdrawalSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!currentSelectedReseller) return;
+    if (withdrawalForm.amount <= 0) {
+      showError('خطأ', 'قيمة مبلغ الصرف يجب أن تكون أكبر من صفر');
+      return;
+    }
+    if (withdrawalForm.amount > currentSelectedReseller.pendingIncomingIqd) {
+      showError('خطأ', 'قيمة مبلغ الصرف أكبر من الوارد الكلي المتاح لهذا الرسيلر');
+      return;
+    }
+    if (!withdrawalForm.reason.trim()) {
+      showError('خطأ', 'سبب الصرف مطلوب');
+      return;
+    }
+    withdrawalMutation.mutate({
+      ...withdrawalForm,
+      agentResellerId: currentSelectedReseller.id,
+      reason: withdrawalForm.reason.trim(),
+      notes: withdrawalForm.notes?.trim() || undefined,
+    });
+  };
+
+  const statusBadge = (request: ExpenseWithdrawalRequest) => {
+    if (Number(request.status) === ExpenseWithdrawalStatus.Approved) {
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+    }
+    if (Number(request.status) === ExpenseWithdrawalStatus.Rejected) {
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+    }
+    return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+  };
+
   const normalizeExpense = (e: OfficeExpense): OfficeExpense => ({
     ...e,
     isPaid: e.isPaid ?? (e as any).isPaid === true,
@@ -277,7 +438,12 @@ const OfficeExpensesPage: React.FC = () => {
               </label>
               <select
                 value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedAgentId(e.target.value);
+                  setSelectedRegionId('');
+                  setSelectedReseller(null);
+                  setWithdrawalsPage(1);
+                }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
               >
                 <option value="">-- اختر الوكيل --</option>
@@ -331,6 +497,101 @@ const OfficeExpensesPage: React.FC = () => {
           </p>
         )}
       </div>
+
+      <section className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-5 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <HandCoins className="h-5 w-5 text-primary-600" />
+            سحب صرفيات من وارد الرسيلر
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            الوارد المعروض هو المتبقي بعد مبالغ الاستلام والتسليم والصرفيات الموافق عليها، ولا يؤثر على جدول الحسابات.
+          </p>
+        </div>
+
+        {withdrawalContextLoading ? (
+          <div className="py-8 text-center text-gray-500">جاري تحميل المناطق...</div>
+        ) : withdrawalRegions.length === 0 ? (
+          <div className="py-8 text-center text-gray-500">لا توجد مناطق أو رسيلرات متاحة.</div>
+        ) : (
+          <>
+            <div className="mb-5">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                اختر المنطقة
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {withdrawalRegions.map((region) => (
+                  <button
+                    key={region.id}
+                    type="button"
+                    onClick={() => handleRegionSelect(region)}
+                    className={`rounded-xl border-2 px-3 py-3 text-right transition-colors ${
+                      selectedRegionId === region.id
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300'
+                    }`}
+                  >
+                    <span className="block font-semibold text-gray-900 dark:text-white">
+                      {region.name}
+                    </span>
+                    <span className="text-xs text-gray-500">{region.resellers.length} رسيلر</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selectedRegion && (
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <Store className="h-4 w-4" />
+                  اختر الرسيلر — {selectedRegion.name}
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {selectedRegion.resellers.map((reseller) => (
+                    <button
+                      key={reseller.id}
+                      type="button"
+                      onClick={() => handleResellerSelect(reseller)}
+                      className={`rounded-xl border-2 px-3 py-3 text-right transition-colors ${
+                        selectedReseller?.id === reseller.id
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-primary-300'
+                      }`}
+                    >
+                      <span className="block font-semibold text-gray-900 dark:text-white">
+                        {reseller.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {currentSelectedReseller && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
+                <div>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                    الوارد الكلي المتاح — {currentSelectedReseller.name}
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200 mt-1">
+                    {formatNumber(currentSelectedReseller.pendingIncomingIqd, { suffix: ' د.ع' })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openWithdrawalModal}
+                  disabled={currentSelectedReseller.pendingIncomingIqd <= 0}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <HandCoins className="h-5 w-5" />
+                  سحب صرفيات
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="wakeel-table-scroll">
@@ -432,6 +693,238 @@ const OfficeExpensesPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <section className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+            سجل طلبات سحب الصرفيات
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            تُخصم القيمة من وارد الرسيلر عند الموافقة فقط.
+          </p>
+        </div>
+        <div className="wakeel-table-scroll">
+          <table className="min-w-[1050px] w-full text-right">
+            <thead>
+              <tr>
+                <th>المنطقة</th>
+                <th>الرسيلر</th>
+                <th>قيمة مبلغ الصرف</th>
+                <th>سبب الصرف</th>
+                <th>تاريخ الصرف</th>
+                <th>ملاحظات</th>
+                <th>بواسطة</th>
+                <th>حالة الطلب</th>
+              </tr>
+            </thead>
+            <tbody>
+              {withdrawalsLoading ? (
+                <tr>
+                  <td colSpan={8} className="py-10 text-center text-gray-500">
+                    جاري تحميل طلبات الصرف...
+                  </td>
+                </tr>
+              ) : withdrawalRequests.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-10 text-center text-gray-500 dark:text-gray-400">
+                    لا توجد طلبات صرف.
+                  </td>
+                </tr>
+              ) : (
+                withdrawalRequests.map((request) => (
+                  <tr key={request.id}>
+                    <td>{request.regionName}</td>
+                    <td>{request.resellerName}</td>
+                    <td className="font-semibold whitespace-nowrap">
+                      {formatNumber(request.amount, { suffix: ' د.ع' })}
+                    </td>
+                    <td>{request.reason}</td>
+                    <td className="whitespace-nowrap">
+                      {formatDate(
+                        request.expenseDate.includes('T')
+                          ? request.expenseDate
+                          : `${request.expenseDate}T00:00:00`
+                      )}
+                    </td>
+                    <td className="max-w-[220px] truncate" title={request.notes ?? ''}>
+                      {request.notes || '—'}
+                    </td>
+                    <td>{request.requestedByUserName}</td>
+                    <td>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusBadge(
+                          request
+                        )}`}
+                      >
+                        {Number(request.status) === ExpenseWithdrawalStatus.Approved ? (
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        ) : Number(request.status) === ExpenseWithdrawalStatus.Rejected ? (
+                          <XCircle className="h-3.5 w-3.5" />
+                        ) : (
+                          <Clock3 className="h-3.5 w-3.5" />
+                        )}
+                        {request.statusLabelAr}
+                      </span>
+                      {!request.whatsAppSent &&
+                        Number(request.status) === ExpenseWithdrawalStatus.Pending && (
+                          <p
+                            className="text-xs text-red-600 dark:text-red-400 mt-1 max-w-[220px]"
+                            title={request.whatsAppError ?? ''}
+                          >
+                            لم تُرسل رسالة واتساب
+                          </p>
+                        )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {(withdrawalRequestsResponse?.totalItems ?? 0) > 0 && (
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <Pagination
+              currentPage={Math.max(1, withdrawalRequestsResponse?.currentPage ?? withdrawalsPage)}
+              totalPages={Math.max(1, withdrawalRequestsResponse?.totalPages ?? 1)}
+              totalItems={withdrawalRequestsResponse?.totalItems ?? 0}
+              pageSize={withdrawalRequestsResponse?.pageSize ?? withdrawalsPageSize}
+              hasNextPage={!!withdrawalRequestsResponse?.hasNextPage}
+              hasPreviousPage={!!withdrawalRequestsResponse?.hasPreviousPage}
+              onPageChange={setWithdrawalsPage}
+              pageSizeOptions={[...STANDARD_PAGE_SIZE_OPTIONS]}
+              onPageSizeChange={(size) => {
+                setWithdrawalsPageSize(size);
+                setWithdrawalsPage(1);
+              }}
+            />
+          </div>
+        )}
+      </section>
+
+      {showWithdrawalModal && currentSelectedReseller && selectedRegion && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  طلب سحب صرفيات
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedRegion.name} — {currentSelectedReseller.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWithdrawalModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleWithdrawalSubmit} className="p-5 space-y-4">
+              <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-3">
+                <span className="text-sm text-emerald-700 dark:text-emerald-300">
+                  الوارد المتاح:
+                </span>{' '}
+                <strong className="text-emerald-800 dark:text-emerald-200">
+                  {formatNumber(currentSelectedReseller.pendingIncomingIqd, { suffix: ' د.ع' })}
+                </strong>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  قيمة مبلغ الصرف *
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={currentSelectedReseller.pendingIncomingIqd}
+                  value={withdrawalForm.amount || ''}
+                  onChange={(e) =>
+                    setWithdrawalForm((previous) => ({
+                      ...previous,
+                      amount: Number(e.target.value) || 0,
+                    }))
+                  }
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  سبب الصرف *
+                </label>
+                <input
+                  type="text"
+                  maxLength={500}
+                  value={withdrawalForm.reason}
+                  onChange={(e) =>
+                    setWithdrawalForm((previous) => ({
+                      ...previous,
+                      reason: e.target.value,
+                    }))
+                  }
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  placeholder="سبب الصرف"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  تاريخ الصرف *
+                </label>
+                <input
+                  type="date"
+                  value={withdrawalForm.expenseDate}
+                  onChange={(e) =>
+                    setWithdrawalForm((previous) => ({
+                      ...previous,
+                      expenseDate: e.target.value,
+                    }))
+                  }
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  ملاحظات
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={1000}
+                  value={withdrawalForm.notes ?? ''}
+                  onChange={(e) =>
+                    setWithdrawalForm((previous) => ({
+                      ...previous,
+                      notes: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                سيُرسل الطلب إلى الرقم +9647701060030، ولن يُخصم المبلغ إلا بعد الموافقة.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawalModal(false)}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={withdrawalMutation.isPending}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:opacity-50"
+                >
+                  {withdrawalMutation.isPending ? 'جاري الإرسال...' : 'إرسال طلب الصرف'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       {showAddModal && (

@@ -2855,6 +2855,46 @@ export interface OfficeExpenseUpdateRequest {
   notes?: string | null;
 }
 
+export enum ExpenseWithdrawalStatus {
+  Pending = 1,
+  Approved = 2,
+  Rejected = 3,
+}
+
+export interface ExpenseWithdrawalRequest {
+  id: string;
+  regionId: string;
+  regionName: string;
+  agentResellerId: string;
+  resellerName: string;
+  requestedByUserId: string;
+  requestedByUserName: string;
+  amount: number;
+  reason: string;
+  expenseDate: string;
+  notes?: string | null;
+  status: ExpenseWithdrawalStatus | number;
+  statusLabelAr: string;
+  whatsAppSent: boolean;
+  whatsAppError?: string | null;
+  createdAt: string;
+  decidedAt?: string | null;
+}
+
+export interface ExpenseWithdrawalCreateRequest {
+  agentResellerId: string;
+  amount: number;
+  reason: string;
+  expenseDate: string;
+  notes?: string;
+}
+
+export interface ExpenseWithdrawalCreateResponse {
+  request: ExpenseWithdrawalRequest;
+  remainingIncomingIqd: number;
+  message: string;
+}
+
 // --- كشف الرواتب (Salary Sheet) ---
 export interface SalaryDeduction {
   id: string;

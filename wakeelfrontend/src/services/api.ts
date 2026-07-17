@@ -121,6 +121,9 @@ import {
   OfficeExpense,
   OfficeExpenseCreateRequest,
   OfficeExpenseUpdateRequest,
+  ExpenseWithdrawalRequest,
+  ExpenseWithdrawalCreateRequest,
+  ExpenseWithdrawalCreateResponse,
   SalarySheetEntry,
   SalarySheetEntryCreateRequest,
   SalarySheetEntryUpdateRequest,
@@ -2808,6 +2811,44 @@ class ApiService {
       isPaid: true,
       paidAt: e?.paidAt ?? e?.PaidAt ?? new Date().toISOString(),
     };
+  }
+
+  async getExpenseWithdrawalContext(agentId?: string): Promise<ReceiptHandoverContext> {
+    const params: Record<string, string> = {};
+    if (agentId) params.agentId = agentId;
+    const response: AxiosResponse<ReceiptHandoverContext> = await this.api.get(
+      '/OfficeExpenses/withdrawal-context',
+      { params }
+    );
+    return response.data;
+  }
+
+  async getExpenseWithdrawalRequests(params?: {
+    agentId?: string;
+    page?: number;
+    pageSize?: number;
+    regionId?: string;
+    resellerId?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<PaginatedResponse<ExpenseWithdrawalRequest>> {
+    const response: AxiosResponse<PaginatedResponse<ExpenseWithdrawalRequest>> =
+      await this.api.get('/OfficeExpenses/withdrawal-requests', { params });
+    return response.data;
+  }
+
+  async createExpenseWithdrawalRequest(
+    data: ExpenseWithdrawalCreateRequest,
+    agentId?: string
+  ): Promise<ExpenseWithdrawalCreateResponse> {
+    const params: Record<string, string> = {};
+    if (agentId) params.agentId = agentId;
+    const response: AxiosResponse<ExpenseWithdrawalCreateResponse> = await this.api.post(
+      '/OfficeExpenses/withdrawal-requests',
+      data,
+      { params }
+    );
+    return response.data;
   }
 
   // --- كشف الرواتب (Salary Sheet) ---
