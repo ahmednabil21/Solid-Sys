@@ -242,6 +242,30 @@ export const DEFAULT_DETAILS_TEMPLATE = `تفاصيل المشترك
 تاريخ التسديد: {{DebtDueDate}}
 رابط التطبيق: ${SUBSCRIBER_INFO_LINK}`;
 
+/** وضع رسالة تنبيه تسديد الدين: افتراضي أو مخصص */
+export type DebtAlertMessageMode = 'default' | 'custom';
+
+/** متغيرات قالب تنبيه تسديد الدين */
+export const DEBT_ALERT_PLACEHOLDERS = [
+  { key: 'SubscriberName', label: 'اسم المشترك', token: '{{SubscriberName}}' },
+  { key: 'PhoneNumber', label: 'رقم الهاتف', token: '{{PhoneNumber}}' },
+  { key: 'ProfileName', label: 'الباقة', token: '{{ProfileName}}' },
+  { key: 'ActivationDate', label: 'تاريخ التفعيل', token: '{{ActivationDate}}' },
+  { key: 'AgentCompanyName', label: 'اسم الشركة', token: '{{AgentCompanyName}}' },
+  { key: 'TotalAmount', label: 'المبلغ الإجمالي (باقة + أجور)', token: '{{TotalAmount}}' },
+  { key: 'PaidAmount', label: 'المبلغ المدفوع', token: '{{PaidAmount}}' },
+  { key: 'DebtAmount', label: 'مبلغ الدين', token: '{{DebtAmount}}' },
+  { key: 'DebtDueDate', label: 'تاريخ التسديد', token: '{{DebtDueDate}}' },
+] as const;
+
+/** القالب الافتراضي لرسالة تنبيه تسديد الدين */
+export const DEFAULT_DEBT_ALERT_TEMPLATE = `يرجى تسديد الدين
+المبلغ الإجمالي: {{TotalAmount}}
+المبلغ المدفوع: {{PaidAmount}}
+مبلغ الدين: {{DebtAmount}}
+تاريخ التسديد: {{DebtDueDate}}
+تاريخ التفعيل: {{ActivationDate}}`;
+
 /**
  * يبني رسالة التنبيه من القالب
  * (يدعم SubscriberName, ExpirationDate, DaysUntilExpiry, AgentCompanyName, CompanyName).

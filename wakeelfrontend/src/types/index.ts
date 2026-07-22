@@ -262,6 +262,7 @@ export interface SystemMessageCreateRequest {
 /** استجابة رسالة التفعيل أو التنبيه (قالب من الباكند) */
 export interface MessageTemplateResponse {
   template: string;
+  regionId?: string | null;
 }
 
 // SAS provider sync

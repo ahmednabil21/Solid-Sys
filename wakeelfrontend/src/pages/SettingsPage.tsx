@@ -16,9 +16,12 @@ import {
   DEFAULT_ACTIVATION_TEMPLATE,
   DETAILS_PLACEHOLDERS,
   DEFAULT_DETAILS_TEMPLATE,
+  DEBT_ALERT_PLACEHOLDERS,
+  DEFAULT_DEBT_ALERT_TEMPLATE,
   type ActivationMessageMode,
   type AlertMessageMode,
   type DetailsMessageMode,
+  type DebtAlertMessageMode,
 } from '../utils/activationMessage';
 import { showSuccess, showError } from '../utils/notifications';
 import { apiService, ApiService } from '../services/api';
@@ -127,6 +130,7 @@ function SettingsPage() {
   const activationTemplateRef = useRef<HTMLTextAreaElement>(null);
   const alertTemplateRef = useRef<HTMLTextAreaElement>(null);
   const detailsTemplateRef = useRef<HTMLTextAreaElement>(null);
+  const debtAlertTemplateRef = useRef<HTMLTextAreaElement>(null);
   const [activationMessageMode, setActivationMessageMode] = useState<ActivationMessageMode>('default');
   const [activationTemplate, setActivationTemplate] = useState('');
   const [activationCustomText, setActivationCustomText] = useState('');
@@ -134,6 +138,9 @@ function SettingsPage() {
   const [alertTemplate, setAlertTemplate] = useState('');
   const [detailsMessageMode, setDetailsMessageMode] = useState<DetailsMessageMode>('default');
   const [detailsTemplate, setDetailsTemplate] = useState(DEFAULT_DETAILS_TEMPLATE);
+  const [debtAlertMessageMode, setDebtAlertMessageMode] = useState<DebtAlertMessageMode>('default');
+  const [debtAlertTemplate, setDebtAlertTemplate] = useState(DEFAULT_DEBT_ALERT_TEMPLATE);
+  const [templateRegionId, setTemplateRegionId] = useState('');
   const [sasSyncLoading] = useState(false);
   const [sasSyncStepIndex, setSasSyncStepIndex] = useState(0);
   const sasSyncStepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -373,29 +380,36 @@ function SettingsPage() {
   });
 
   const { data: activationMessageData } = useQuery({
-    queryKey: ['activationMessage'],
-    queryFn: () => apiService.getActivationMessage(),
+    queryKey: ['activationMessage', templateRegionId],
+    queryFn: () => apiService.getActivationMessage(templateRegionId),
+    enabled: Boolean(templateRegionId),
   });
   const { data: alertMessageData } = useQuery({
-    queryKey: ['alertMessage'],
-    queryFn: () => apiService.getAlertMessage(),
+    queryKey: ['alertMessage', templateRegionId],
+    queryFn: () => apiService.getAlertMessage(templateRegionId),
+    enabled: Boolean(templateRegionId),
   });
   const { data: detailsMessageData } = useQuery({
-    queryKey: ['detailsMessage'],
-    queryFn: () => apiService.getDetailsMessage(),
+    queryKey: ['detailsMessage', templateRegionId],
+    queryFn: () => apiService.getDetailsMessage(templateRegionId),
+    enabled: Boolean(templateRegionId),
+  });
+  const { data: debtAlertMessageData } = useQuery({
+    queryKey: ['debtAlertMessage', templateRegionId],
+    queryFn: () => apiService.getDebtAlertMessage(templateRegionId),
+    enabled: Boolean(templateRegionId),
   });
 
   useEffect(() => {
-    if (activationMessageData?.template != null) {
+    if (activationMessageData?.template != null && activationMessageData.template.trim()) {
       setActivationTemplate(activationMessageData.template);
       setActivationMessageMode('custom');
     } else if (activationMessageData === null) {
-      const saved = getActivationMessageSettings(user?.id);
-      setActivationMessageMode(saved.mode);
-      setActivationTemplate(saved.template || '');
-      setActivationCustomText(saved.customText);
+      setActivationMessageMode('default');
+      setActivationTemplate(DEFAULT_ACTIVATION_TEMPLATE);
+      setActivationCustomText('');
     }
-  }, [activationMessageData, user?.id]);
+  }, [activationMessageData, templateRegionId]);
 
   useEffect(() => {
     if (alertMessageData?.template != null && alertMessageData.template.trim()) {
@@ -405,7 +419,7 @@ function SettingsPage() {
       setAlertMessageMode('default');
       setAlertTemplate(DEFAULT_ALERT_TEMPLATE);
     }
-  }, [alertMessageData]);
+  }, [alertMessageData, templateRegionId]);
 
   useEffect(() => {
     const tpl = (detailsMessageData?.template || '').trim();
@@ -421,7 +435,23 @@ function SettingsPage() {
       setDetailsMessageMode('default');
       setDetailsTemplate(DEFAULT_DETAILS_TEMPLATE);
     }
-  }, [detailsMessageData]);
+  }, [detailsMessageData, templateRegionId]);
+
+  useEffect(() => {
+    const tpl = (debtAlertMessageData?.template || '').trim();
+    if (tpl) {
+      if (tpl === DEFAULT_DEBT_ALERT_TEMPLATE.trim()) {
+        setDebtAlertMessageMode('default');
+        setDebtAlertTemplate(DEFAULT_DEBT_ALERT_TEMPLATE);
+      } else {
+        setDebtAlertMessageMode('custom');
+        setDebtAlertTemplate(debtAlertMessageData!.template);
+      }
+    } else {
+      setDebtAlertMessageMode('default');
+      setDebtAlertTemplate(DEFAULT_DEBT_ALERT_TEMPLATE);
+    }
+  }, [debtAlertMessageData, templateRegionId]);
 
   const insertPlaceholder = (token: string) => {
     const el = activationTemplateRef.current;
@@ -474,12 +504,30 @@ function SettingsPage() {
     }
   };
 
+  const insertDebtAlertPlaceholder = (token: string) => {
+    const el = debtAlertTemplateRef.current;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const before = debtAlertTemplate.slice(0, start);
+      const after = debtAlertTemplate.slice(end);
+      setDebtAlertTemplate(before + token + after);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + token.length, start + token.length);
+      }, 0);
+    } else {
+      setDebtAlertTemplate((prev) => prev + token);
+    }
+  };
+
   type SettingsSection =
     | 'profile'
     | 'theme'
     | 'activation'
     | 'alert'
     | 'details'
+    | 'debtAlert'
     | 'customMessage'
     | 'resellers'
     | 'serviceFees'
@@ -720,7 +768,7 @@ function SettingsPage() {
   const { data: myRegions = [], isLoading: regionsLoading } = useQuery<AgentRegion[]>({
     queryKey: ['myRegions'],
     queryFn: () => apiService.getMyRegions(true),
-    enabled: isAgentOrSubAgent,
+    enabled: isAgentOrSubAgentOrEmployee,
   });
   const [regionFormId, setRegionFormId] = useState<string | null>(null);
   const [showRegionForm, setShowRegionForm] = useState(false);
@@ -743,6 +791,15 @@ function SettingsPage() {
       setWaSelectedRegionId(myRegions[0].id);
     }
   }, [myRegions, waSelectedRegionId]);
+  useEffect(() => {
+    if (!templateRegionId && myRegions.length > 0) {
+      setTemplateRegionId(myRegions[0].id);
+    } else if (templateRegionId && myRegions.length > 0 && !myRegions.some((r) => r.id === templateRegionId)) {
+      setTemplateRegionId(myRegions[0].id);
+    } else if (myRegions.length === 0) {
+      setTemplateRegionId('');
+    }
+  }, [myRegions, templateRegionId]);
 
   const waSelectedRegion = myRegions.find((r) => r.id === waSelectedRegionId) ?? null;
   // مودال إعلان مميز أثناء سحب المشتركين من SAS في الخلفية (يُعرض عند انتهاء مهلة الاتصال لمدة 5 دقائق كحد أقصى)
@@ -1390,13 +1447,14 @@ function SettingsPage() {
 
   const [customMessageTemplate, setCustomMessageTemplate] = useState('');
   const { data: customMessageData } = useQuery({
-    queryKey: ['customMessage'],
-    queryFn: () => apiService.getCustomMessage(),
-    enabled: isAgentOrSubAgent,
+    queryKey: ['customMessage', templateRegionId],
+    queryFn: () => apiService.getCustomMessage(templateRegionId),
+    enabled: isAgentOrSubAgent && Boolean(templateRegionId),
   });
   useEffect(() => {
     if (customMessageData?.template != null) setCustomMessageTemplate(customMessageData.template);
-  }, [customMessageData]);
+    else if (customMessageData === null) setCustomMessageTemplate('');
+  }, [customMessageData, templateRegionId]);
 
   useEffect(() => {
     if (!sasSyncLoading) {
@@ -1419,28 +1477,35 @@ function SettingsPage() {
   }, [sasSyncLoading]);
 
   const saveActivationMutation = useMutation({
-    mutationFn: (template: string) => apiService.setActivationMessage(template),
+    mutationFn: (template: string) => apiService.setActivationMessage(template, templateRegionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activationMessage'] });
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
   const saveAlertMutation = useMutation({
-    mutationFn: (template: string) => apiService.setAlertMessage(template),
+    mutationFn: (template: string) => apiService.setAlertMessage(template, templateRegionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alertMessage'] });
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
   const saveDetailsMutation = useMutation({
-    mutationFn: (template: string) => apiService.setDetailsMessage(template),
+    mutationFn: (template: string) => apiService.setDetailsMessage(template, templateRegionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['detailsMessage'] });
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
+  const saveDebtAlertMutation = useMutation({
+    mutationFn: (template: string) => apiService.setDebtAlertMessage(template, templateRegionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['debtAlertMessage'] });
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
   const saveCustomMessageMutation = useMutation({
-    mutationFn: (template: string) => apiService.setCustomMessage(template),
+    mutationFn: (template: string) => apiService.setCustomMessage(template, templateRegionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customMessage'] });
       showSuccess('تم الحفظ', 'تم حفظ قالب رسالة خاصة بنجاح.');
@@ -1449,6 +1514,10 @@ function SettingsPage() {
   });
 
   const handleSaveSettings = async () => {
+    if (!templateRegionId) {
+      showError('خطأ', 'اختر المنطقة أولاً، أو أضف منطقة من قسم الرسيلرز والروابط.');
+      return;
+    }
     setIsLoading(true);
     setActivationMessageSettings(user?.id ?? '', {
       mode: activationMessageMode,
@@ -1486,18 +1555,30 @@ function SettingsPage() {
         return out;
       };
 
-      if (activationMessageMode === 'custom' && activationTemplate.trim()) {
-        const tpl = normalizeActivationTemplateForBackend(activationTemplate.trim(), activationCustomText.trim());
-        await saveActivationMutation.mutateAsync(tpl);
+      if (activeSection === 'activation') {
+        if (activationMessageMode === 'custom' && activationTemplate.trim()) {
+          const tpl = normalizeActivationTemplateForBackend(activationTemplate.trim(), activationCustomText.trim());
+          await saveActivationMutation.mutateAsync(tpl);
+        } else if (activationMessageMode === 'default') {
+          await saveActivationMutation.mutateAsync(DEFAULT_ACTIVATION_TEMPLATE);
+        }
       }
-      if (alertMessageMode === 'custom' && alertTemplate.trim()) {
-        await saveAlertMutation.mutateAsync(alertTemplate.trim());
+      if (activeSection === 'alert') {
+        if (alertMessageMode === 'custom' && alertTemplate.trim()) {
+          await saveAlertMutation.mutateAsync(alertTemplate.trim());
+        } else if (alertMessageMode === 'default') {
+          await saveAlertMutation.mutateAsync(DEFAULT_ALERT_TEMPLATE);
+        }
       }
       if (activeSection === 'details') {
         const tpl = detailsMessageMode === 'custom' ? detailsTemplate.trim() : DEFAULT_DETAILS_TEMPLATE.trim();
         await saveDetailsMutation.mutateAsync(tpl);
       }
-      showSuccess('تم الحفظ', 'تم حفظ الإعدادات بنجاح.');
+      if (activeSection === 'debtAlert') {
+        const tpl = debtAlertMessageMode === 'custom' ? debtAlertTemplate.trim() : DEFAULT_DEBT_ALERT_TEMPLATE.trim();
+        await saveDebtAlertMutation.mutateAsync(tpl);
+      }
+      showSuccess('تم الحفظ', 'تم حفظ إعدادات القالب للمنطقة المحددة بنجاح.');
     } catch (_) {
       // Errors already shown by mutation onError
     } finally {
@@ -1852,8 +1933,29 @@ function SettingsPage() {
               </h2>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              اختر إما الرسالة الافتراضية (المُستخدمة في النظام) أو صياغة رسالة مخصصة تُرسل للمشترك عند التفعيل (مثلاً عبر واتساب).
+              اختر المنطقة أولاً ثم عدّل قالب رسالة التفعيل الخاص بها (مثل رقم واتساب لكل منطقة).
             </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
+              {regionsLoading ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400">جاري تحميل المناطق...</div>
+              ) : (
+                <select
+                  value={templateRegionId}
+                  onChange={(e) => setTemplateRegionId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                >
+                  {myRegions.length === 0 ? (
+                    <option value="">— أضف منطقة أولاً من الرسيلرز والروابط —</option>
+                  ) : (
+                    myRegions.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))
+                  )}
+                </select>
+              )}
+            </div>
+            {templateRegionId && (
             <div className="space-y-4">
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1925,6 +2027,7 @@ function SettingsPage() {
                 </>
               )}
             </div>
+            )}
           </div>
           )}
 
@@ -1938,8 +2041,29 @@ function SettingsPage() {
               </h2>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              قالب الرسالة المُرسلة عند اختيار «رسالة تنبيه الاشتراك» من إجراءات المشتركين. اختر الافتراضية أو صياغة مخصصة.
+              اختر المنطقة ثم عدّل قالب تنبيه انتهاء الاشتراك الخاص بها.
             </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
+              {regionsLoading ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400">جاري تحميل المناطق...</div>
+              ) : (
+                <select
+                  value={templateRegionId}
+                  onChange={(e) => setTemplateRegionId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                >
+                  {myRegions.length === 0 ? (
+                    <option value="">— أضف منطقة أولاً من الرسيلرز والروابط —</option>
+                  ) : (
+                    myRegions.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))
+                  )}
+                </select>
+              )}
+            </div>
+            {templateRegionId && (
             <div className="space-y-4">
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1999,6 +2123,7 @@ function SettingsPage() {
                 </>
               )}
             </div>
+            )}
           </div>
           )}
 
@@ -2012,9 +2137,30 @@ function SettingsPage() {
                 </h2>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                قالب الرسالة المُرسلة عند اختيار «إرسال دين او التفاصيل». يمكنك استخدام القالب الافتراضي أو كتابة قالب مخصص.
+                اختر المنطقة ثم عدّل قالب رسالة الدين أو التفاصيل الخاص بها.
               </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
+                {regionsLoading ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">جاري تحميل المناطق...</div>
+                ) : (
+                  <select
+                    value={templateRegionId}
+                    onChange={(e) => setTemplateRegionId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    {myRegions.length === 0 ? (
+                      <option value="">— أضف منطقة أولاً من الرسيلرز والروابط —</option>
+                    ) : (
+                      myRegions.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))
+                    )}
+                  </select>
+                )}
+              </div>
 
+              {templateRegionId && (
               <div className="space-y-4">
                 <div className="flex gap-6">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -2072,6 +2218,102 @@ function SettingsPage() {
                   />
                 </div>
               </div>
+              )}
+            </div>
+          )}
+
+          {/* رسالة تنبيه تسديد الدين */}
+          {activeSection === 'debtAlert' && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex items-center space-x-3 mb-6">
+                <MessageSquare className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  رسالة تنبيه تسديد الدين
+                </h2>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                اختر المنطقة ثم عدّل قالب تنبيه تسديد الدين (يُستخدم من صفحة الديون).
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
+                {regionsLoading ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">جاري تحميل المناطق...</div>
+                ) : (
+                  <select
+                    value={templateRegionId}
+                    onChange={(e) => setTemplateRegionId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    {myRegions.length === 0 ? (
+                      <option value="">— أضف منطقة أولاً من الرسيلرز والروابط —</option>
+                    ) : (
+                      myRegions.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))
+                    )}
+                  </select>
+                )}
+              </div>
+
+              {templateRegionId && (
+              <div className="space-y-4">
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="debtAlertMessageMode"
+                      checked={debtAlertMessageMode === 'default'}
+                      onChange={() => setDebtAlertMessageMode('default')}
+                      className="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700 dark:text-gray-300">الرسالة الافتراضية</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="debtAlertMessageMode"
+                      checked={debtAlertMessageMode === 'custom'}
+                      onChange={() => setDebtAlertMessageMode('custom')}
+                      className="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-gray-700 dark:text-gray-300">رسالة مخصصة</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    إدراج عناصر في الرسالة
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {DEBT_ALERT_PLACEHOLDERS.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => insertDebtAlertPlaceholder(p.token)}
+                        className="px-3 py-1.5 text-sm rounded-md bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    نص رسالة تنبيه تسديد الدين
+                  </label>
+                  <textarea
+                    ref={debtAlertTemplateRef}
+                    value={debtAlertMessageMode === 'custom' ? debtAlertTemplate : DEFAULT_DEBT_ALERT_TEMPLATE}
+                    onChange={(e) => setDebtAlertTemplate(e.target.value)}
+                    rows={8}
+                    placeholder={DEFAULT_DEBT_ALERT_TEMPLATE}
+                    disabled={debtAlertMessageMode !== 'custom'}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-70"
+                  />
+                </div>
+              </div>
+              )}
             </div>
           )}
 
@@ -2344,7 +2586,7 @@ function SettingsPage() {
             <ActivationExcelImportSection />
           )}
 
-          {/* قالب رسالة خاصة — للوكيل/الموظف، يُرسل كما هو لأي مشترك بدون مكانات */}
+          {/* قالب رسالة خاصة — حسب المنطقة، يُرسل كما هو لأي مشترك بدون مكانات */}
           {isAgentOrSubAgent && activeSection === 'customMessage' && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center space-x-3 mb-6">
@@ -2354,8 +2596,30 @@ function SettingsPage() {
                 </h2>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                نص واحد لكل وكيل (حتى 2000 حرف). يُرسل كما هو لأي مشترك عبر واتساب بدون تعبئة مكانات (مثل التفعيل أو التنبيه). احفظ القالب ثم اختر «إرسال رسالة حر» من إجراءات المشترك.
+                اختر المنطقة ثم احفظ نصاً خاصاً بها (حتى 2000 حرف). يُرسل كما هو لأي مشترك عبر واتساب بدون تعبئة مكانات. احفظ القالب ثم اختر «إرسال رسالة حر» من إجراءات المشترك.
               </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
+                {regionsLoading ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">جاري تحميل المناطق...</div>
+                ) : (
+                  <select
+                    value={templateRegionId}
+                    onChange={(e) => setTemplateRegionId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    {myRegions.length === 0 ? (
+                      <option value="">— أضف منطقة أولاً من الرسيلرز والروابط —</option>
+                    ) : (
+                      myRegions.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))
+                    )}
+                  </select>
+                )}
+              </div>
+              {templateRegionId && (
+              <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   نص القالب
@@ -2375,14 +2639,22 @@ function SettingsPage() {
               <div className="flex justify-end mt-4">
                 <button
                   type="button"
-                  onClick={() => saveCustomMessageMutation.mutate(customMessageTemplate)}
-                  disabled={saveCustomMessageMutation.isPending}
+                  onClick={() => {
+                    if (!templateRegionId) {
+                      showError('خطأ', 'اختر المنطقة أولاً.');
+                      return;
+                    }
+                    saveCustomMessageMutation.mutate(customMessageTemplate);
+                  }}
+                  disabled={saveCustomMessageMutation.isPending || !templateRegionId}
                   className="flex items-center space-x-2 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
                   <span>{saveCustomMessageMutation.isPending ? 'جاري الحفظ...' : 'حفظ القالب'}</span>
                 </button>
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -3879,12 +4151,12 @@ function SettingsPage() {
             </div>
           )}
 
-          {/* زر الحفظ — يظهر عند رسائل الوكيل */}
-          {(activeSection === 'activation' || activeSection === 'alert' || activeSection === 'details') && (
+          {/* زر الحفظ — يظهر عند رسائل الوكيل حسب المنطقة */}
+          {(activeSection === 'activation' || activeSection === 'alert' || activeSection === 'details' || activeSection === 'debtAlert') && (
             <div className="flex justify-end mt-4">
               <button
                 onClick={handleSaveSettings}
-                disabled={isLoading}
+                disabled={isLoading || !templateRegionId}
                 className="flex items-center space-x-2 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
@@ -3957,6 +4229,18 @@ function SettingsPage() {
               >
                 <MessageSquare className="h-5 w-5 flex-shrink-0" />
                 <span>رسالة الدين او التفاصيل</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection('debtAlert')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                  activeSection === 'debtAlert'
+                    ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <MessageSquare className="h-5 w-5 flex-shrink-0" />
+                <span>رسالة تنبيه تسديد الدين</span>
               </button>
               {isAgentOrSubAgent && (
                 <button

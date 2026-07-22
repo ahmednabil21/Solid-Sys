@@ -3546,9 +3546,11 @@ class ApiService {
   }
 
   // رسالة التفعيل (Activation Message) - للوكيل الحالي
-  async getActivationMessage(): Promise<MessageTemplateResponse | null> {
+  async getActivationMessage(regionId: string): Promise<MessageTemplateResponse | null> {
     try {
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/ActivationMessage');
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/ActivationMessage', {
+        params: { regionId },
+      });
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;
@@ -3556,24 +3558,34 @@ class ApiService {
     }
   }
 
-  async setActivationMessage(template: string): Promise<MessageTemplateResponse> {
+  async setActivationMessage(template: string, regionId: string): Promise<MessageTemplateResponse> {
     try {
-      await this.getActivationMessage();
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put('/ActivationMessage', { template });
+      await this.getActivationMessage(regionId);
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put(
+        '/ActivationMessage',
+        { template },
+        { params: { regionId } }
+      );
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post('/ActivationMessage', { template });
+        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post(
+          '/ActivationMessage',
+          { template },
+          { params: { regionId } }
+        );
         return response.data;
       }
       throw err;
     }
   }
 
-  // رسالة التنبيه (Alert Message) - للوكيل الحالي
-  async getAlertMessage(): Promise<MessageTemplateResponse | null> {
+  // رسالة التنبيه (Alert Message) - حسب المنطقة
+  async getAlertMessage(regionId: string): Promise<MessageTemplateResponse | null> {
     try {
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/AlertMessage');
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/AlertMessage', {
+        params: { regionId },
+      });
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;
@@ -3581,14 +3593,22 @@ class ApiService {
     }
   }
 
-  async setAlertMessage(template: string): Promise<MessageTemplateResponse> {
+  async setAlertMessage(template: string, regionId: string): Promise<MessageTemplateResponse> {
     try {
-      await this.getAlertMessage();
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put('/AlertMessage', { template });
+      await this.getAlertMessage(regionId);
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put(
+        '/AlertMessage',
+        { template },
+        { params: { regionId } }
+      );
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post('/AlertMessage', { template });
+        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post(
+          '/AlertMessage',
+          { template },
+          { params: { regionId } }
+        );
         return response.data;
       }
       throw err;
@@ -3596,18 +3616,20 @@ class ApiService {
   }
 
   // alias (older frontend code): keep names but use correct backend endpoint
-  async getDetailsMessage(): Promise<MessageTemplateResponse | null> {
-    return await this.getSubscriberDetailsMessage();
+  async getDetailsMessage(regionId: string): Promise<MessageTemplateResponse | null> {
+    return await this.getSubscriberDetailsMessage(regionId);
   }
 
-  async setDetailsMessage(template: string): Promise<MessageTemplateResponse> {
-    return await this.setSubscriberDetailsMessage(template);
+  async setDetailsMessage(template: string, regionId: string): Promise<MessageTemplateResponse> {
+    return await this.setSubscriberDetailsMessage(template, regionId);
   }
 
-  // رسالة تفاصيل المشترك (Subscriber Details Message) - للوكيل الحالي
-  async getSubscriberDetailsMessage(): Promise<MessageTemplateResponse | null> {
+  // رسالة تفاصيل المشترك (Subscriber Details Message) - حسب المنطقة
+  async getSubscriberDetailsMessage(regionId: string): Promise<MessageTemplateResponse | null> {
     try {
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/SubscriberDetailsMessage');
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/SubscriberDetailsMessage', {
+        params: { regionId },
+      });
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;
@@ -3615,24 +3637,34 @@ class ApiService {
     }
   }
 
-  async setSubscriberDetailsMessage(template: string): Promise<MessageTemplateResponse> {
+  async setSubscriberDetailsMessage(template: string, regionId: string): Promise<MessageTemplateResponse> {
     try {
-      await this.getSubscriberDetailsMessage();
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put('/SubscriberDetailsMessage', { template });
+      await this.getSubscriberDetailsMessage(regionId);
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put(
+        '/SubscriberDetailsMessage',
+        { template },
+        { params: { regionId } }
+      );
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post('/SubscriberDetailsMessage', { template });
+        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post(
+          '/SubscriberDetailsMessage',
+          { template },
+          { params: { regionId } }
+        );
         return response.data;
       }
       throw err;
     }
   }
 
-  /** قالب رسالة خاصة — قالب واحد لكل وكيل (حتى 2000 حرف)، يُرسل كما هو بدون مكانات */
-  async getCustomMessage(): Promise<MessageTemplateResponse | null> {
+  /** رسالة تنبيه تسديد الدين — حسب المنطقة */
+  async getDebtAlertMessage(regionId: string): Promise<MessageTemplateResponse | null> {
     try {
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/CustomMessage');
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/DebtAlertMessage', {
+        params: { regionId },
+      });
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;
@@ -3640,14 +3672,57 @@ class ApiService {
     }
   }
 
-  async setCustomMessage(template: string): Promise<MessageTemplateResponse> {
+  async setDebtAlertMessage(template: string, regionId: string): Promise<MessageTemplateResponse> {
     try {
-      await this.getCustomMessage();
-      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put('/CustomMessage', { template });
+      await this.getDebtAlertMessage(regionId);
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put(
+        '/DebtAlertMessage',
+        { template },
+        { params: { regionId } }
+      );
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post('/CustomMessage', { template });
+        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post(
+          '/DebtAlertMessage',
+          { template },
+          { params: { regionId } }
+        );
+        return response.data;
+      }
+      throw err;
+    }
+  }
+
+  /** قالب رسالة خاصة — حسب المنطقة (حتى 2000 حرف)، يُرسل كما هو بدون مكانات */
+  async getCustomMessage(regionId: string): Promise<MessageTemplateResponse | null> {
+    try {
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.get('/CustomMessage', {
+        params: { regionId },
+      });
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }
+  }
+
+  async setCustomMessage(template: string, regionId: string): Promise<MessageTemplateResponse> {
+    try {
+      await this.getCustomMessage(regionId);
+      const response: AxiosResponse<MessageTemplateResponse> = await this.api.put(
+        '/CustomMessage',
+        { template },
+        { params: { regionId } }
+      );
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        const response: AxiosResponse<MessageTemplateResponse> = await this.api.post(
+          '/CustomMessage',
+          { template },
+          { params: { regionId } }
+        );
         return response.data;
       }
       throw err;

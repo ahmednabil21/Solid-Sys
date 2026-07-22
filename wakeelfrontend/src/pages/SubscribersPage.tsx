@@ -2994,14 +2994,20 @@ const SubscribersPage: React.FC = () => {
           return withoutNoise.length === 0;
         };
 
-        const current = await apiService.getActivationMessage();
-        const currentTpl = (current?.template || '').trim();
-        if (!currentTpl) {
-          await apiService.setActivationMessage(DEFAULT_ACTIVATION_TEMPLATE);
-        } else if (isBarePlaceholdersTemplate(currentTpl)) {
-          await apiService.setActivationMessage(DEFAULT_ACTIVATION_TEMPLATE);
-        } else if (/\{\{\s*subscriber(Name|Phone)\s*\}\}|\{\{\s*activationDate\s*\}\}|\{\{\s*expirationDate\s*\}\}|\{\{\s*companyName\s*\}\}/i.test(currentTpl)) {
-          await apiService.setActivationMessage(normalizeActivationTemplateForBackend(currentTpl));
+        const regionId =
+          (receipt as { regionId?: string })?.regionId ||
+          (subscribers as { id: string; regionId?: string }[] | undefined)?.find((s) => s.id === subscriberId)?.regionId ||
+          '';
+        if (regionId) {
+          const current = await apiService.getActivationMessage(regionId);
+          const currentTpl = (current?.template || '').trim();
+          if (!currentTpl) {
+            await apiService.setActivationMessage(DEFAULT_ACTIVATION_TEMPLATE, regionId);
+          } else if (isBarePlaceholdersTemplate(currentTpl)) {
+            await apiService.setActivationMessage(DEFAULT_ACTIVATION_TEMPLATE, regionId);
+          } else if (/\{\{\s*subscriber(Name|Phone)\s*\}\}|\{\{\s*activationDate\s*\}\}|\{\{\s*expirationDate\s*\}\}|\{\{\s*companyName\s*\}\}/i.test(currentTpl)) {
+            await apiService.setActivationMessage(normalizeActivationTemplateForBackend(currentTpl), regionId);
+          }
         }
       } catch {
         // ignore template fix errors
@@ -3037,8 +3043,13 @@ const SubscribersPage: React.FC = () => {
       const msg = ApiService.showError(err);
       if (/لا يوجد قالب لرسالة تفاصيل المشترك/.test(msg)) {
         try {
+          const regionId = subscriber.regionId;
+          if (!regionId) {
+            showError('إرسال تفاصيل المشترك', 'المشترك غير مرتبط بمنطقة. عيّن منطقة للمشترك أولاً.');
+            return;
+          }
           showInfo('إرسال دين او التفاصيل', 'لا يوجد قالب تفاصيل. سيتم إنشاء القالب الافتراضي تلقائياً ثم إعادة الإرسال...');
-          await apiService.setDetailsMessage(DEFAULT_DETAILS_TEMPLATE);
+          await apiService.setDetailsMessage(DEFAULT_DETAILS_TEMPLATE, regionId);
           await apiService.sendWhatsAppDetails(subscriber.id);
           showSuccess('إرسال تفاصيل المشترك', 'تم إنشاء القالب الافتراضي وإرسال رسالة الدين او التفاصيل بنجاح.');
           return;
@@ -3071,8 +3082,15 @@ const SubscribersPage: React.FC = () => {
       const msg = ApiService.showError(err);
       if (/لا يوجد قالب لرسالة تفاصيل المشترك/.test(msg)) {
         try {
+          const regionId =
+            (subscribers as { id: string; regionId?: string }[] | undefined)?.find((s) => s.id === subscriberId)?.regionId ||
+            '';
+          if (!regionId) {
+            showError('إرسال تفاصيل المشترك', 'المشترك غير مرتبط بمنطقة. عيّن منطقة للمشترك أولاً.');
+            return;
+          }
           showInfo('إرسال دين او التفاصيل', 'لا يوجد قالب تفاصيل. سيتم إنشاء القالب الافتراضي تلقائياً ثم إعادة الإرسال...');
-          await apiService.setDetailsMessage(DEFAULT_DETAILS_TEMPLATE);
+          await apiService.setDetailsMessage(DEFAULT_DETAILS_TEMPLATE, regionId);
           await apiService.sendWhatsAppDetails(subscriberId);
           showSuccess('إرسال تفاصيل المشترك', 'تم إنشاء القالب الافتراضي وإرسال رسالة الدين او التفاصيل بنجاح.');
           return;
