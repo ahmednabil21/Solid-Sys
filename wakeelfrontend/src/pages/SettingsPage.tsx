@@ -8,7 +8,6 @@ import SubscriberPhonesUpdateSection from '../components/SubscriberPhonesUpdateS
 import SubscriberExcelImportSection from '../components/SubscriberExcelImportSection';
 import ActivationExcelImportSection from '../components/ActivationExcelImportSection';
 import {
-  getActivationMessageSettings,
   setActivationMessageSettings,
   PLACEHOLDERS,
   ALERT_PLACEHOLDERS,
