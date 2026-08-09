@@ -4,14 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { StatCard } from '../components/StatCard';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import IraqSubAgentsMap from '../components/IraqSubAgentsMap';
+import { DashboardCharts, DashboardSubscriberAnalytics } from '../components/dashboard/DashboardCharts';
 import {
   DashboardCreditBalanceCard,
-  DashboardFinancialSummary,
+  DashboardDebtInsights,
   DashboardHeader,
+  DashboardOperationalOverview,
   DashboardRecentActivationsTable,
   DashboardRecentTasksTable,
   DashboardRegionResellerFilters,
-  DashboardSubscriberChart,
   DashboardSummaryAmounts,
 } from '../components/dashboard/DashboardWidgets';
 import { apiService, ApiService } from '../services/api';
@@ -43,6 +44,8 @@ import {
   AgentRegion,
   RenewalReceipt,
   EmployeeTask,
+  ActivationPaymentMethod,
+  Subscriber,
 } from '../types';
 import { 
   Users, 
@@ -79,6 +82,25 @@ function getBaghdadDateDaysAgo(days: number): string {
   const date = new Date(Date.UTC(y, m - 1, d));
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10);
+}
+
+function getPreviousDateRange(fromDate: string, toDate: string): { fromDate: string; toDate: string } {
+  const from = new Date(`${fromDate}T00:00:00Z`);
+  const to = new Date(`${toDate}T00:00:00Z`);
+  const rangeDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1);
+  const previousTo = new Date(from);
+  previousTo.setUTCDate(previousTo.getUTCDate() - 1);
+  const previousFrom = new Date(previousTo);
+  previousFrom.setUTCDate(previousFrom.getUTCDate() - rangeDays + 1);
+  return {
+    fromDate: previousFrom.toISOString().slice(0, 10),
+    toDate: previousTo.toISOString().slice(0, 10),
+  };
+}
+
+function getChangePercent(current: number, previous: number): number | undefined {
+  if (!previous) return undefined;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 function canAccessAccountsSummary(role?: UserRole, canAccessAccounts?: boolean): boolean {
@@ -237,19 +259,21 @@ const DashboardPage: React.FC = () => {
     refetchInterval: 30000,
   });
 
-  const { data: recentReceiptsData } = useQuery<{ receipts: RenewalReceipt[] }>({
+  const { data: recentReceiptsData, isLoading: recentActivationsLoading } = useQuery<{ receipts: RenewalReceipt[] }>({
     queryKey: [
       'dashboard-recent-receipts',
       regionResellerFilter.regionId || null,
       regionResellerFilter.resellerId || null,
+      appliedIncomingFromDate || null,
+      appliedIncomingToDate || null,
       isAdmin ? selectedAgentId : 'me',
     ],
     queryFn: async () => {
       const res = await apiService.getRenewalReceipts(
         1,
         5,
-        undefined,
-        undefined,
+        appliedIncomingFromDate || undefined,
+        appliedIncomingToDate || undefined,
         regionResellerFilter.resellerId,
         regionResellerFilter.regionId
       );
@@ -263,6 +287,10 @@ const DashboardPage: React.FC = () => {
 
   const dashboardAccountsFromDate = appliedIncomingFromDate || getBaghdadDateDaysAgo(30);
   const dashboardAccountsToDate = appliedIncomingToDate || getBaghdadToday();
+  const previousDashboardPeriod = useMemo(
+    () => getPreviousDateRange(dashboardAccountsFromDate, dashboardAccountsToDate),
+    [dashboardAccountsFromDate, dashboardAccountsToDate]
+  );
 
   const { data: accountsSummary } = useQuery({
     queryKey: [
@@ -289,6 +317,81 @@ const DashboardPage: React.FC = () => {
       (!isAdmin || !!selectedAgentId),
   });
 
+  const { data: previousPeriodSummary } = useQuery({
+    queryKey: [
+      'dashboard-previous-period-summary',
+      previousDashboardPeriod.fromDate,
+      previousDashboardPeriod.toDate,
+      regionResellerFilter.regionId || null,
+      regionResellerFilter.resellerId || null,
+      isAdmin ? selectedAgentId : 'me',
+    ],
+    queryFn: async () => {
+      const baseParams = {
+        fromDate: previousDashboardPeriod.fromDate,
+        toDate: previousDashboardPeriod.toDate,
+        regionId: regionResellerFilter.regionId,
+        resellerId: regionResellerFilter.resellerId,
+        agentId: isAdmin ? selectedAgentId : undefined,
+      };
+      const [previousStats, previousAccounts] = await Promise.all([
+        apiService.getSubscribersDashboard(baseParams),
+        apiService.getAccounts({ ...baseParams, page: 1, pageSize: 1 }),
+      ]);
+      return { previousStats, previousAccounts };
+    },
+    enabled:
+      !isMainAgent &&
+      canAccessAccountsSummary(user?.role, user?.canAccessAccounts) &&
+      (!isAdmin || !!selectedAgentId),
+  });
+
+  const { data: activationPaymentSummary } = useQuery({
+    queryKey: [
+      'dashboard-activation-payment-summary',
+      dashboardAccountsFromDate,
+      dashboardAccountsToDate,
+      regionResellerFilter.regionId || null,
+      regionResellerFilter.resellerId || null,
+      isAdmin ? selectedAgentId : 'me',
+    ],
+    queryFn: async () => {
+      const baseParams = {
+        fromDate: dashboardAccountsFromDate,
+        toDate: dashboardAccountsToDate,
+        regionId: regionResellerFilter.regionId,
+        resellerId: regionResellerFilter.resellerId,
+        agentId: isAdmin ? selectedAgentId : undefined,
+        page: 1,
+        pageSize: 1,
+      };
+      const [cash, master] = await Promise.all([
+        apiService.getAccounts({ ...baseParams, activationPaymentMethod: ActivationPaymentMethod.Cash }),
+        apiService.getAccounts({ ...baseParams, activationPaymentMethod: ActivationPaymentMethod.Master }),
+      ]);
+      return {
+        cash: Number(cash.totalPackageIncome ?? cash.amountPaid ?? 0),
+        master: Number(master.totalPackageIncome ?? master.amountPaid ?? 0),
+      };
+    },
+    enabled:
+      !isMainAgent &&
+      canAccessAccountsSummary(user?.role, user?.canAccessAccounts) &&
+      (!isAdmin || !!selectedAgentId),
+  });
+
+  const { data: subscribersAnalyticsData } = useQuery({
+    queryKey: [
+      'dashboard-subscribers-analytics',
+      regionResellerFilter.regionId || null,
+      regionResellerFilter.resellerId || null,
+      isAdmin ? selectedAgentId : 'me',
+    ],
+    queryFn: () => apiService.getSubscribers({ page: 1, pageSize: 10_000 }),
+    enabled: !isMainAgent && !isAdmin,
+    staleTime: 60_000,
+  });
+
   const { data: recentTasksResponse } = useQuery<{ data: EmployeeTask[] }>({
     queryKey: ['dashboard-recent-tasks', isAdmin ? selectedAgentId : 'me'],
     queryFn: async () => {
@@ -305,9 +408,49 @@ const DashboardPage: React.FC = () => {
   const recentTasks = recentTasksResponse?.data ?? [];
 
   const { data: debtsData, isLoading: debtsLoading } = useQuery({
-    queryKey: ['debts-stats', 'offline', online],
-    queryFn: () => fetchDebtsWithCache(online, { page: 1, pageSize: 10000 }, false),
+    queryKey: [
+      'debts-stats',
+      online,
+      regionResellerFilter.regionId || null,
+      regionResellerFilter.resellerId || null,
+    ],
+    queryFn: () =>
+      fetchDebtsWithCache(
+        online,
+        {
+          page: 1,
+          pageSize: 10000,
+          regionId: regionResellerFilter.regionId,
+          resellerId: regionResellerFilter.resellerId,
+        },
+        false
+      ),
     refetchInterval: 30000,
+    enabled: !isMainAgent,
+  });
+
+  const { data: paidDebtsInPeriod } = useQuery({
+    queryKey: [
+      'dashboard-debt-payments',
+      online,
+      dashboardAccountsFromDate,
+      dashboardAccountsToDate,
+      regionResellerFilter.regionId || null,
+      regionResellerFilter.resellerId || null,
+    ],
+    queryFn: () =>
+      fetchDebtsWithCache(
+        online,
+        {
+          page: 1,
+          pageSize: 1,
+          paymentCreatedAtFrom: `${dashboardAccountsFromDate}T00:00:00.000Z`,
+          paymentCreatedAtTo: `${dashboardAccountsToDate}T23:59:59.999Z`,
+          regionId: regionResellerFilter.regionId,
+          resellerId: regionResellerFilter.resellerId,
+        },
+        false
+      ),
     enabled: !isMainAgent,
   });
 
@@ -315,6 +458,111 @@ const DashboardPage: React.FC = () => {
     totalDebtAmount: stats?.totalDebtAmount ?? (debtsData?.data?.reduce((total: number, debt: Debt) => total + debt.amount, 0) || 0),
     totalDebtors: debtsData?.data?.length || 0
   };
+
+  const debtInsights = useMemo(() => {
+    const currentDate = new Date();
+    const unpaidDebts = (debtsData?.data ?? []).filter((debt: Debt) => debt.status !== DebtStatus.Paid);
+    const remainingAmount = (debt: Debt) =>
+      Math.max(0, Number(debt.amount ?? 0) - Number(debt.totalPaidAmount ?? 0));
+    const aging = [
+      { label: '0–30 يوم', amount: 0, colorClass: 'bg-amber-400' },
+      { label: '31–60 يوم', amount: 0, colorClass: 'bg-orange-500' },
+      { label: 'أكثر من 60 يوم', amount: 0, colorClass: 'bg-rose-500' },
+    ];
+    const debtors = new Map<string, number>();
+    let overdueAmount = 0;
+
+    unpaidDebts.forEach((debt: Debt) => {
+      const amount = remainingAmount(debt);
+      const debtDate = new Date(debt.debtDate || debt.createdAt);
+      const ageInDays = Number.isNaN(debtDate.getTime())
+        ? 0
+        : Math.max(0, Math.floor((currentDate.getTime() - debtDate.getTime()) / 86_400_000));
+      const dueDate = new Date(debt.dueDate);
+      if (!Number.isNaN(dueDate.getTime()) && dueDate < currentDate) overdueAmount += amount;
+      if (ageInDays <= 30) aging[0].amount += amount;
+      else if (ageInDays <= 60) aging[1].amount += amount;
+      else aging[2].amount += amount;
+      debtors.set(debt.subscriberName || 'مشترك غير محدد', (debtors.get(debt.subscriberName || 'مشترك غير محدد') ?? 0) + amount);
+    });
+
+    return {
+      aging,
+      overdueAmount,
+      topDebtors: Array.from(debtors.entries())
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5),
+    };
+  }, [debtsData]);
+
+  const subscriberAnalytics = useMemo(() => {
+    const filteredSubscribers = (subscribersAnalyticsData?.data ?? []).filter((subscriber: Subscriber) => {
+      if (regionResellerFilter.regionId && subscriber.regionId !== regionResellerFilter.regionId) return false;
+      if (regionResellerFilter.resellerId && subscriber.agentResellerId !== regionResellerFilter.resellerId) return false;
+      return true;
+    });
+    const makeDistribution = (values: string[], fallback: string) => {
+      const counts = new Map<string, number>();
+      values.forEach((value) => counts.set(value || fallback, (counts.get(value || fallback) ?? 0) + 1));
+      return Array.from(counts.entries())
+        .map(([label, value]) => ({ label, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+    };
+    const isDaily = Math.round(
+      (new Date(`${dashboardAccountsToDate}T00:00:00Z`).getTime() - new Date(`${dashboardAccountsFromDate}T00:00:00Z`).getTime()) /
+        86_400_000
+    ) <= 31;
+    const getBucket = (value?: string) => {
+      if (!value) return null;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return null;
+      return isDaily ? date.toISOString().slice(0, 10) : date.toISOString().slice(0, 7);
+    };
+    const inPeriod = (value?: string) => {
+      const bucket = getBucket(value);
+      const lowerBound = isDaily ? dashboardAccountsFromDate : dashboardAccountsFromDate.slice(0, 7);
+      const upperBound = isDaily ? dashboardAccountsToDate : dashboardAccountsToDate.slice(0, 7);
+      return !!bucket && bucket >= lowerBound && bucket <= upperBound;
+    };
+    const trend = new Map<string, { label: string; activations: number; expirations: number }>();
+    filteredSubscribers.forEach((subscriber: Subscriber) => {
+      if (inPeriod(subscriber.activationDate)) {
+        const label = getBucket(subscriber.activationDate)!;
+        const current = trend.get(label) ?? { label, activations: 0, expirations: 0 };
+        current.activations += 1;
+        trend.set(label, current);
+      }
+      if (inPeriod(subscriber.expirationDate)) {
+        const label = getBucket(subscriber.expirationDate)!;
+        const current = trend.get(label) ?? { label, activations: 0, expirations: 0 };
+        current.expirations += 1;
+        trend.set(label, current);
+      }
+    });
+
+    return {
+      trend: Array.from(trend.values()).sort((a, b) => a.label.localeCompare(b.label)),
+      distributions: {
+        regions: makeDistribution(filteredSubscribers.map((subscriber: Subscriber) => subscriber.regionName || subscriber.regionId || ''), 'غير محددة'),
+        resellers: makeDistribution(filteredSubscribers.map((subscriber: Subscriber) => subscriber.agentResellerName || subscriber.agentResellerId || ''), 'غير محدد'),
+        profiles: makeDistribution(filteredSubscribers.map((subscriber: Subscriber) => subscriber.profileName), 'غير محددة'),
+        statuses: makeDistribution(
+          filteredSubscribers.map((subscriber: Subscriber) =>
+            subscriber.isSubscriptionActive ?? subscriber.isActive ? 'فعال' : 'غير فعال'
+          ),
+          'غير محدد'
+        ),
+      },
+    };
+  }, [
+    subscribersAnalyticsData,
+    regionResellerFilter.regionId,
+    regionResellerFilter.resellerId,
+    dashboardAccountsFromDate,
+    dashboardAccountsToDate,
+  ]);
 
   // Update last updated when data changes
   React.useEffect(() => {
@@ -388,64 +636,73 @@ const DashboardPage: React.FC = () => {
     return 'الرصيد الإجمالي';
   }, [selectedOperationalResellerId, selectedOperationalRegionId, myResellers, myRegions]);
 
-  const transferProfitEstimate = useMemo(() => {
-    const amountPaid = accountsSummary?.amountPaid ?? 0;
-    const activationProfit = accountsSummary?.totalActivationProfit ?? 0;
-    const debtPaid = accountsSummary?.totalPaidSubscriptionDebt ?? 0;
-    const totalReceived = amountPaid + debtPaid;
-    return Math.max(0, totalReceived - amountPaid - activationProfit - debtPaid);
-  }, [accountsSummary]);
-
   const summaryAmountItems = useMemo(
     () => [
       {
+        title: 'الوارد الكلي',
+        value: formatNumber(accountsSummary?.totalGeneralIncome ?? stats?.incomingAmount ?? 0, { suffix: ' د.ع' }),
+        changePercent: getChangePercent(
+          Number(accountsSummary?.totalGeneralIncome ?? stats?.incomingAmount ?? 0),
+          Number(previousPeriodSummary?.previousAccounts.totalGeneralIncome ?? previousPeriodSummary?.previousStats.incomingAmount ?? 0)
+        ),
+      },
+      {
         title: 'مبالغ الاشتراكات',
-        value: formatNumber(accountsSummary?.amountPaid ?? stats?.incomingAmount ?? 0, { suffix: ' د.ع' }),
+        value: formatNumber(accountsSummary?.totalPackageIncome ?? accountsSummary?.amountPaid ?? 0, { suffix: ' د.ع' }),
+        changePercent: getChangePercent(
+          Number(accountsSummary?.totalPackageIncome ?? accountsSummary?.amountPaid ?? 0),
+          Number(previousPeriodSummary?.previousAccounts.totalPackageIncome ?? previousPeriodSummary?.previousAccounts.amountPaid ?? 0)
+        ),
       },
       {
-        title: 'ربح الاشتراكات',
-        value: formatNumber(accountsSummary?.totalActivationProfit ?? 0, { suffix: ' د.ع' }),
-      },
-      {
-        title: 'ربح التحويل',
-        value: formatNumber(transferProfitEstimate, { suffix: ' د.ع' }),
+        title: 'مبالغ الأجور',
+        value: formatNumber(accountsSummary?.totalServiceFeesIncome ?? 0, { suffix: ' د.ع' }),
+        changePercent: getChangePercent(
+          Number(accountsSummary?.totalServiceFeesIncome ?? 0),
+          Number(previousPeriodSummary?.previousAccounts.totalServiceFeesIncome ?? 0)
+        ),
       },
     ],
-    [accountsSummary, stats?.incomingAmount, transferProfitEstimate, formatNumber]
+    [accountsSummary, stats?.incomingAmount, previousPeriodSummary, formatNumber]
   );
 
-  const financialSummaryItems = useMemo(
+  const financialChartValues = useMemo(
     () => [
-      { label: 'الوارد', value: Number(stats?.incomingAmount ?? 0), barClass: 'bg-emerald-500' },
-      { label: 'الديون', value: Number(debtsStats.totalDebtAmount ?? 0), barClass: 'bg-violet-500' },
+      { label: 'الوارد', value: Number(stats?.incomingAmount ?? 0), color: '#10b981' },
+      { label: 'الديون', value: Number(debtsStats.totalDebtAmount ?? 0), color: '#8b5cf6' },
       {
         label: 'ربح التفعيل',
         value: Number(accountsSummary?.totalActivationProfit ?? 0),
-        barClass: 'bg-blue-500',
+        color: '#3b82f6',
       },
-      { label: 'ربح التحويل', value: transferProfitEstimate, barClass: 'bg-teal-500' },
       {
         label: 'بيع المواد',
         value: Number(stats?.totalMaterialSales ?? 0),
-        barClass: 'bg-gray-400 dark:bg-gray-500',
+        color: '#f59e0b',
       },
     ],
-    [stats, debtsStats.totalDebtAmount, accountsSummary, transferProfitEstimate]
+    [stats, debtsStats.totalDebtAmount, accountsSummary]
   );
 
-  const subscriberChartItems = useMemo(
-    () => [
-      { label: 'إجمالي المشتركين', value: Number(stats?.total ?? 0), barClass: 'bg-primary-500' },
-      { label: 'منتهي الصلاحية', value: Number(stats?.expired ?? 0), barClass: 'bg-rose-400' },
+  const subscriberChartValues = useMemo(() => {
+    const total = Number(stats?.total ?? 0);
+    const active = Number(stats?.active ?? 0);
+    const expired = Number(stats?.expired ?? 0);
+    const expiringSoon = Number(stats?.expiringWithin3Days ?? 0);
+    const activeWithoutExpiring = Math.max(0, active - expiringSoon);
+    const unclassified = Math.max(0, total - activeWithoutExpiring - expiringSoon - expired);
+
+    return [
+      { label: 'فعال', value: activeWithoutExpiring, color: '#10b981' },
       {
-        label: 'ينتهي خلال 3 أيام',
-        value: Number(stats?.expiringWithin3Days ?? 0),
-        barClass: 'bg-amber-400',
+        label: 'قريب الانتهاء',
+        value: expiringSoon,
+        color: '#f59e0b',
       },
-      { label: 'الفعالين', value: Number(stats?.active ?? 0), barClass: 'bg-emerald-500' },
-    ],
-    [stats]
-  );
+      { label: 'منتهي', value: expired, color: '#f43f5e' },
+      { label: 'غير مصنف', value: unclassified, color: '#94a3b8' },
+    ];
+  }, [stats]);
 
   const dashboardUserName = user?.fullName || user?.username || 'مستخدم';
 
@@ -837,22 +1094,51 @@ const DashboardPage: React.FC = () => {
           </div>
 
           {canAccessAccountsSummary(user?.role, user?.canAccessAccounts) && (
-            <DashboardSummaryAmounts items={summaryAmountItems} />
+            <>
+              <DashboardSummaryAmounts items={summaryAmountItems} />
+              <DashboardOperationalOverview
+                cashAmount={activationPaymentSummary?.cash ?? 0}
+                masterAmount={activationPaymentSummary?.master ?? 0}
+                balance={displayBalance}
+                balanceDeduction={Number(accountsSummary?.totalBalanceDeduction ?? 0)}
+                formatNumber={formatNumber}
+              />
+            </>
           )}
 
-          <section>
-            <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-white">
-              مؤشرات المشتركين والمالية
-            </h2>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <DashboardFinancialSummary items={financialSummaryItems} formatNumber={formatNumber} />
-              <DashboardSubscriberChart items={subscriberChartItems} formatNumber={formatNumber} />
-            </div>
-          </section>
+          <DashboardCharts
+            subscriberValues={subscriberChartValues}
+            financialValues={financialChartValues}
+            formatNumber={formatNumber}
+          />
+
+          {!isAdmin && (
+            <DashboardSubscriberAnalytics
+              trend={subscriberAnalytics.trend}
+              distributions={subscriberAnalytics.distributions}
+              formatNumber={formatNumber}
+            />
+          )}
+
+          <DashboardDebtInsights
+            totalDebt={Number(debtsStats.totalDebtAmount ?? 0)}
+            subscriptionDebt={Number(accountsSummary?.totalUnpaidSubscriptionDebt ?? 0)}
+            serviceFeesDebt={Number(accountsSummary?.totalServiceFeesDebt ?? 0)}
+            collectedAmount={Number(paidDebtsInPeriod?.totalDebtPaymentsIncome ?? 0)}
+            overdueAmount={debtInsights.overdueAmount}
+            aging={debtInsights.aging}
+            topDebtors={debtInsights.topDebtors}
+            formatNumber={formatNumber}
+          />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {canManageEmployeeTasks && <DashboardRecentTasksTable tasks={recentTasks} />}
-            <DashboardRecentActivationsTable receipts={recentReceipts} formatNumber={formatNumber} />
+            <DashboardRecentActivationsTable
+              receipts={recentReceipts}
+              formatNumber={formatNumber}
+              formatDate={formatDate}
+              isLoading={recentActivationsLoading}
+            />
           </div>
 
           <div className="flex flex-wrap gap-2">

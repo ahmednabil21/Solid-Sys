@@ -373,6 +373,7 @@ const ReportsPage: React.FC = () => {
         >
           <option value="">الكل</option>
           <option value={ActivationPaymentMethod.Cash}>كاش</option>
+          <option value={ActivationPaymentMethod.Master}>ماستر</option>
           <option value={ActivationPaymentMethod.CustomerWallet}>محفظة زبون</option>
           <option value={ActivationPaymentMethod.Deferred}>آجل</option>
         </select>
@@ -607,7 +608,7 @@ const ReportsPage: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">التكاليف والديون</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 sm:gap-4">
                 <StatCard
                   title="استقطاع رصيد المنطقة"
                   value={accounts?.totalBalanceDeduction ?? 0}
@@ -645,6 +646,14 @@ const ReportsPage: React.FC = () => {
                   value={accounts?.totalServiceFeesDebt ?? 0}
                   icon={CreditCard}
                   color="orange"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="ديون الأجور الواصلة"
+                  value={accounts?.totalPaidServiceFeesDebt ?? 0}
+                  icon={CreditCard}
+                  color="purple"
                   isAmount
                   glass
                 />

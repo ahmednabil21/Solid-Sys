@@ -443,6 +443,7 @@ const DebtsPage: React.FC = () => {
       acc[key] = {
         subscriberId: debt.subscriberId,
         subscriberName: debt.subscriberName,
+        subscriberUsername: debt.subscriberUsername,
         subscriberPhone: debt.subscriberPhone,
         agentName: debt.agentName,
         agentCompanyName: debt.agentCompanyName,
@@ -468,6 +469,7 @@ const DebtsPage: React.FC = () => {
   }, {} as Record<string, {
     subscriberId: string;
     subscriberName: string;
+    subscriberUsername?: string;
     subscriberPhone?: string;
     agentName: string;
     agentCompanyName?: string;
@@ -1246,6 +1248,9 @@ const DebtsPage: React.FC = () => {
                   المشترك
                 </th>
                 <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  اسم المستخدم
+                </th>
+                <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   إجمالي الدين
                 </th>
                 <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -1312,6 +1317,9 @@ const DebtsPage: React.FC = () => {
                         )}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap font-mono text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+                    {subscriberDebt.subscriberUsername || '—'}
                   </td>
                   <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
                     {formatNumber(subscriberDebt.totalDebt, { suffix: ' د.ع' })}

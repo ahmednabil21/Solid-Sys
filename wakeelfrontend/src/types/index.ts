@@ -2378,6 +2378,7 @@ export interface Debt {
   updatedAt?: string;
   profileName?: string | null;
   subscriberName: string;
+  subscriberUsername?: string;
   agentName?: string;
   notes?: string;
   status: DebtStatus;
@@ -2744,6 +2745,8 @@ export interface AccountsResponse {
   totalAgentPackageIncome?: number;
   /** مجموع وارد الأجور (واصل عند التفعيل + تسديد ديون الأجور) */
   totalServiceFeesIncome?: number;
+  /** مجموع تسديدات ديون أجور الخدمة الواصلة */
+  totalPaidServiceFeesDebt?: number;
   /** مجموع ديون أجور الخدمة غير الواصلة */
   totalServiceFeesDebt?: number;
   /** مجموع وارد الكاشباك */
