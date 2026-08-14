@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { apiService, ApiService } from '../services/api';
 import { MaterialDisburseRequest, MaterialReturnRequest, DisbursementType } from '../types';
-import type { MaterialDisbursement } from '../types';
+import type { MaterialDisbursement, Subscriber } from '../types';
 import { showSuccess, showError } from '../utils/notifications';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -49,6 +49,156 @@ function effectiveMaterialUnitPrice(subscriberPrice: number, discountPercent = 0
   const pct = Math.min(100, Math.max(0, discountPercent));
   return subscriberPrice * (1 - pct / 100);
 }
+
+const SUBSCRIBER_SEARCH_MIN_LENGTH = 1;
+const SUBSCRIBER_SEARCH_PAGE_SIZE = 20;
+
+function subscriberDisplayName(s: {
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+}): string {
+  return (
+    (s.fullName || '').trim() ||
+    `${(s.firstName || '').trim()} ${(s.lastName || '').trim()}`.trim() ||
+    (s.username || '').trim() ||
+    ''
+  );
+}
+
+function subscriberSearchLabel(s: Subscriber): string {
+  const name = subscriberDisplayName(s);
+  return s.phoneNumber ? `${name} — ${s.phoneNumber}` : name;
+}
+
+interface SubscriberSearchPickerProps {
+  label: string;
+  labelClassName?: string;
+  selected: Subscriber | null;
+  search: string;
+  onSearchChange: (value: string) => void;
+  onSelect: (subscriber: Subscriber | null) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  results: Subscriber[];
+  loading: boolean;
+  hasMore?: boolean;
+}
+
+const SubscriberSearchPicker: React.FC<SubscriberSearchPickerProps> = ({
+  label,
+  labelClassName = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2',
+  selected,
+  search,
+  onSearchChange,
+  onSelect,
+  open,
+  onOpenChange,
+  containerRef,
+  results,
+  loading,
+  hasMore = false,
+}) => {
+  const searchReady = search.trim().length >= SUBSCRIBER_SEARCH_MIN_LENGTH;
+
+  return (
+    <div ref={containerRef}>
+      <label className={labelClassName}>{label}</label>
+      <div className="relative">
+        <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            onSearchChange(e.target.value);
+            onOpenChange(true);
+            if (selected) onSelect(null);
+          }}
+          onFocus={() => onOpenChange(true)}
+          placeholder="ابحث بالاسم أو رقم الهاتف..."
+          className="w-full pl-8 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-right text-sm"
+        />
+        {(selected || search) && (
+          <button
+            type="button"
+            onClick={() => {
+              onSelect(null);
+              onSearchChange('');
+              onOpenChange(false);
+            }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            aria-label="إلغاء اختيار المشترك"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        {open && (
+          <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg max-h-64 overflow-auto">
+            <button
+              type="button"
+              onClick={() => {
+                onSelect(null);
+                onSearchChange('');
+                onOpenChange(false);
+              }}
+              className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                !selected
+                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              بدون مشترك
+            </button>
+            {!searchReady ? (
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                اكتب للبحث عن المشترك — لن تُعرض القائمة إلا بعد البحث
+              </div>
+            ) : loading ? (
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">جاري البحث...</div>
+            ) : results.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">لا توجد نتائج</div>
+            ) : (
+              <ul className="py-1">
+                {results.map((s) => {
+                  const name = subscriberDisplayName(s);
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelect(s);
+                          onSearchChange(subscriberSearchLabel(s));
+                          onOpenChange(false);
+                        }}
+                        className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                          selected?.id === s.id
+                            ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <span className="block truncate">{name}{s.phoneNumber ? ` — ${s.phoneNumber}` : ''}</span>
+                        {s.username ? (
+                          <span className="block text-xs text-gray-500 dark:text-gray-400 font-mono truncate">{s.username}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {searchReady && !loading && hasMore && (
+              <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-600">
+                هناك نتائج أكثر — خصّص البحث بالاسم أو رقم الهاتف
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const MaterialsDisbursementPage: React.FC = () => {
   const location = useLocation();
@@ -127,7 +277,9 @@ const MaterialsDisbursementPage: React.FC = () => {
   const [returnSearching, setReturnSearching] = useState(false);
   const [returnQuantity, setReturnQuantity] = useState<number>(0);
   const [returnNotes, setReturnNotes] = useState('');
-  const [selectedSubscriberIdForPos, setSelectedSubscriberIdForPos] = useState<string>('');
+  const [posSelectedSubscriber, setPosSelectedSubscriber] = useState<Subscriber | null>(null);
+  const [modalSelectedSubscriber, setModalSelectedSubscriber] = useState<Subscriber | null>(null);
+  const [debouncedSubscriberSearch, setDebouncedSubscriberSearch] = useState('');
   const [cartItems, setCartItems] = useState<PosCartItem[]>([]);
   const [posSaleSubmitting, setPosSaleSubmitting] = useState(false);
   const isSalesHistoryMode = location.pathname.endsWith('/sales-history');
@@ -175,13 +327,6 @@ const MaterialsDisbursementPage: React.FC = () => {
   const disbursements = disbursementsResponse?.data ?? [];
   const statistics = disbursementsResponse?.statistics;
 
-  const { data: subscribersResponse } = useQuery({
-    queryKey: ['subscribers-for-disburse', 'offline', online, 1, 500, isAdmin ? selectedAgentId : undefined],
-    queryFn: () => fetchSubscribersWithCache(online, { page: 1, pageSize: 500 }),
-    enabled: true,
-  });
-  const subscribers = React.useMemo(() => subscribersResponse?.data ?? [], [subscribersResponse?.data]);
-
   const filteredMaterials = React.useMemo(() => {
     const q = (materialSearch || '').trim().toLowerCase();
     if (!q) return list;
@@ -192,27 +337,55 @@ const MaterialsDisbursementPage: React.FC = () => {
     );
   }, [list, materialSearch]);
 
-  const filteredSubscribers = React.useMemo(() => {
-    const q = (subscriberSearch || '').trim().toLowerCase();
-    if (!q) return subscribers;
-    return subscribers.filter(
-      (s) =>
-        (s.fullName || '').toLowerCase().includes(q) ||
-        (s.firstName || '').toLowerCase().includes(q) ||
-        (s.lastName || '').toLowerCase().includes(q) ||
-        (s.username || '').toLowerCase().includes(q) ||
-        (s.phoneNumber || '').replace(/\s/g, '').includes(q.replace(/\s/g, ''))
-    );
-  }, [subscribers, subscriberSearch]);
+  const isSubscriberPickerOpen = showPosSubscriberDropdown || showSubscriberDropdown;
+  const activeSubscriberSearch = showSubscriberDropdown
+    ? subscriberSearch
+    : showPosSubscriberDropdown
+      ? posSubscriberSearch
+      : '';
 
   useEffect(() => {
-    if (!showDisburseModal) {
-      setShowMaterialDropdown(false);
-      setShowSubscriberDropdown(false);
-      setMaterialSearch('');
-      setSubscriberSearch('');
+    const t = setTimeout(() => setDebouncedSubscriberSearch(activeSubscriberSearch.trim()), 300);
+    return () => clearTimeout(t);
+  }, [activeSubscriberSearch]);
+
+  const canSearchSubscribers = debouncedSubscriberSearch.length >= SUBSCRIBER_SEARCH_MIN_LENGTH;
+  const searchPending = activeSubscriberSearch.trim() !== debouncedSubscriberSearch;
+
+  const { data: subscriberSearchResponse, isFetching: subscriberSearchLoading } = useQuery({
+    queryKey: [
+      'subscribers-for-disburse-search',
+      'offline',
+      online,
+      debouncedSubscriberSearch,
+      isAdmin ? selectedAgentId : undefined,
+    ],
+    queryFn: () =>
+      fetchSubscribersWithCache(online, {
+        page: 1,
+        pageSize: SUBSCRIBER_SEARCH_PAGE_SIZE,
+        search: debouncedSubscriberSearch,
+      }),
+    enabled: isSubscriberPickerOpen && canSearchSubscribers,
+    staleTime: 10_000,
+  });
+  const subscriberSearchResults = subscriberSearchResponse?.data ?? [];
+  const subscriberSearchBusy =
+    subscriberSearchLoading ||
+    (isSubscriberPickerOpen &&
+      searchPending &&
+      activeSubscriberSearch.trim().length >= SUBSCRIBER_SEARCH_MIN_LENGTH);
+
+  useEffect(() => {
+    if (showDisburseModal) {
+      setShowPosSubscriberDropdown(false);
+      return;
     }
-  }, [showDisburseModal]);
+    setShowMaterialDropdown(false);
+    setShowSubscriberDropdown(false);
+    setMaterialSearch('');
+    if (!modalSelectedSubscriber) setSubscriberSearch('');
+  }, [showDisburseModal, modalSelectedSubscriber]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -231,16 +404,7 @@ const MaterialsDisbursementPage: React.FC = () => {
   }, []);
 
   const selectedMaterial = list.find((m) => m.id === disburseForm.materialId);
-  const selectedSubscriber = subscribers.find((s) => s.id === (isPosMode ? selectedSubscriberIdForPos : disburseForm.subscriberId));
-
-  const filteredPosSubscribers = React.useMemo(() => {
-    const q = posSubscriberSearch.trim().toLowerCase();
-    if (!q) return subscribers;
-    return subscribers.filter((s) => {
-      const label = `${s.fullName || ''} ${s.firstName || ''} ${s.lastName || ''} ${s.username || ''} ${s.phoneNumber || ''}`.toLowerCase();
-      return label.includes(q);
-    });
-  }, [subscribers, posSubscriberSearch]);
+  const selectedSubscriber = isPosMode ? posSelectedSubscriber : modalSelectedSubscriber;
 
   const disburseMutation = useMutation({
     mutationFn: (data: MaterialDisburseRequest) =>
@@ -265,6 +429,8 @@ const MaterialsDisbursementPage: React.FC = () => {
       });
       setShowSuccessPrintModal(true);
       setShowDisburseModal(false);
+      setModalSelectedSubscriber(null);
+      setSubscriberSearch('');
       setDisburseForm({
         materialId: '',
         subscriberId: '',
@@ -299,7 +465,7 @@ const MaterialsDisbursementPage: React.FC = () => {
           const created = await apiService.postMaterialDisburse(
             {
               materialId: line.material.id,
-              subscriberId: selectedSubscriberIdForPos.trim() || null,
+              subscriberId: posSelectedSubscriber?.id?.trim() || null,
               disbursementType: DisbursementType.Sale,
               quantity: line.item.quantity,
               pricePaidBySubscriber: line.item.pricePaidBySubscriber || 0,
@@ -898,84 +1064,20 @@ const MaterialsDisbursementPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <div ref={posSubscriberDropdownRef}>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">المشترك (اختياري)</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowPosSubscriberDropdown((v) => !v);
-                        if (!showPosSubscriberDropdown) setPosSubscriberSearch('');
-                      }}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-right flex items-center justify-between"
-                    >
-                      <span className="truncate text-sm">
-                        {selectedSubscriber
-                          ? `${selectedSubscriber.fullName || `${(selectedSubscriber.firstName || '').trim()} ${(selectedSubscriber.lastName || '').trim()}`.trim() || selectedSubscriber.username} — ${selectedSubscriber.phoneNumber || ''}`
-                          : 'بدون مشترك'}
-                      </span>
-                      <Search className="h-4 w-4 text-gray-400 flex-shrink-0 mr-2" />
-                    </button>
-                    {showPosSubscriberDropdown && (
-                      <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg max-h-64 flex flex-col">
-                        <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
-                          <div className="relative">
-                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                              type="text"
-                              value={posSubscriberSearch}
-                              onChange={(e) => setPosSubscriberSearch(e.target.value)}
-                              placeholder="بحث بالاسم أو رقم الهاتف..."
-                              className="w-full pl-3 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-600 dark:text-white text-right"
-                              autoFocus
-                            />
-                          </div>
-                        </div>
-                        <ul className="overflow-y-auto py-1 max-h-48">
-                          <li>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedSubscriberIdForPos('');
-                                setShowPosSubscriberDropdown(false);
-                                setPosSubscriberSearch('');
-                              }}
-                              className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
-                                !selectedSubscriberIdForPos ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              بدون مشترك
-                            </button>
-                          </li>
-                          {filteredPosSubscribers.length === 0 ? (
-                            <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">لا توجد نتائج</li>
-                          ) : (
-                            filteredPosSubscribers.map((s) => {
-                              const label = s.fullName || `${(s.firstName || '').trim()} ${(s.lastName || '').trim()}`.trim() || s.username;
-                              return (
-                                <li key={s.id}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedSubscriberIdForPos(s.id);
-                                      setShowPosSubscriberDropdown(false);
-                                      setPosSubscriberSearch('');
-                                    }}
-                                    className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
-                                      selectedSubscriberIdForPos === s.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
-                                    }`}
-                                  >
-                                    {label} — {s.phoneNumber || ''}
-                                  </button>
-                                </li>
-                              );
-                            })
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <SubscriberSearchPicker
+                  label="المشترك (اختياري)"
+                  labelClassName="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                  selected={posSelectedSubscriber}
+                  search={posSubscriberSearch}
+                  onSearchChange={setPosSubscriberSearch}
+                  onSelect={setPosSelectedSubscriber}
+                  open={showPosSubscriberDropdown}
+                  onOpenChange={setShowPosSubscriberDropdown}
+                  containerRef={posSubscriberDropdownRef}
+                  results={subscriberSearchResults}
+                  loading={subscriberSearchBusy}
+                  hasMore={(subscriberSearchResponse?.totalItems ?? 0) > subscriberSearchResults.length}
+                />
                 <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-2 text-sm flex items-center justify-between">
                   <span className="text-gray-600 dark:text-gray-300">إجمالي الفاتورة</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{formatNumber(cartTotal, { suffix: ' د.ع' })}</span>
@@ -1318,85 +1420,28 @@ const MaterialsDisbursementPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div ref={subscriberDropdownRef}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">المشترك (اختياري — للبيع/التبديل بدون مشترك)</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSubscriberDropdown((v) => !v);
-                      setShowMaterialDropdown(false);
-                      if (!showSubscriberDropdown) setSubscriberSearch('');
-                    }}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-right flex items-center justify-between"
-                  >
-                    <span className="truncate">
-                      {selectedSubscriber
-                        ? `${selectedSubscriber.fullName || `${(selectedSubscriber.firstName || '').trim()} ${(selectedSubscriber.lastName || '').trim()}`.trim() || selectedSubscriber.username} — ${selectedSubscriber.phoneNumber || ''}`
-                        : '-- اختر المشترك أو بدون مشترك --'}
-                    </span>
-                    <Search className="h-4 w-4 text-gray-400 flex-shrink-0 mr-2" />
-                  </button>
-                  {showSubscriberDropdown && (
-                    <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg max-h-64 flex flex-col">
-                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
-                        <div className="relative">
-                          <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            type="text"
-                            value={subscriberSearch}
-                            onChange={(e) => setSubscriberSearch(e.target.value)}
-                            placeholder="بحث بالاسم أو رقم الهاتف..."
-                            className="w-full pl-3 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-600 dark:text-white text-right"
-                            autoFocus
-                          />
-                        </div>
-                      </div>
-                      <ul className="overflow-y-auto py-1 max-h-48">
-                        <li>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDisburseForm((prev) => ({ ...prev, subscriberId: '' }));
-                              setShowSubscriberDropdown(false);
-                              setSubscriberSearch('');
-                            }}
-                            className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
-                              !disburseForm.subscriberId ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
-                            }`}
-                          >
-                            بدون مشترك
-                          </button>
-                        </li>
-                        {filteredSubscribers.length === 0 ? (
-                          <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">لا توجد نتائج</li>
-                        ) : (
-                          filteredSubscribers.map((s) => {
-                            const label = s.fullName || `${(s.firstName || '').trim()} ${(s.lastName || '').trim()}`.trim() || s.username;
-                            return (
-                              <li key={s.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDisburseForm((prev) => ({ ...prev, subscriberId: s.id }));
-                                    setShowSubscriberDropdown(false);
-                                    setSubscriberSearch('');
-                                  }}
-                                  className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 ${
-                                    disburseForm.subscriberId === s.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
-                                  }`}
-                                >
-                                  {label} — {s.phoneNumber || ''}
-                                </button>
-                              </li>
-                            );
-                          })
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <SubscriberSearchPicker
+                label="المشترك (اختياري — للبيع/التبديل بدون مشترك)"
+                selected={modalSelectedSubscriber}
+                search={subscriberSearch}
+                onSearchChange={(value) => {
+                  setSubscriberSearch(value);
+                  setShowMaterialDropdown(false);
+                }}
+                onSelect={(s) => {
+                  setModalSelectedSubscriber(s);
+                  setDisburseForm((prev) => ({ ...prev, subscriberId: s?.id ?? '' }));
+                }}
+                open={showSubscriberDropdown}
+                onOpenChange={(open) => {
+                  setShowSubscriberDropdown(open);
+                  if (open) setShowMaterialDropdown(false);
+                }}
+                containerRef={subscriberDropdownRef}
+                results={subscriberSearchResults}
+                loading={subscriberSearchBusy}
+                hasMore={(subscriberSearchResponse?.totalItems ?? 0) > subscriberSearchResults.length}
+              />
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">نوع الصرف</label>
                 <select

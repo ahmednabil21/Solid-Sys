@@ -380,11 +380,20 @@ export async function fetchSubscribersWithCache(
 ): Promise<PaginatedResponse<Subscriber>> {
   const fallback = async (): Promise<PaginatedResponse<Subscriber>> => {
     const cached = await getCachedSubscribers();
-    const total = cached.length;
+    const q = (params.search || '').trim().toLowerCase();
+    const qDigits = q.replace(/\s/g, '');
+    const filtered = q
+      ? cached.filter((s) => {
+          const name = `${s.fullName || ''} ${s.firstName || ''} ${s.lastName || ''} ${s.username || ''}`.toLowerCase();
+          const phone = (s.phoneNumber || '').replace(/\s/g, '');
+          return name.includes(q) || (qDigits.length > 0 && phone.includes(qDigits));
+        })
+      : cached;
+    const total = filtered.length;
     const page = Math.max(1, params.page ?? 1);
     const size = Math.max(1, params.pageSize ?? 10);
     const start = (page - 1) * size;
-    const data = total === 0 ? [] : cached.slice(start, start + size);
+    const data = total === 0 ? [] : filtered.slice(start, start + size);
     const totalPages = total === 0 ? 0 : Math.ceil(total / size);
     return {
       data,
