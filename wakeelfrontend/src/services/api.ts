@@ -3265,6 +3265,23 @@ class ApiService {
     return response.data;
   }
 
+  async exportIsolatedMonthlyAccountsToExcel(
+    params?: IsolatedMonthlyAccountsListParams
+  ): Promise<Blob> {
+    const queryParams: Record<string, string | number> = {};
+    if (params?.year != null) queryParams.year = params.year;
+    if (params?.month != null) queryParams.month = params.month;
+    if (params?.regionId) queryParams.regionId = params.regionId;
+    if (params?.resellerId) queryParams.resellerId = params.resellerId;
+    if (params?.subscriberName?.trim()) queryParams.subscriberName = params.subscriberName.trim();
+    if (params?.agentId?.trim()) queryParams.agentId = params.agentId.trim();
+    const response: AxiosResponse<Blob> = await this.api.get(
+      '/IsolatedMonthlyAccounts/export/excel',
+      { params: queryParams, responseType: 'blob' }
+    );
+    return response.data;
+  }
+
   async exportAccountsToExcel(params?: AccountsExportParams): Promise<Blob> {
     const response = await this.api.get('/Accounts/export/excel', {
       params: this.buildAccountsQueryParams(params, { includePagination: false }),

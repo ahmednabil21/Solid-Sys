@@ -32,8 +32,10 @@ import {
 } from '../types';
 import {
   CalendarDays,
+  Coins,
   CreditCard,
   DollarSign,
+  FileSpreadsheet,
   Gift,
   Receipt,
   RefreshCw,
@@ -115,6 +117,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
   const [freePage, setFreePage] = useState(1);
   const [freePageSize, setFreePageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
   const [payDebts, setPayDebts] = useState<Debt[] | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const {
     myRegions,
@@ -375,6 +378,33 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
     );
   };
 
+  const handleExportExcel = async () => {
+    if (isAdmin && !selectedAgentId) return;
+    try {
+      setIsExporting(true);
+      const blob = await apiService.exportIsolatedMonthlyAccountsToExcel({
+        agentId: isAdmin ? selectedAgentId || undefined : undefined,
+        year: appliedYear,
+        month: appliedMonth,
+        subscriberName: appliedSubscriberName.trim() || undefined,
+        ...regionResellerFilter,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `isolated-monthly-accounts_${appliedYear}_${String(appliedMonth).padStart(2, '0')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      showSuccess('تم التصدير', 'تم تنزيل ملف Excel بنفس جداول الصفحة.');
+    } catch (err: unknown) {
+      showError('خطأ في التصدير', ApiService.showError(err));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!canAccessAccounts) {
     return (
       <div className="p-6">
@@ -394,15 +424,26 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
             تفعيلات الاشتراك حسب الشهر. المبالغ = الباقة + أجور الخدمة، مع فصل المسدد لغير شهر التفعيل والمشتركين المجانيين
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          تحديث
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExporting || (isAdmin && !selectedAgentId)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm disabled:opacity-50"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            {isExporting ? 'جاري التصدير...' : 'تصدير اكسل'}
+          </button>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            تحديث
+          </button>
+        </div>
       </div>
 
       {isAdmin && (
@@ -515,9 +556,21 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
             ) : undefined
           }
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
-            <StatCard title="مجموع المبالغ المسددة" value={report?.totalPaid ?? 0} icon={DollarSign} color="green" isAmount glass />
-            <StatCard title="مجموع المبالغ الغير مسددة" value={report?.totalUnpaid ?? 0} icon={CreditCard} color="red" isAmount glass />
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <StatCard
+              title="مجموع الوارد التفعيلات الكلي"
+              value={
+                report?.totalGrossActivationsIncome
+                ?? (report?.totalActivationsIncome ?? 0) + (report?.totalServiceFeesIncome ?? 0)
+              }
+              icon={Wallet}
+              color="blue"
+              isAmount
+              glass
+            />
+            <StatCard title="وارد التفعيلات" value={report?.totalActivationsIncome ?? report?.totalPaid ?? 0} icon={DollarSign} color="green" isAmount glass />
+            <StatCard title="وارد الأجور" value={report?.totalServiceFeesIncome ?? 0} icon={Coins} color="teal" isAmount glass />
+            <StatCard title="مجموع التفعيلات الغير مسددة" value={report?.totalUnpaid ?? 0} icon={CreditCard} color="red" isAmount glass />
             <StatCard
               title="مبلغ الأجور الغير مسددة"
               value={report?.totalUnpaidServiceFees ?? 0}
@@ -542,6 +595,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
               isAmount
               glass
             />
+            <StatCard title="وارد الكاشباك" value={report?.totalCashbackIncome ?? 0} icon={Coins} color="indigo" isAmount glass />
           </div>
 
           {isLoading ? (

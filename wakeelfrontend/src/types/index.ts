@@ -2863,6 +2863,10 @@ export interface IsolatedMonthlyAccountsResponse {
   year: number;
   month: number;
   totalPaid: number;
+  totalActivationsIncome: number;
+  totalServiceFeesIncome: number;
+  totalGrossActivationsIncome: number;
+  totalCashbackIncome: number;
   totalUnpaid: number;
   totalPaidOtherMonth: number;
   totalUnpaidServiceFees: number;
