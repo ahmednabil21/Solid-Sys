@@ -3252,6 +3252,7 @@ class ApiService {
     if (params?.month != null) queryParams.month = params.month;
     if (params?.regionId) queryParams.regionId = params.regionId;
     if (params?.resellerId) queryParams.resellerId = params.resellerId;
+    if (params?.subscriberName?.trim()) queryParams.subscriberName = params.subscriberName.trim();
     if (params?.page !== undefined) queryParams.page = params.page;
     if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
     if (params?.freePage !== undefined) queryParams.freePage = params.freePage;

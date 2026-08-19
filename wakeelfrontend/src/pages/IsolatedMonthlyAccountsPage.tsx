@@ -4,6 +4,7 @@ import { apiService, ApiService } from '../services/api';
 import { StatCard } from '../components/StatCard';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import Pagination from '../components/Pagination';
+import PageSearchDateFilterBar from '../components/filters/PageSearchDateFilterBar';
 import OperationalFiltersSidebar from '../components/filters/OperationalFiltersSidebar';
 import ListPageWithFilters from '../components/layout/ListPageWithFilters';
 import PayDebtModal from '../components/PayDebtModal';
@@ -34,6 +35,7 @@ import {
   CreditCard,
   DollarSign,
   Gift,
+  Receipt,
   RefreshCw,
   Wallet,
 } from 'lucide-react';
@@ -106,6 +108,8 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
   const [month, setMonth] = useState(baghdadNow.month);
   const [appliedYear, setAppliedYear] = useState(baghdadNow.year);
   const [appliedMonth, setAppliedMonth] = useState(baghdadNow.month);
+  const [subscriberName, setSubscriberName] = useState('');
+  const [appliedSubscriberName, setAppliedSubscriberName] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
   const [freePage, setFreePage] = useState(1);
@@ -151,6 +155,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
         isAdmin ? selectedAgentId || null : null,
         appliedYear,
         appliedMonth,
+        appliedSubscriberName || null,
         regionResellerFilter.regionId ?? null,
         regionResellerFilter.resellerId ?? null,
         currentPage,
@@ -163,6 +168,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
       selectedAgentId,
       appliedYear,
       appliedMonth,
+      appliedSubscriberName,
       regionResellerFilter.regionId,
       regionResellerFilter.resellerId,
       currentPage,
@@ -179,6 +185,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
         agentId: isAdmin ? selectedAgentId || undefined : undefined,
         year: appliedYear,
         month: appliedMonth,
+        subscriberName: appliedSubscriberName.trim() || undefined,
         ...regionResellerFilter,
         page: currentPage,
         pageSize,
@@ -277,6 +284,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
               <tr>
                 <th>اسم المشترك</th>
                 <th>اسم المستخدم</th>
+                <th>الباقة</th>
                 <th>تاريخ التفعيل</th>
                 <th>مبلغ المسدد</th>
                 <th>مبلغ الغير مسدد</th>
@@ -289,7 +297,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canPayDebtAction ? 8 : 7}
+                    colSpan={canPayDebtAction ? 9 : 8}
                     className="text-center py-10 text-gray-500 dark:text-gray-400"
                   >
                     لا توجد سجلات ضمن الفلتر المحدد.
@@ -304,6 +312,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
                         {row.subscriberName || '—'}
                       </td>
                       <td className="whitespace-nowrap">{row.username || '—'}</td>
+                      <td className="whitespace-nowrap">{row.profileName || '—'}</td>
                       <td className="whitespace-nowrap">
                         {row.activationDate ? formatDate(row.activationDate, DATE_OPTIONS) : '—'}
                       </td>
@@ -382,7 +391,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">حسابات شهرية معزولة</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            تفعيلات الاشتراك حسب الشهر مع فصل المسدد لغير شهر التفعيل والمشتركين المجانيين
+            تفعيلات الاشتراك حسب الشهر. المبالغ = الباقة + أجور الخدمة، مع فصل المسدد لغير شهر التفعيل والمشتركين المجانيين
           </p>
         </div>
         <button
@@ -418,6 +427,24 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
         </div>
       )}
 
+      <PageSearchDateFilterBar
+        searchTerm={subscriberName}
+        onSearchTermChange={setSubscriberName}
+        searchPlaceholder="اسم المشترك أو اليوزر..."
+        onApply={() => {
+          setAppliedSubscriberName(subscriberName);
+          setCurrentPage(1);
+          setFreePage(1);
+        }}
+        onClear={() => {
+          setSubscriberName('');
+          setAppliedSubscriberName('');
+          setCurrentPage(1);
+          setFreePage(1);
+        }}
+        disabled={isAdmin && !selectedAgentId}
+      />
+
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">السنة</label>
@@ -452,6 +479,7 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
           onClick={() => {
             setAppliedYear(year);
             setAppliedMonth(month);
+            setAppliedSubscriberName(subscriberName);
             setCurrentPage(1);
             setFreePage(1);
           }}
@@ -487,9 +515,17 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
             ) : undefined
           }
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
             <StatCard title="مجموع المبالغ المسددة" value={report?.totalPaid ?? 0} icon={DollarSign} color="green" isAmount glass />
             <StatCard title="مجموع المبالغ الغير مسددة" value={report?.totalUnpaid ?? 0} icon={CreditCard} color="red" isAmount glass />
+            <StatCard
+              title="مبلغ الأجور الغير مسددة"
+              value={report?.totalUnpaidServiceFees ?? 0}
+              icon={Receipt}
+              color="blue"
+              isAmount
+              glass
+            />
             <StatCard
               title="المسدد لغير الشهر الحالي"
               value={report?.totalPaidOtherMonth ?? 0}

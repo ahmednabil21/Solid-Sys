@@ -2837,6 +2837,7 @@ export interface IsolatedMonthlyAccountRow {
   subscriberId: string;
   subscriberName: string;
   username: string;
+  profileName?: string | null;
   subscriptionType: SubscriptionType | number;
   activationDate: string;
   paidAmount: number;
@@ -2864,6 +2865,7 @@ export interface IsolatedMonthlyAccountsResponse {
   totalPaid: number;
   totalUnpaid: number;
   totalPaidOtherMonth: number;
+  totalUnpaidServiceFees: number;
   totalUnpaidFreeSubscriptions: number;
   regularItems: IsolatedMonthlyAccountItemsPage;
   freeItems: IsolatedMonthlyAccountItemsPage;
@@ -2874,6 +2876,7 @@ export interface IsolatedMonthlyAccountsListParams {
   month?: number;
   regionId?: string;
   resellerId?: string;
+  subscriberName?: string;
   page?: number;
   pageSize?: number;
   freePage?: number;
