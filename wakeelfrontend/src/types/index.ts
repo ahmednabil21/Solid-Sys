@@ -2870,6 +2870,7 @@ export interface IsolatedMonthlyAccountsResponse {
   totalUnpaid: number;
   totalPaidOtherMonth: number;
   totalUnpaidServiceFees: number;
+  totalUnpaidActivationsAndFees: number;
   totalUnpaidFreeSubscriptions: number;
   regularItems: IsolatedMonthlyAccountItemsPage;
   freeItems: IsolatedMonthlyAccountItemsPage;

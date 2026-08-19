@@ -580,6 +580,17 @@ const IsolatedMonthlyAccountsPage: React.FC = () => {
               glass
             />
             <StatCard
+              title="مجموع التفعيلات والأجور الغير مسددة"
+              value={
+                report?.totalUnpaidActivationsAndFees
+                ?? (report?.totalUnpaid ?? 0) + (report?.totalUnpaidServiceFees ?? 0)
+              }
+              icon={CreditCard}
+              color="yellow"
+              isAmount
+              glass
+            />
+            <StatCard
               title="المسدد لغير الشهر الحالي"
               value={report?.totalPaidOtherMonth ?? 0}
               icon={Wallet}
