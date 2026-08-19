@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, User, Phone, Package, Lock, UserCircle } from 'lucide-react';
-import { Subscriber, SubscriberUpdateRequest, Profile, SubscriberNoteType } from '../types';
+import { Subscriber, SubscriberUpdateRequest, Profile, SubscriberNoteType, SubscriptionType } from '../types';
 import { useDigits } from '../contexts/DigitsContext';
 
 interface EditSubscriberModalProps {
@@ -36,7 +36,8 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
     expirationDate: subscriber.expirationDate || subscriber.activationDate,
     fat: subscriber.fat ?? '',
     apartmentNumber: subscriber.apartmentNumber ?? '',
-    zone: subscriber.zone ?? ''
+    zone: subscriber.zone ?? '',
+    subscriptionType: subscriber.subscriptionType ?? SubscriptionType.Paid,
   });
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -60,7 +61,8 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
         expirationDate: subscriber.expirationDate || subscriber.activationDate,
         fat: subscriber.fat ?? '',
         apartmentNumber: subscriber.apartmentNumber ?? '',
-        zone: subscriber.zone ?? ''
+        zone: subscriber.zone ?? '',
+        subscriptionType: subscriber.subscriptionType ?? SubscriptionType.Paid,
       });
     }
   }, [isOpen, subscriber, profiles]);
@@ -75,6 +77,12 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
           ...prev,
           noteType: nextNoteType,
           note: nextNoteType === SubscriberNoteType.Other ? prev.note : '',
+        };
+      }
+      if (name === 'subscriptionType') {
+        return {
+          ...prev,
+          subscriptionType: parseInt(value, 10) as SubscriptionType,
         };
       }
       return {
@@ -309,6 +317,22 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                نوع المشترك *
+              </label>
+              <select
+                name="subscriptionType"
+                value={formData.subscriptionType ?? SubscriptionType.Paid}
+                onChange={handleInputChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value={SubscriptionType.Paid}>اعتيادي</option>
+                <option value={SubscriptionType.Free}>مجاني</option>
+              </select>
             </div>
 
           </div>

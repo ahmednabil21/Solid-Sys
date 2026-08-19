@@ -60,6 +60,8 @@ import {
   AccountsLedgerKind,
   MonthlyReportResponse,
   MonthlyReportListParams,
+  IsolatedMonthlyAccountsResponse,
+  IsolatedMonthlyAccountsListParams,
   DailyHandoverCreateRequest,
   DailyHandoverUpdateRequest,
   DailyHandoverRecipient,
@@ -3239,6 +3241,26 @@ class ApiService {
     const response: AxiosResponse<MonthlyReportResponse> = await this.api.get('/MonthlyReport', {
       params: queryParams,
     });
+    return response.data;
+  }
+
+  async getIsolatedMonthlyAccounts(
+    params?: IsolatedMonthlyAccountsListParams
+  ): Promise<IsolatedMonthlyAccountsResponse> {
+    const queryParams: Record<string, string | number> = {};
+    if (params?.year != null) queryParams.year = params.year;
+    if (params?.month != null) queryParams.month = params.month;
+    if (params?.regionId) queryParams.regionId = params.regionId;
+    if (params?.resellerId) queryParams.resellerId = params.resellerId;
+    if (params?.page !== undefined) queryParams.page = params.page;
+    if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
+    if (params?.freePage !== undefined) queryParams.freePage = params.freePage;
+    if (params?.freePageSize !== undefined) queryParams.freePageSize = params.freePageSize;
+    if (params?.agentId?.trim()) queryParams.agentId = params.agentId.trim();
+    const response: AxiosResponse<IsolatedMonthlyAccountsResponse> = await this.api.get(
+      '/IsolatedMonthlyAccounts',
+      { params: queryParams }
+    );
     return response.data;
   }
 

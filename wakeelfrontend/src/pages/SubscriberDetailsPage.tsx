@@ -401,7 +401,7 @@ const SubscriberDetailsPage: React.FC = () => {
   };
 
   const subscriptionTypeLabel = (t: SubscriptionType) =>
-    t === SubscriptionType.Free ? 'مجاني' : t === SubscriptionType.Paid ? 'مدفوع' : String(t);
+    t === SubscriptionType.Free ? 'مجاني' : t === SubscriptionType.Paid ? 'اعتيادي' : String(t);
 
   const subscriberPaymentLabel = (ps: PaymentStatus) => {
     if (ps === PaymentStatus.Paid) return 'مدفوع';
@@ -609,7 +609,7 @@ const SubscriberDetailsPage: React.FC = () => {
                 <InfoCell label="اسم المستخدم" value={subscriber.username} />
                 <InfoCell label="رقم الهاتف" value={subscriber.phoneNumber || '—'} />
                 <InfoCell label="الباقة" value={`${subscriber.profileName} — ${formatNumber(subscriber.profilePrice || 0, { suffix: ' د.ع' })}`} />
-                <InfoCell label="نوع الاشتراك" value={subscriptionTypeLabel(subscriber.subscriptionType)} />
+                <InfoCell label="نوع المشترك" value={subscriptionTypeLabel(subscriber.subscriptionType)} />
                 <InfoCell label="حالة الاشتراك" value={subscriptionStatusLabel(subscriber)} />
                 <InfoCell label="حالة الدفع (المشترك)" value={subscriberPaymentLabel(subscriber.paymentStatus)} />
                 <InfoCell

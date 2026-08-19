@@ -14,7 +14,7 @@ import {
 import EmployeePagePermissionsEditor from '../components/EmployeePagePermissionsEditor';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { UserPlus, X, Edit, Trash2, CheckCircle2 } from 'lucide-react';
-import { normalizePagePermissions } from '../utils/employeePermissions';
+import { normalizePagePermissions, pagePermissionsIncludeReceiveTasks } from '../utils/employeePermissions';
 
 const getEmployeeRoleLabel = (role: UserRole | number | undefined): string => {
   if (role == null) return '—';
@@ -128,6 +128,7 @@ const EmployeesPage: React.FC = () => {
             password: newEmployeeData.password,
             role: UserRole.Employee,
             pagePermissions: normalizePagePermissions(newEmployeeData.pagePermissions),
+            canReceiveTaskRequests: pagePermissionsIncludeReceiveTasks(newEmployeeData.pagePermissions),
             allowedResellerIds: newEmployeeData.allowedResellerIds,
           };
     createEmployeeMutation.mutate(dataToSend);
@@ -431,6 +432,7 @@ const EmployeesPage: React.FC = () => {
                           fullName: trimmedName,
                           isActive: editEmployeeData.isActive,
                           pagePermissions: normalizePagePermissions(editEmployeeData.pagePermissions),
+                          canReceiveTaskRequests: pagePermissionsIncludeReceiveTasks(editEmployeeData.pagePermissions),
                           allowedResellerIds: editEmployeeData.allowedResellerIds,
                         };
                     if (!isSubAgentRole(selectedEmployee.role) && !data.pagePermissions?.length) {

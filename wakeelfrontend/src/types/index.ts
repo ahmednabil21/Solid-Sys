@@ -2831,6 +2831,56 @@ export interface MonthlyReportListParams {
   agentId?: string;
 }
 
+export interface IsolatedMonthlyAccountRow {
+  id: string;
+  renewalId: string;
+  subscriberId: string;
+  subscriberName: string;
+  username: string;
+  subscriptionType: SubscriptionType | number;
+  activationDate: string;
+  paidAmount: number;
+  unpaidAmount: number;
+  paymentDate?: string | null;
+  paidOtherMonthAmount: number;
+  unpaidDebtId?: string | null;
+  hasUnpaidDebt: boolean;
+}
+
+export interface IsolatedMonthlyAccountItemsPage {
+  data: IsolatedMonthlyAccountRow[];
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+/** استجابة GET /api/IsolatedMonthlyAccounts */
+export interface IsolatedMonthlyAccountsResponse {
+  year: number;
+  month: number;
+  totalPaid: number;
+  totalUnpaid: number;
+  totalPaidOtherMonth: number;
+  totalUnpaidFreeSubscriptions: number;
+  regularItems: IsolatedMonthlyAccountItemsPage;
+  freeItems: IsolatedMonthlyAccountItemsPage;
+}
+
+export interface IsolatedMonthlyAccountsListParams {
+  year?: number;
+  month?: number;
+  regionId?: string;
+  resellerId?: string;
+  page?: number;
+  pageSize?: number;
+  freePage?: number;
+  freePageSize?: number;
+  agentId?: string;
+}
+
 // --- مصاريف المكتب (Office Expenses) ---
 export interface OfficeExpense {
   id: string;

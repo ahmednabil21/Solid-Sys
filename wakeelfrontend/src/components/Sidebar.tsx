@@ -22,6 +22,7 @@ import {
   UserPlus,
   BarChart3,
   CalendarDays,
+  CalendarClock,
   CreditCard,
   FileSpreadsheet,
   Receipt,
@@ -199,6 +200,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
     },
     {
+      name: 'حسابات شهرية معزولة',
+      path: '/admin/isolated-monthly-accounts',
+      icon: CalendarClock,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+    },
+    {
       name: 'الباقات',
       path: '/admin/packages',
       icon: Package,
@@ -312,6 +319,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     '/admin/activity-log',
     '/admin/reports',
     '/admin/monthly-reports',
+    '/admin/isolated-monthly-accounts',
     '/admin/expenses/office',
     '/admin/settings',
   ];

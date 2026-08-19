@@ -22,7 +22,7 @@ import {
   AgentRegistrationApproveRequest,
 } from '../types';
 import EmployeePagePermissionsEditor from '../components/EmployeePagePermissionsEditor';
-import { normalizePagePermissions } from '../utils/employeePermissions';
+import { normalizePagePermissions, pagePermissionsIncludeReceiveTasks } from '../utils/employeePermissions';
 import { IraqGovernorates } from '../types';
 import Pagination from '../components/Pagination';
 import { StatCard } from '../components/StatCard';
@@ -198,6 +198,7 @@ const AgentsPage: React.FC = () => {
             password: newEmployeeData.password,
             role: UserRole.Employee,
             pagePermissions: normalizePagePermissions(newEmployeeData.pagePermissions),
+            canReceiveTaskRequests: pagePermissionsIncludeReceiveTasks(newEmployeeData.pagePermissions),
           };
     createEmployeeMutation.mutate({ agentId: selectedAgentForEmployees.id, data: dataToSend });
   };

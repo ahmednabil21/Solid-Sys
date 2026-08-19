@@ -4269,7 +4269,7 @@ const SubscribersPage: React.FC = () => {
                 {/* Subscription Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    نوع الاشتراك *
+                    نوع المشترك *
                   </label>
                   <select
                     name="subscriptionType"
@@ -4278,7 +4278,7 @@ const SubscribersPage: React.FC = () => {
                     required
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                   >
-                    <option value={SubscriptionType.Paid}>مدفوع</option>
+                    <option value={SubscriptionType.Paid}>اعتيادي</option>
                     <option value={SubscriptionType.Free}>مجاني</option>
                   </select>
                 </div>

@@ -13,7 +13,7 @@ import { UserRole } from '../types';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import Pagination from '../components/Pagination';
 import { StatCard } from '../components/StatCard';
-import { Package, X, Save, ShoppingCart, Search, RefreshCw, CreditCard, Wallet, Printer, RotateCcw, Gift } from 'lucide-react';
+import { Package, X, Save, ShoppingCart, Search, RefreshCw, CreditCard, Wallet, Printer, RotateCcw } from 'lucide-react';
 
 function disbursementTypeLabel(t: number): string {
   if (t === DisbursementType.Sale) return 'بيع';
@@ -1177,7 +1177,7 @@ const MaterialsDisbursementPage: React.FC = () => {
       )}
 
       {statistics && (
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="مواد مباعة"
             value={statistics.soldQuantity ?? 0}
@@ -1189,12 +1189,6 @@ const MaterialsDisbursementPage: React.FC = () => {
             value={statistics.replacedQuantity ?? 0}
             icon={RefreshCw}
             color="blue"
-          />
-          <StatCard
-            title="مواد عرض خاص"
-            value={statistics.specialOfferPackageQuantity ?? 0}
-            icon={Gift}
-            color="orange"
           />
           <StatCard
             title="إجمالي دين المواد"

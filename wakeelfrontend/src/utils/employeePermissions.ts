@@ -1,4 +1,4 @@
-import { EmployeePagePermissionSet, User, UserRole } from '../types';
+import { EmployeePagePermissionSet, EmployeePermissionCatalog, User, UserRole } from '../types';
 
 export type DashboardPageKey =
   | 'Dashboard'
@@ -14,6 +14,69 @@ export type DashboardPageKey =
   | 'Balance'
   | 'CustomerInvoices'
   | 'Settings';
+
+export const RECEIVE_TASK_ACTIONS = [
+  'receiveTask',
+  'receiveTaskRequests',
+  'canReceiveTaskRequests',
+] as const;
+
+const RECEIVE_TASK_CATALOG_ACTION = {
+  action: 'receiveTask',
+  label: 'استلام طلبات المهام',
+};
+
+/** يضيف صلاحية استلام المهام إن لم تكن موجودة في كتالوج الباكند. */
+export function mergeEmployeePermissionCatalog(
+  catalog: EmployeePermissionCatalog | null | undefined
+): EmployeePermissionCatalog {
+  const pages = (catalog?.pages ?? []).map((p) => ({
+    ...p,
+    actions: [...(p.actions ?? [])],
+  }));
+  const empIdx = pages.findIndex(
+    (p) =>
+      p.page === 'EmployeeManagement' ||
+      p.page === 'Employees' ||
+      p.page === 'EmployeeTasks' ||
+      (p.label || '').includes('موظف')
+  );
+
+  if (empIdx >= 0) {
+    const page = pages[empIdx];
+    const hasReceive = page.actions.some(
+      (a) =>
+        RECEIVE_TASK_ACTIONS.includes(a.action as (typeof RECEIVE_TASK_ACTIONS)[number]) ||
+        (a.label || '').includes('استلام طلبات') ||
+        (a.label || '').includes('استلام مهام')
+    );
+    if (!hasReceive) {
+      pages[empIdx] = { ...page, actions: [...page.actions, RECEIVE_TASK_CATALOG_ACTION] };
+    }
+  } else {
+    pages.push({
+      page: 'EmployeeManagement',
+      label: 'إدارة الموظفين والمهام',
+      actions: [RECEIVE_TASK_CATALOG_ACTION],
+    });
+  }
+
+  return { pages };
+}
+
+export function pagePermissionsIncludeReceiveTasks(
+  sets?: EmployeePagePermissionSet[] | null
+): boolean {
+  return normalizePagePermissions(sets).some((p) =>
+    p.actions.some(
+      (a) =>
+        RECEIVE_TASK_ACTIONS.includes(a as (typeof RECEIVE_TASK_ACTIONS)[number]) ||
+        a === 'addTask' ||
+        a === 'editTask' ||
+        a === 'deleteTask'
+    )
+  );
+}
 
 export interface AdminRoutePermissionRule {
   pathPrefix: string;
@@ -62,6 +125,12 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
   },
   {
     pathPrefix: '/admin/monthly-reports',
+    page: 'Accounts',
+    viewAction: 'view',
+    legacyCheck: (u) => u.canAccessAccounts !== false,
+  },
+  {
+    pathPrefix: '/admin/isolated-monthly-accounts',
     page: 'Accounts',
     viewAction: 'view',
     legacyCheck: (u) => u.canAccessAccounts !== false,
@@ -208,7 +277,14 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
       return !!user.canManageMaterialsAndSales;
     case 'EmployeeManagement':
       if (action === 'view') return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
-      if (['addTask', 'editTask', 'deleteTask'].includes(action)) return !!user.canReceiveTaskRequests;
+      if (
+        action === 'receiveTask' ||
+        action === 'receiveTaskRequests' ||
+        action === 'canReceiveTaskRequests' ||
+        ['addTask', 'editTask', 'deleteTask'].includes(action)
+      ) {
+        return !!user.canReceiveTaskRequests;
+      }
       if (['viewSalarySheets', 'addSalary', 'advance', 'deduction'].includes(action)) {
         return !!user.canAccessExpensesAndSalarySheet;
       }
@@ -237,7 +313,7 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
     Packages: ['view', 'add', 'edit', 'delete'],
     MaterialsAndSales: ['view', 'add', 'edit', 'delete', 'sell', 'return', 'salesLog', 'printInvoice'],
     EmployeeManagement: [
-      'view', 'addEmployee', 'editEmployee', 'deleteEmployee', 'addTask', 'deleteTask', 'editTask',
+      'view', 'addEmployee', 'editEmployee', 'deleteEmployee', 'receiveTask', 'addTask', 'deleteTask', 'editTask',
       'viewSalarySheets', 'addSalary', 'advance', 'deduction',
     ],
     GeneralExpenses: ['view', 'add', 'edit'],
@@ -310,9 +386,7 @@ export function employeeCanAccessExpenseFeatures(user: User | null | undefined):
 export function employeeCanReceiveTaskRequests(user: User | null | undefined): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
   if (usesPagePermissions(user)) {
-    return ['addTask', 'editTask', 'deleteTask'].some((a) =>
-      hasPageAction(user, 'EmployeeManagement', a)
-    );
+    return pagePermissionsIncludeReceiveTasks(user.pagePermissions);
   }
   return !!user.canReceiveTaskRequests;
 }

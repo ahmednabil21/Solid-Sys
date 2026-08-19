@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { apiService } from '../services/api';
 import { EmployeePagePermissionSet } from '../types';
-import { normalizePagePermissions } from '../utils/employeePermissions';
+import { normalizePagePermissions, mergeEmployeePermissionCatalog } from '../utils/employeePermissions';
 
 interface EmployeePagePermissionsEditorProps {
   value: EmployeePagePermissionSet[];
@@ -23,7 +23,10 @@ const EmployeePagePermissionsEditor: React.FC<EmployeePagePermissionsEditorProps
   });
 
   const normalizedValue = useMemo(() => normalizePagePermissions(value), [value]);
-  const pages = catalog?.pages ?? [];
+  const pages = useMemo(
+    () => mergeEmployeePermissionCatalog(catalog).pages,
+    [catalog]
+  );
 
   const getActionsForPage = (page: string) =>
     normalizedValue.find((p) => p.page === page)?.actions ?? [];
