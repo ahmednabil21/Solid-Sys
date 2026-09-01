@@ -75,6 +75,7 @@ import {
   ReceiptHandoverContext,
   ReceiptHandoverCreateRequest,
   ReceiptHandoverRecord,
+  ReceiptHandoverReseller,
   AgentEmployeeCreateRequest,
   AgentEmployeeUpdateRequest,
   EmployeePermissionCatalog,
@@ -1527,11 +1528,100 @@ class ApiService {
     return response.data.types ?? [];
   }
 
+  private normalizeReceiptHandoverReseller(raw: Record<string, unknown>): ReceiptHandoverReseller {
+    const num = (...keys: string[]) => {
+      for (const key of keys) {
+        const value = raw[key];
+        if (value == null || value === '') continue;
+        const n = Number(value);
+        if (Number.isFinite(n)) return n;
+      }
+      return 0;
+    };
+    return {
+      id: String(raw.id ?? raw.Id ?? ''),
+      name: String(raw.name ?? raw.Name ?? ''),
+      pendingIncomingIqd: num('pendingIncomingIqd', 'PendingIncomingIqd'),
+      pendingTotalProfitIqd: num(
+        'pendingTotalProfitIqd',
+        'PendingTotalProfitIqd',
+        'pendingProfitIqd',
+        'PendingProfitIqd',
+        'totalProfit',
+        'TotalProfit'
+      ),
+    };
+  }
+
+  private normalizeReceiptHandoverContext(raw: unknown): ReceiptHandoverContext {
+    if (raw == null || typeof raw !== 'object') {
+      return { regions: [] };
+    }
+    const body = raw as Record<string, unknown>;
+    const regionsRaw = body.regions ?? body.Regions;
+    const regions = Array.isArray(regionsRaw)
+      ? regionsRaw.map((region) => {
+          const r = (region ?? {}) as Record<string, unknown>;
+          const resellersRaw = r.resellers ?? r.Resellers;
+          const resellers = Array.isArray(resellersRaw)
+            ? resellersRaw.map((item) =>
+                this.normalizeReceiptHandoverReseller((item ?? {}) as Record<string, unknown>)
+              )
+            : [];
+          return {
+            id: String(r.id ?? r.Id ?? ''),
+            name: String(r.name ?? r.Name ?? ''),
+            resellers,
+          };
+        })
+      : [];
+    return { regions };
+  }
+
+  private normalizeReceiptHandoverRecord(raw: unknown): ReceiptHandoverRecord {
+    if (raw == null || typeof raw !== 'object') {
+      return raw as ReceiptHandoverRecord;
+    }
+    const r = raw as Record<string, unknown>;
+    const num = (...keys: string[]) => {
+      for (const key of keys) {
+        const value = r[key];
+        if (value == null || value === '') continue;
+        const n = Number(value);
+        if (Number.isFinite(n)) return n;
+      }
+      return 0;
+    };
+    const totalProfitAmount = num(
+      'totalProfitAmount',
+      'TotalProfitAmount',
+      'totalProfit',
+      'TotalProfit'
+    );
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      agentResellerId: String(r.agentResellerId ?? r.AgentResellerId ?? ''),
+      resellerName: String(r.resellerName ?? r.ResellerName ?? ''),
+      regionId: String(r.regionId ?? r.RegionId ?? ''),
+      regionName: String(r.regionName ?? r.RegionName ?? ''),
+      totalIncomingAmount: num('totalIncomingAmount', 'TotalIncomingAmount'),
+      totalProfitAmount,
+      receivedAmount: num('receivedAmount', 'ReceivedAmount'),
+      remainingAmount: num('remainingAmount', 'RemainingAmount'),
+      handedByEmployeeUserId: String(r.handedByEmployeeUserId ?? r.HandedByEmployeeUserId ?? ''),
+      handedByEmployeeName: String(r.handedByEmployeeName ?? r.HandedByEmployeeName ?? ''),
+      recordedByUserName: String(r.recordedByUserName ?? r.RecordedByUserName ?? ''),
+      handoverDate: String(r.handoverDate ?? r.HandoverDate ?? ''),
+      notes: (r.notes ?? r.Notes ?? null) as string | null | undefined,
+      createdAt: String(r.createdAt ?? r.CreatedAt ?? ''),
+    };
+  }
+
   async getReceiptHandoverContext(agentId?: string): Promise<ReceiptHandoverContext> {
     const params: Record<string, string> = {};
     if (agentId?.trim()) params.agentId = agentId.trim();
     const response: AxiosResponse<ReceiptHandoverContext> = await this.api.get('/ReceiptHandover/context', { params });
-    return response.data;
+    return this.normalizeReceiptHandoverContext(response.data);
   }
 
   async getReceiptHandoverRecords(params: {
@@ -1551,7 +1641,11 @@ class ApiService {
     const response: AxiosResponse<PaginatedResponse<ReceiptHandoverRecord>> = await this.api.get('/ReceiptHandover/records', {
       params: query,
     });
-    return response.data;
+    const body = response.data;
+    const data = Array.isArray(body?.data)
+      ? body.data.map((row) => this.normalizeReceiptHandoverRecord(row))
+      : [];
+    return { ...body, data };
   }
 
   async createReceiptHandover(
@@ -1561,7 +1655,7 @@ class ApiService {
     const params: Record<string, string> = {};
     if (agentId?.trim()) params.agentId = agentId.trim();
     const response: AxiosResponse<ReceiptHandoverRecord> = await this.api.post('/ReceiptHandover', body, { params });
-    return response.data;
+    return this.normalizeReceiptHandoverRecord(response.data);
   }
 
   // Profile/Package endpoints
@@ -2851,7 +2945,7 @@ class ApiService {
       '/OfficeExpenses/withdrawal-context',
       { params }
     );
-    return response.data;
+    return this.normalizeReceiptHandoverContext(response.data);
   }
 
   async getExpenseWithdrawalRequests(params?: {

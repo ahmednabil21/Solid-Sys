@@ -2319,7 +2319,10 @@ export type DailyHandoverUpdateRequest = DailyHandoverCreateRequest;
 export interface ReceiptHandoverReseller {
   id: string;
   name: string;
+  /** @deprecated يُستخدم للمصاريف — صفحة الاستلام والتسليم تعتمد pendingTotalProfitIqd */
   pendingIncomingIqd: number;
+  /** مجموع الربح الكلي المتبقي للاستلام (totalProfit من الحسابات) */
+  pendingTotalProfitIqd: number;
 }
 
 export interface ReceiptHandoverRegion {
@@ -2346,7 +2349,10 @@ export interface ReceiptHandoverRecord {
   resellerName: string;
   regionId: string;
   regionName: string;
+  /** @deprecated — يُفضَّل totalProfitAmount */
   totalIncomingAmount: number;
+  /** مجموع الربح الكلي وقت الاستلام (totalProfit) */
+  totalProfitAmount: number;
   receivedAmount: number;
   remainingAmount: number;
   handedByEmployeeUserId: string;

@@ -102,8 +102,8 @@ const ReceiptHandoverPage: React.FC = () => {
     [regions, selectedRegionId]
   );
 
-  const pendingIncoming = selectedReseller?.pendingIncomingIqd ?? 0;
-  const remainingAfterReceive = Math.max(0, pendingIncoming - (receivedAmount || 0));
+  const pendingProfit = selectedReseller?.pendingTotalProfitIqd ?? 0;
+  const remainingAfterReceive = Math.max(0, pendingProfit - (receivedAmount || 0));
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -146,8 +146,8 @@ const ReceiptHandoverPage: React.FC = () => {
   };
 
   const openHandoverModal = () => {
-    if (!selectedReseller || pendingIncoming <= 0) return;
-    setReceivedAmount(pendingIncoming);
+    if (!selectedReseller || pendingProfit <= 0) return;
+    setReceivedAmount(pendingProfit);
     setShowModal(true);
   };
 
@@ -170,7 +170,7 @@ const ReceiptHandoverPage: React.FC = () => {
             الاستلام والتسليم
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            استلام الوارد من الموظفين حسب المنطقة والرسيلر — منفصل عن تقرير الحسابات
+            استلام مجموع الربح الكلي من الموظفين حسب المنطقة والرسيلر — منفصل عن تقرير الحسابات
           </p>
         </div>
         {isAdmin && (
@@ -251,7 +251,7 @@ const ReceiptHandoverPage: React.FC = () => {
                   >
                     <div className="font-semibold text-gray-900 dark:text-white">{reseller.name}</div>
                     <div className="text-sm text-emerald-700 dark:text-emerald-400 mt-2 font-medium">
-                      {formatNumber(reseller.pendingIncomingIqd, { suffix: ' د.ع' })}
+                      {formatNumber(reseller.pendingTotalProfitIqd, { suffix: ' د.ع' })}
                     </div>
                   </button>
                 ))}
@@ -266,15 +266,15 @@ const ReceiptHandoverPage: React.FC = () => {
               </h2>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">الوارد الكلي</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">مجموع الربح الكلي</p>
                   <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">
-                    {formatNumber(pendingIncoming, { suffix: ' د.ع' })}
+                    {formatNumber(pendingProfit, { suffix: ' د.ع' })}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={openHandoverModal}
-                  disabled={pendingIncoming <= 0}
+                  disabled={pendingProfit <= 0}
                   className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <HandCoins className="h-5 w-5" />
@@ -295,7 +295,7 @@ const ReceiptHandoverPage: React.FC = () => {
                     <th>التاريخ</th>
                     <th>المنطقة</th>
                     <th>الرسيلر</th>
-                    <th>الوارد الكلي</th>
+                    <th>مجموع الربح الكلي</th>
                     <th>المستلم</th>
                     <th>المتبقي</th>
                     <th>من الموظف</th>
@@ -322,7 +322,7 @@ const ReceiptHandoverPage: React.FC = () => {
                         <td className="whitespace-nowrap">{formatDateTime(row.handoverDate)}</td>
                         <td>{row.regionName}</td>
                         <td>{row.resellerName}</td>
-                        <td>{formatNumber(row.totalIncomingAmount, { suffix: ' د.ع' })}</td>
+                        <td>{formatNumber(row.totalProfitAmount, { suffix: ' د.ع' })}</td>
                         <td className="font-medium text-emerald-700 dark:text-emerald-400">
                           {formatNumber(row.receivedAmount, { suffix: ' د.ع' })}
                         </td>
@@ -377,10 +377,10 @@ const ReceiptHandoverPage: React.FC = () => {
             <div className="p-4 space-y-4">
               <div>
                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                  مبالغ الوارد الكلي
+                  مجموع الربح الكلي
                 </label>
                 <div className="px-3 py-2 rounded-md bg-gray-100 dark:bg-gray-700 font-semibold text-primary-700 dark:text-primary-300">
-                  {formatNumber(pendingIncoming, { suffix: ' د.ع' })}
+                  {formatNumber(pendingProfit, { suffix: ' د.ع' })}
                 </div>
               </div>
               <div>
@@ -390,7 +390,7 @@ const ReceiptHandoverPage: React.FC = () => {
                 <input
                   type="number"
                   min={0}
-                  max={pendingIncoming}
+                  max={pendingProfit}
                   value={receivedAmount || ''}
                   onChange={(e) => setReceivedAmount(Number(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
@@ -456,7 +456,7 @@ const ReceiptHandoverPage: React.FC = () => {
                   createMutation.isPending ||
                   !handedByEmployeeUserId ||
                   receivedAmount <= 0 ||
-                  receivedAmount > pendingIncoming
+                  receivedAmount > pendingProfit
                 }
                 onClick={() => createMutation.mutate()}
                 className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:opacity-50"
