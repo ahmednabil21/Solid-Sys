@@ -2333,6 +2333,32 @@ class ApiService {
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
     };
+    const itemsRaw = r.serviceFeesItems ?? r.ServiceFeesItems;
+    const items = Array.isArray(itemsRaw) ? itemsRaw : [];
+    const feesFromItems = items.reduce(
+      (acc, item) => {
+        const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+        const price = Number(row.serviceFeesPrice ?? row.ServiceFeesPrice ?? 0);
+        const paid = Number(row.serviceFeesAmountPaid ?? row.ServiceFeesAmountPaid ?? 0);
+        const remaining = Number(
+          row.serviceFeesRemainingAmount ??
+            row.ServiceFeesRemainingAmount ??
+            Math.max(0, (Number.isFinite(price) ? price : 0) - (Number.isFinite(paid) ? paid : 0))
+        );
+        return {
+          price: acc.price + (Number.isFinite(price) ? price : 0),
+          paid: acc.paid + (Number.isFinite(paid) ? paid : 0),
+          remaining: acc.remaining + (Number.isFinite(remaining) ? remaining : 0),
+        };
+      },
+      { price: 0, paid: 0, remaining: 0 }
+    );
+    const serviceFeesPrice = num('serviceFeesPrice', 'ServiceFeesPrice') || feesFromItems.price;
+    const serviceFeesAmountPaid =
+      num('serviceFeesAmountPaid', 'ServiceFeesAmountPaid') || feesFromItems.paid;
+    const serviceFeesRemainingAmount =
+      num('serviceFeesRemainingAmount', 'ServiceFeesRemainingAmount') || feesFromItems.remaining;
+
     return {
       id: String(r.id ?? r.Id ?? ''),
       receiptNumber: str('receiptNumber', 'ReceiptNumber'),
@@ -2344,6 +2370,9 @@ class ApiService {
       newProfileName: str('newProfileName', 'NewProfileName'),
       paymentStatus: num('paymentStatus', 'PaymentStatus'),
       wifiCode: (r.wifiCode ?? r.WiFiCode ?? r.WifiCode ?? null) as string | null,
+      serviceFeesPrice,
+      serviceFeesAmountPaid,
+      serviceFeesRemainingAmount,
     };
   }
 

@@ -127,6 +127,9 @@ export interface SubscriberAppRenewalDto {
   newProfileName?: string;
   paymentStatus?: number;
   wifiCode?: string | null;
+  serviceFeesPrice?: number;
+  serviceFeesAmountPaid?: number;
+  serviceFeesRemainingAmount?: number;
 }
 
 /** أنواع مشاكل طلب الصيانة في تطبيق المشترك */

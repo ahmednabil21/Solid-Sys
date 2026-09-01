@@ -9,6 +9,7 @@ import {
   AgentAnnouncementDto,
 } from '../types';
 import { useDigits } from '../contexts/DigitsContext';
+import { resolveReceiptPrintAmounts } from '../utils/receiptPrint';
 import waklogo from '../images/waklogo.png';
 import {
   User,
@@ -47,7 +48,7 @@ const PROBLEM_TYPE_OPTIONS: { value: SubscriberAppProblemType; label: string }[]
 ];
 
 const problemTypeLabel = (type?: SubscriberAppProblemType | number | null) => {
-  const found = PROBLEM_TYPE_OPTIONS.find((o) => o.value === type);
+  const found = PROBLEM_TYPE_OPTIONS.find((o) => o.value === type);  
   return found?.label ?? '—';
 };
 
@@ -326,6 +327,7 @@ const SubscriberInfoPage: React.FC = () => {
   const headerRegion = subscriber?.regionName || session?.regionName;
   const headerReseller = subscriber?.agentResellerName || session?.agentResellerName;
   const renewalProfileName = (r: SubscriberAppRenewalDto) => r.newProfileName || '—';
+  const renewalAmounts = (r: SubscriberAppRenewalDto) => resolveReceiptPrintAmounts(r);
 
   const navItems: { id: AppTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'maintenance', label: 'الصيانة', icon: Wrench },
@@ -607,13 +609,13 @@ const SubscriberInfoPage: React.FC = () => {
                           <div>
                             <p className="text-xs text-slate-500 mb-0.5">السعر</p>
                             <p className="font-semibold text-slate-800">
-                              {formatNumber(r.finalPrice, { suffix: ' د.ع' })}
+                              {formatNumber(renewalAmounts(r).subscriptionPrice, { suffix: ' د.ع' })}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-slate-500 mb-0.5">المدفوع</p>
                             <p className="font-semibold text-slate-800">
-                              {formatNumber(r.amountPaid, { suffix: ' د.ع' })}
+                              {formatNumber(renewalAmounts(r).amountPaid, { suffix: ' د.ع' })}
                             </p>
                           </div>
                           <div className="col-span-2">
