@@ -2980,11 +2980,12 @@ export interface ExpenseProfitSummary {
   agentResellerId?: string | null;
   year: number;
   month: number;
-  paymentMethod?: number | null;
   totalProfit: number;
   cashProfit: number;
   masterProfit: number;
   remainingAfterExpenses: number;
+  remainingCashAfterExpenses: number;
+  remainingMasterAfterExpenses: number;
 }
 
 // --- كشف الرواتب (Salary Sheet) ---

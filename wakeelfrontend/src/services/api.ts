@@ -2954,7 +2954,6 @@ class ApiService {
     year: number;
     month: number;
     resellerId?: string;
-    paymentMethod?: number;
     agentId?: string;
   }): Promise<ExpenseProfitSummary> {
     const query: Record<string, string | number> = {
@@ -2963,7 +2962,6 @@ class ApiService {
       month: params.month,
     };
     if (params.resellerId) query.resellerId = params.resellerId;
-    if (params.paymentMethod != null) query.paymentMethod = params.paymentMethod;
     if (params.agentId) query.agentId = params.agentId;
     const response: AxiosResponse<ExpenseProfitSummary> = await this.api.get(
       '/OfficeExpenses/profit-summary',
@@ -2975,11 +2973,16 @@ class ApiService {
       agentResellerId: (d.agentResellerId ?? d.AgentResellerId ?? null) as string | null,
       year: Number(d.year ?? d.Year ?? params.year),
       month: Number(d.month ?? d.Month ?? params.month),
-      paymentMethod: (d.paymentMethod ?? d.PaymentMethod ?? null) as number | null,
       totalProfit: Number(d.totalProfit ?? d.TotalProfit ?? 0),
       cashProfit: Number(d.cashProfit ?? d.CashProfit ?? 0),
       masterProfit: Number(d.masterProfit ?? d.MasterProfit ?? 0),
       remainingAfterExpenses: Number(d.remainingAfterExpenses ?? d.RemainingAfterExpenses ?? 0),
+      remainingCashAfterExpenses: Number(
+        d.remainingCashAfterExpenses ?? d.RemainingCashAfterExpenses ?? 0
+      ),
+      remainingMasterAfterExpenses: Number(
+        d.remainingMasterAfterExpenses ?? d.RemainingMasterAfterExpenses ?? 0
+      ),
     };
   }
 

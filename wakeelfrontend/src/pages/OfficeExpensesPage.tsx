@@ -96,7 +96,6 @@ const OfficeExpensesPage: React.FC = () => {
   const baghdadNow = getBaghdadYearMonth();
   const [filterYear, setFilterYear] = useState(baghdadNow.year);
   const [filterMonth, setFilterMonth] = useState(baghdadNow.month);
-  const [filterPaymentMethod, setFilterPaymentMethod] = useState<number>(ActivationPaymentMethod.Cash);
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [withdrawalsPage, setWithdrawalsPage] = useState(1);
   const [withdrawalsPageSize, setWithdrawalsPageSize] = useState<number>(
@@ -207,7 +206,6 @@ const OfficeExpensesPage: React.FC = () => {
       currentSelectedReseller?.id ?? null,
       filterYear,
       filterMonth,
-      filterPaymentMethod,
     ],
     queryFn: () =>
       apiService.getExpenseProfitSummary({
@@ -215,7 +213,6 @@ const OfficeExpensesPage: React.FC = () => {
         year: filterYear,
         month: filterMonth,
         resellerId: currentSelectedReseller?.id,
-        paymentMethod: filterPaymentMethod,
         agentId: isAdmin ? effectiveAgentId || undefined : undefined,
       }),
     enabled: canLoadData && !!selectedRegionId,
@@ -323,7 +320,7 @@ const OfficeExpensesPage: React.FC = () => {
         agentResellerId: selectedReseller?.id,
         year: filterYear,
         month: filterMonth,
-        paymentMethod: filterPaymentMethod,
+        paymentMethod: ActivationPaymentMethod.Cash,
         amount: 0,
         reason: '',
         expenseDate: new Date().toISOString().split('T')[0],
@@ -415,15 +412,28 @@ const OfficeExpensesPage: React.FC = () => {
   };
 
   const remainingAfterExpenses = profitSummary?.remainingAfterExpenses ?? 0;
+  const remainingCashAfterExpenses = profitSummary?.remainingCashAfterExpenses ?? 0;
+  const remainingMasterAfterExpenses = profitSummary?.remainingMasterAfterExpenses ?? 0;
+  const canWithdraw =
+    remainingCashAfterExpenses > 0 || remainingMasterAfterExpenses > 0;
+
+  const remainingForSelectedSource =
+    Number(withdrawalForm.paymentMethod) === ActivationPaymentMethod.Master
+      ? remainingMasterAfterExpenses
+      : remainingCashAfterExpenses;
 
   const openWithdrawalModal = () => {
-    if (!selectedRegionId || remainingAfterExpenses <= 0) return;
+    if (!selectedRegionId || !canWithdraw) return;
+    const defaultMethod =
+      remainingCashAfterExpenses > 0
+        ? ActivationPaymentMethod.Cash
+        : ActivationPaymentMethod.Master;
     setWithdrawalForm({
       regionId: selectedRegionId,
       agentResellerId: currentSelectedReseller?.id,
       year: filterYear,
       month: filterMonth,
-      paymentMethod: filterPaymentMethod,
+      paymentMethod: defaultMethod,
       amount: 0,
       reason: '',
       expenseDate: new Date().toISOString().split('T')[0],
@@ -439,8 +449,8 @@ const OfficeExpensesPage: React.FC = () => {
       showError('خطأ', 'قيمة مبلغ الصرف يجب أن تكون أكبر من صفر');
       return;
     }
-    if (withdrawalForm.amount > remainingAfterExpenses) {
-      showError('خطأ', 'قيمة مبلغ الصرف أكبر من الربح المتبقي بعد الصرف');
+    if (withdrawalForm.amount > remainingForSelectedSource) {
+      showError('خطأ', 'قيمة مبلغ الصرف أكبر من الربح المتبقي لهذا المصدر');
       return;
     }
     if (!withdrawalForm.reason.trim()) {
@@ -453,7 +463,7 @@ const OfficeExpensesPage: React.FC = () => {
       agentResellerId: currentSelectedReseller?.id,
       year: filterYear,
       month: filterMonth,
-      paymentMethod: filterPaymentMethod,
+      paymentMethod: withdrawalForm.paymentMethod,
       reason: withdrawalForm.reason.trim(),
       notes: withdrawalForm.notes?.trim() || undefined,
     });
@@ -655,7 +665,7 @@ const OfficeExpensesPage: React.FC = () => {
 
             {selectedRegionId && (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                       السنة
@@ -686,19 +696,6 @@ const OfficeExpensesPage: React.FC = () => {
                           {m.label}
                         </option>
                       ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      مصدر الصرف
-                    </label>
-                    <select
-                      value={filterPaymentMethod}
-                      onChange={(e) => setFilterPaymentMethod(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-                    >
-                      <option value={ActivationPaymentMethod.Cash}>كاش</option>
-                      <option value={ActivationPaymentMethod.Master}>ماستر كارد</option>
                     </select>
                   </div>
                 </div>
@@ -743,7 +740,6 @@ const OfficeExpensesPage: React.FC = () => {
                       المتبقي للسحب — {selectedRegion?.name}
                       {currentSelectedReseller ? ` — ${currentSelectedReseller.name}` : ' (كل المنطقة)'}
                       {` — ${filterMonth.toString().padStart(2, '0')}/${filterYear}`}
-                      {` — ${filterPaymentMethod === ActivationPaymentMethod.Master ? 'ماستر كارد' : 'كاش'}`}
                     </p>
                     <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200 mt-1">
                       {formatNumber(remainingAfterExpenses, { suffix: ' د.ع' })}
@@ -752,7 +748,7 @@ const OfficeExpensesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={openWithdrawalModal}
-                    disabled={remainingAfterExpenses <= 0}
+                    disabled={!canWithdraw}
                     className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <HandCoins className="h-5 w-5" />
@@ -993,7 +989,6 @@ const OfficeExpensesPage: React.FC = () => {
                   {selectedRegion.name}
                   {currentSelectedReseller ? ` — ${currentSelectedReseller.name}` : ' — كل المنطقة'}
                   {` — ${filterMonth.toString().padStart(2, '0')}/${filterYear}`}
-                  {` — ${filterPaymentMethod === ActivationPaymentMethod.Master ? 'ماستر كارد' : 'كاش'}`}
                 </p>
               </div>
               <button
@@ -1005,12 +1000,31 @@ const OfficeExpensesPage: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleWithdrawalSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  مصدر الصرف *
+                </label>
+                <select
+                  value={withdrawalForm.paymentMethod}
+                  onChange={(e) =>
+                    setWithdrawalForm((previous) => ({
+                      ...previous,
+                      paymentMethod: Number(e.target.value),
+                    }))
+                  }
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                >
+                  <option value={ActivationPaymentMethod.Cash}>كاش</option>
+                  <option value={ActivationPaymentMethod.Master}>ماستر كارد</option>
+                </select>
+              </div>
               <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-3">
                 <span className="text-sm text-emerald-700 dark:text-emerald-300">
-                  الربح المتبقي بعد الصرف:
+                  الربح المتبقي بعد الصرف لهذا المصدر:
                 </span>{' '}
                 <strong className="text-emerald-800 dark:text-emerald-200">
-                  {formatNumber(remainingAfterExpenses, { suffix: ' د.ع' })}
+                  {formatNumber(remainingForSelectedSource, { suffix: ' د.ع' })}
                 </strong>
               </div>
               <div>
@@ -1020,7 +1034,7 @@ const OfficeExpensesPage: React.FC = () => {
                 <input
                   type="number"
                   min={1}
-                  max={remainingAfterExpenses}
+                  max={remainingForSelectedSource}
                   value={withdrawalForm.amount || ''}
                   onChange={(e) =>
                     setWithdrawalForm((previous) => ({
