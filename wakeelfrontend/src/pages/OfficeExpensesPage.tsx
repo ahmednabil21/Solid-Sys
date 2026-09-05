@@ -700,7 +700,7 @@ const OfficeExpensesPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
                   <StatCard
                     title="الربح الكلي"
                     value={profitSummary?.totalProfit ?? 0}
@@ -727,6 +727,20 @@ const OfficeExpensesPage: React.FC = () => {
                     value={remainingAfterExpenses}
                     icon={HandCoins}
                     color="orange"
+                    isAmount
+                  />
+                  <StatCard
+                    title="المتبقي من صرف الكاش"
+                    value={remainingCashAfterExpenses}
+                    icon={Wallet}
+                    color="teal"
+                    isAmount
+                  />
+                  <StatCard
+                    title="المتبقي من صرف الماستر"
+                    value={remainingMasterAfterExpenses}
+                    icon={CreditCard}
+                    color="indigo"
                     isAmount
                   />
                 </div>
