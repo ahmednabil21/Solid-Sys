@@ -1601,7 +1601,7 @@ class ApiService {
     );
     return {
       id: String(r.id ?? r.Id ?? ''),
-      agentResellerId: String(r.agentResellerId ?? r.AgentResellerId ?? ''),
+      agentResellerId: (r.agentResellerId ?? r.AgentResellerId ?? null) as string | null,
       resellerName: String(r.resellerName ?? r.ResellerName ?? ''),
       regionId: String(r.regionId ?? r.RegionId ?? ''),
       regionName: String(r.regionName ?? r.RegionName ?? ''),
@@ -1631,6 +1631,8 @@ class ApiService {
     agentId?: string;
     regionId?: string;
     agentResellerId?: string;
+    year?: number;
+    month?: number;
   }): Promise<PaginatedResponse<ReceiptHandoverRecord>> {
     const query: Record<string, string | number> = {
       page: params.page,
@@ -1639,6 +1641,8 @@ class ApiService {
     if (params.agentId) query.agentId = params.agentId;
     if (params.regionId) query.regionId = params.regionId;
     if (params.agentResellerId) query.agentResellerId = params.agentResellerId;
+    if (params.year) query.year = params.year;
+    if (params.month) query.month = params.month;
     const response: AxiosResponse<PaginatedResponse<ReceiptHandoverRecord>> = await this.api.get('/ReceiptHandover/records', {
       params: query,
     });

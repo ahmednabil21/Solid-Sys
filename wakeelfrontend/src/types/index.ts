@@ -2336,7 +2336,10 @@ export interface ReceiptHandoverContext {
 }
 
 export interface ReceiptHandoverCreateRequest {
-  agentResellerId: string;
+  regionId: string;
+  agentResellerId?: string;
+  year: number;
+  month: number;
   receivedAmount: number;
   handedByEmployeeUserId: string;
   notes?: string;
@@ -2345,7 +2348,7 @@ export interface ReceiptHandoverCreateRequest {
 
 export interface ReceiptHandoverRecord {
   id: string;
-  agentResellerId: string;
+  agentResellerId?: string | null;
   resellerName: string;
   regionId: string;
   regionName: string;
