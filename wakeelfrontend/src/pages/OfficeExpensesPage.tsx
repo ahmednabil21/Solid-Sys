@@ -8,9 +8,11 @@ import {
   ExpenseWithdrawalCreateRequest,
   ExpenseWithdrawalRequest,
   ExpenseWithdrawalStatus,
+  ExpenseProfitSummary,
   ReceiptHandoverRegion,
   ReceiptHandoverReseller,
   UserRole,
+  ActivationPaymentMethod,
 } from '../types';
 import { showSuccess, showError } from '../utils/notifications';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,11 +32,49 @@ import {
   HandCoins,
   Clock3,
   XCircle,
+  Coins,
+  CreditCard,
 } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 
 const DASHBOARD_OFFICE_EXPENSES_AGENT_KEY = 'wakeel_office_expenses_agentId';
+
+const ARABIC_MONTHS = [
+  { value: 1, label: 'يناير' },
+  { value: 2, label: 'فبراير' },
+  { value: 3, label: 'مارس' },
+  { value: 4, label: 'أبريل' },
+  { value: 5, label: 'مايو' },
+  { value: 6, label: 'يونيو' },
+  { value: 7, label: 'يوليو' },
+  { value: 8, label: 'أغسطس' },
+  { value: 9, label: 'سبتمبر' },
+  { value: 10, label: 'أكتوبر' },
+  { value: 11, label: 'نوفمبر' },
+  { value: 12, label: 'ديسمبر' },
+];
+
+function getBaghdadYearMonth(): { year: number; month: number } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Baghdad',
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(new Date());
+    const y = Number(parts.find((p) => p.type === 'year')?.value);
+    const m = Number(parts.find((p) => p.type === 'month')?.value);
+    if (y && m) return { year: y, month: m };
+  } catch (_) {}
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+function yearOptions(currentYear: number): number[] {
+  const years: number[] = [];
+  for (let y = currentYear - 5; y <= currentYear + 1; y += 1) years.push(y);
+  return years;
+}
 
 const OfficeExpensesPage: React.FC = () => {
   const { user } = useAuth();
@@ -53,13 +93,20 @@ const OfficeExpensesPage: React.FC = () => {
   const [appliedToDate, setAppliedToDate] = useState('');
   const [selectedRegionId, setSelectedRegionId] = useState('');
   const [selectedReseller, setSelectedReseller] = useState<ReceiptHandoverReseller | null>(null);
+  const baghdadNow = getBaghdadYearMonth();
+  const [filterYear, setFilterYear] = useState(baghdadNow.year);
+  const [filterMonth, setFilterMonth] = useState(baghdadNow.month);
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<number>(ActivationPaymentMethod.Cash);
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [withdrawalsPage, setWithdrawalsPage] = useState(1);
   const [withdrawalsPageSize, setWithdrawalsPageSize] = useState<number>(
     STANDARD_PAGE_SIZE_OPTIONS[0]
   );
   const [withdrawalForm, setWithdrawalForm] = useState<ExpenseWithdrawalCreateRequest>({
-    agentResellerId: '',
+    regionId: '',
+    year: baghdadNow.year,
+    month: baghdadNow.month,
+    paymentMethod: ActivationPaymentMethod.Cash,
     amount: 0,
     reason: '',
     expenseDate: new Date().toISOString().split('T')[0],
@@ -151,6 +198,29 @@ const OfficeExpensesPage: React.FC = () => {
       selectedReseller,
     [selectedRegion, selectedReseller]
   );
+
+  const { data: profitSummary, isLoading: profitSummaryLoading } = useQuery<ExpenseProfitSummary>({
+    queryKey: [
+      'expense-profit-summary',
+      effectiveAgentId ?? 'self',
+      selectedRegionId || null,
+      currentSelectedReseller?.id ?? null,
+      filterYear,
+      filterMonth,
+      filterPaymentMethod,
+    ],
+    queryFn: () =>
+      apiService.getExpenseProfitSummary({
+        regionId: selectedRegionId,
+        year: filterYear,
+        month: filterMonth,
+        resellerId: currentSelectedReseller?.id,
+        paymentMethod: filterPaymentMethod,
+        agentId: isAdmin ? effectiveAgentId || undefined : undefined,
+      }),
+    enabled: canLoadData && !!selectedRegionId,
+    refetchInterval: 15000,
+  });
 
   const { data: withdrawalRequestsResponse, isLoading: withdrawalsLoading } = useQuery({
     queryKey: [
@@ -245,10 +315,15 @@ const OfficeExpensesPage: React.FC = () => {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['expense-withdrawal-context'] });
       queryClient.invalidateQueries({ queryKey: ['expense-withdrawal-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-profit-summary'] });
       queryClient.invalidateQueries({ queryKey: ['receiptHandoverContext'] });
       setShowWithdrawalModal(false);
       setWithdrawalForm({
-        agentResellerId: selectedReseller?.id ?? '',
+        regionId: selectedRegionId,
+        agentResellerId: selectedReseller?.id,
+        year: filterYear,
+        month: filterMonth,
+        paymentMethod: filterPaymentMethod,
         amount: 0,
         reason: '',
         expenseDate: new Date().toISOString().split('T')[0],
@@ -335,14 +410,20 @@ const OfficeExpensesPage: React.FC = () => {
   };
 
   const handleResellerSelect = (reseller: ReceiptHandoverReseller) => {
-    setSelectedReseller(reseller);
+    setSelectedReseller((previous) => (previous?.id === reseller.id ? null : reseller));
     setWithdrawalsPage(1);
   };
 
+  const remainingAfterExpenses = profitSummary?.remainingAfterExpenses ?? 0;
+
   const openWithdrawalModal = () => {
-    if (!currentSelectedReseller || currentSelectedReseller.pendingIncomingIqd <= 0) return;
+    if (!selectedRegionId || remainingAfterExpenses <= 0) return;
     setWithdrawalForm({
-      agentResellerId: currentSelectedReseller.id,
+      regionId: selectedRegionId,
+      agentResellerId: currentSelectedReseller?.id,
+      year: filterYear,
+      month: filterMonth,
+      paymentMethod: filterPaymentMethod,
       amount: 0,
       reason: '',
       expenseDate: new Date().toISOString().split('T')[0],
@@ -353,13 +434,13 @@ const OfficeExpensesPage: React.FC = () => {
 
   const handleWithdrawalSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!currentSelectedReseller) return;
+    if (!selectedRegionId) return;
     if (withdrawalForm.amount <= 0) {
       showError('خطأ', 'قيمة مبلغ الصرف يجب أن تكون أكبر من صفر');
       return;
     }
-    if (withdrawalForm.amount > currentSelectedReseller.pendingIncomingIqd) {
-      showError('خطأ', 'قيمة مبلغ الصرف أكبر من الوارد الكلي المتاح لهذا الرسيلر');
+    if (withdrawalForm.amount > remainingAfterExpenses) {
+      showError('خطأ', 'قيمة مبلغ الصرف أكبر من الربح المتبقي بعد الصرف');
       return;
     }
     if (!withdrawalForm.reason.trim()) {
@@ -368,7 +449,11 @@ const OfficeExpensesPage: React.FC = () => {
     }
     withdrawalMutation.mutate({
       ...withdrawalForm,
-      agentResellerId: currentSelectedReseller.id,
+      regionId: selectedRegionId,
+      agentResellerId: currentSelectedReseller?.id,
+      year: filterYear,
+      month: filterMonth,
+      paymentMethod: filterPaymentMethod,
       reason: withdrawalForm.reason.trim(),
       notes: withdrawalForm.notes?.trim() || undefined,
     });
@@ -502,10 +587,10 @@ const OfficeExpensesPage: React.FC = () => {
         <div className="mb-4">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <HandCoins className="h-5 w-5 text-primary-600" />
-            سحب صرفيات من وارد الرسيلر
+            سحب صرفيات من ربح المنطقة الشهري
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            الوارد المعروض هو المتبقي بعد مبالغ الاستلام والتسليم والصرفيات الموافق عليها، ولا يؤثر على جدول الحسابات.
+            اختر المنطقة (يُلغى اختيار الرسيلر) ثم السنة والشهر ومصدر الصرف. المبلغ من مجموع totalProfit ولا يغيّر سجل الحسابات.
           </p>
         </div>
 
@@ -545,7 +630,7 @@ const OfficeExpensesPage: React.FC = () => {
               <div className="mb-5">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                   <Store className="h-4 w-4" />
-                  اختر الرسيلر — {selectedRegion.name}
+                  الرسيلر اختياري — {selectedRegion.name}
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {selectedRegion.resellers.map((reseller) => (
@@ -568,26 +653,113 @@ const OfficeExpensesPage: React.FC = () => {
               </div>
             )}
 
-            {currentSelectedReseller && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
-                <div>
-                  <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                    الوارد الكلي المتاح — {currentSelectedReseller.name}
-                  </p>
-                  <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200 mt-1">
-                    {formatNumber(currentSelectedReseller.pendingIncomingIqd, { suffix: ' د.ع' })}
-                  </p>
+            {selectedRegionId && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      السنة
+                    </label>
+                    <select
+                      value={filterYear}
+                      onChange={(e) => setFilterYear(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                      {yearOptions(baghdadNow.year).map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      الشهر
+                    </label>
+                    <select
+                      value={filterMonth}
+                      onChange={(e) => setFilterMonth(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                      {ARABIC_MONTHS.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      مصدر الصرف
+                    </label>
+                    <select
+                      value={filterPaymentMethod}
+                      onChange={(e) => setFilterPaymentMethod(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                      <option value={ActivationPaymentMethod.Cash}>كاش</option>
+                      <option value={ActivationPaymentMethod.Master}>ماستر كارد</option>
+                    </select>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={openWithdrawalModal}
-                  disabled={currentSelectedReseller.pendingIncomingIqd <= 0}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <HandCoins className="h-5 w-5" />
-                  سحب صرفيات
-                </button>
-              </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                  <StatCard
+                    title="الربح الكلي"
+                    value={profitSummary?.totalProfit ?? 0}
+                    icon={DollarSign}
+                    color="blue"
+                    isAmount
+                  />
+                  <StatCard
+                    title="الربح كاش"
+                    value={profitSummary?.cashProfit ?? 0}
+                    icon={Coins}
+                    color="green"
+                    isAmount
+                  />
+                  <StatCard
+                    title="الربح ماستر كارد"
+                    value={profitSummary?.masterProfit ?? 0}
+                    icon={CreditCard}
+                    color="purple"
+                    isAmount
+                  />
+                  <StatCard
+                    title="الربح المتبقي بعد الصرف"
+                    value={remainingAfterExpenses}
+                    icon={HandCoins}
+                    color="orange"
+                    isAmount
+                  />
+                </div>
+                {profitSummaryLoading && (
+                  <p className="text-xs text-gray-500 mb-3">جاري تحديث أرقام الشهر...</p>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
+                  <div>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                      المتبقي للسحب — {selectedRegion?.name}
+                      {currentSelectedReseller ? ` — ${currentSelectedReseller.name}` : ' (كل المنطقة)'}
+                      {` — ${filterMonth.toString().padStart(2, '0')}/${filterYear}`}
+                      {` — ${filterPaymentMethod === ActivationPaymentMethod.Master ? 'ماستر كارد' : 'كاش'}`}
+                    </p>
+                    <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200 mt-1">
+                      {formatNumber(remainingAfterExpenses, { suffix: ' د.ع' })}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openWithdrawalModal}
+                    disabled={remainingAfterExpenses <= 0}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <HandCoins className="h-5 w-5" />
+                    سحب صرفيات
+                  </button>
+                </div>
+              </>
             )}
           </>
         )}
@@ -700,7 +872,7 @@ const OfficeExpensesPage: React.FC = () => {
             سجل طلبات سحب الصرفيات
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            تُخصم القيمة من وارد الرسيلر عند الموافقة فقط.
+            تُخصم القيمة من ربح الشهر المحدد عند الموافقة فقط، دون تغيير سجل الحسابات.
           </p>
         </div>
         <div className="wakeel-table-scroll">
@@ -709,6 +881,8 @@ const OfficeExpensesPage: React.FC = () => {
               <tr>
                 <th>المنطقة</th>
                 <th>الرسيلر</th>
+                <th>الشهر</th>
+                <th>المصدر</th>
                 <th>قيمة مبلغ الصرف</th>
                 <th>سبب الصرف</th>
                 <th>تاريخ الصرف</th>
@@ -720,13 +894,13 @@ const OfficeExpensesPage: React.FC = () => {
             <tbody>
               {withdrawalsLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-gray-500">
+                  <td colSpan={10} className="py-10 text-center text-gray-500">
                     جاري تحميل طلبات الصرف...
                   </td>
                 </tr>
               ) : withdrawalRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={10} className="py-10 text-center text-gray-500 dark:text-gray-400">
                     لا توجد طلبات صرف.
                   </td>
                 </tr>
@@ -734,7 +908,13 @@ const OfficeExpensesPage: React.FC = () => {
                 withdrawalRequests.map((request) => (
                   <tr key={request.id}>
                     <td>{request.regionName}</td>
-                    <td>{request.resellerName}</td>
+                    <td>{request.resellerName || 'كل المنطقة'}</td>
+                    <td className="whitespace-nowrap">
+                      {request.month && request.year
+                        ? `${String(request.month).padStart(2, '0')}/${request.year}`
+                        : '—'}
+                    </td>
+                    <td>{request.paymentMethodLabelAr || '—'}</td>
                     <td className="font-semibold whitespace-nowrap">
                       {formatNumber(request.amount, { suffix: ' د.ع' })}
                     </td>
@@ -801,7 +981,7 @@ const OfficeExpensesPage: React.FC = () => {
         )}
       </section>
 
-      {showWithdrawalModal && currentSelectedReseller && selectedRegion && (
+      {showWithdrawalModal && selectedRegion && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
@@ -810,7 +990,10 @@ const OfficeExpensesPage: React.FC = () => {
                   طلب سحب صرفيات
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  {selectedRegion.name} — {currentSelectedReseller.name}
+                  {selectedRegion.name}
+                  {currentSelectedReseller ? ` — ${currentSelectedReseller.name}` : ' — كل المنطقة'}
+                  {` — ${filterMonth.toString().padStart(2, '0')}/${filterYear}`}
+                  {` — ${filterPaymentMethod === ActivationPaymentMethod.Master ? 'ماستر كارد' : 'كاش'}`}
                 </p>
               </div>
               <button
@@ -824,10 +1007,10 @@ const OfficeExpensesPage: React.FC = () => {
             <form onSubmit={handleWithdrawalSubmit} className="p-5 space-y-4">
               <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-3">
                 <span className="text-sm text-emerald-700 dark:text-emerald-300">
-                  الوارد المتاح:
+                  الربح المتبقي بعد الصرف:
                 </span>{' '}
                 <strong className="text-emerald-800 dark:text-emerald-200">
-                  {formatNumber(currentSelectedReseller.pendingIncomingIqd, { suffix: ' د.ع' })}
+                  {formatNumber(remainingAfterExpenses, { suffix: ' د.ع' })}
                 </strong>
               </div>
               <div>
@@ -837,7 +1020,7 @@ const OfficeExpensesPage: React.FC = () => {
                 <input
                   type="number"
                   min={1}
-                  max={currentSelectedReseller.pendingIncomingIqd}
+                  max={remainingAfterExpenses}
                   value={withdrawalForm.amount || ''}
                   onChange={(e) =>
                     setWithdrawalForm((previous) => ({

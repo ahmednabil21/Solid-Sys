@@ -2936,8 +2936,12 @@ export interface ExpenseWithdrawalRequest {
   id: string;
   regionId: string;
   regionName: string;
-  agentResellerId: string;
+  agentResellerId?: string | null;
   resellerName: string;
+  year?: number;
+  month?: number;
+  paymentMethod?: ActivationPaymentMethod | number;
+  paymentMethodLabelAr?: string;
   requestedByUserId: string;
   requestedByUserName: string;
   amount: number;
@@ -2953,7 +2957,11 @@ export interface ExpenseWithdrawalRequest {
 }
 
 export interface ExpenseWithdrawalCreateRequest {
-  agentResellerId: string;
+  regionId: string;
+  agentResellerId?: string;
+  year: number;
+  month: number;
+  paymentMethod: ActivationPaymentMethod | number;
   amount: number;
   reason: string;
   expenseDate: string;
@@ -2963,7 +2971,20 @@ export interface ExpenseWithdrawalCreateRequest {
 export interface ExpenseWithdrawalCreateResponse {
   request: ExpenseWithdrawalRequest;
   remainingIncomingIqd: number;
+  remainingAfterExpenses?: number;
   message: string;
+}
+
+export interface ExpenseProfitSummary {
+  regionId: string;
+  agentResellerId?: string | null;
+  year: number;
+  month: number;
+  paymentMethod?: number | null;
+  totalProfit: number;
+  cashProfit: number;
+  masterProfit: number;
+  remainingAfterExpenses: number;
 }
 
 // --- كشف الرواتب (Salary Sheet) ---

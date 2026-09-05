@@ -127,6 +127,7 @@ import {
   ExpenseWithdrawalRequest,
   ExpenseWithdrawalCreateRequest,
   ExpenseWithdrawalCreateResponse,
+  ExpenseProfitSummary,
   SalarySheetEntry,
   SalarySheetEntryCreateRequest,
   SalarySheetEntryUpdateRequest,
@@ -2946,6 +2947,40 @@ class ApiService {
       { params }
     );
     return this.normalizeReceiptHandoverContext(response.data);
+  }
+
+  async getExpenseProfitSummary(params: {
+    regionId: string;
+    year: number;
+    month: number;
+    resellerId?: string;
+    paymentMethod?: number;
+    agentId?: string;
+  }): Promise<ExpenseProfitSummary> {
+    const query: Record<string, string | number> = {
+      regionId: params.regionId,
+      year: params.year,
+      month: params.month,
+    };
+    if (params.resellerId) query.resellerId = params.resellerId;
+    if (params.paymentMethod != null) query.paymentMethod = params.paymentMethod;
+    if (params.agentId) query.agentId = params.agentId;
+    const response: AxiosResponse<ExpenseProfitSummary> = await this.api.get(
+      '/OfficeExpenses/profit-summary',
+      { params: query }
+    );
+    const d = response.data as ExpenseProfitSummary & Record<string, unknown>;
+    return {
+      regionId: String(d.regionId ?? d.RegionId ?? params.regionId),
+      agentResellerId: (d.agentResellerId ?? d.AgentResellerId ?? null) as string | null,
+      year: Number(d.year ?? d.Year ?? params.year),
+      month: Number(d.month ?? d.Month ?? params.month),
+      paymentMethod: (d.paymentMethod ?? d.PaymentMethod ?? null) as number | null,
+      totalProfit: Number(d.totalProfit ?? d.TotalProfit ?? 0),
+      cashProfit: Number(d.cashProfit ?? d.CashProfit ?? 0),
+      masterProfit: Number(d.masterProfit ?? d.MasterProfit ?? 0),
+      remainingAfterExpenses: Number(d.remainingAfterExpenses ?? d.RemainingAfterExpenses ?? 0),
+    };
   }
 
   async getExpenseWithdrawalRequests(params?: {
