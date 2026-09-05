@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
-import { employeeCanReceiveTaskRequests } from '../utils/employeePermissions';
+import { employeeCanReceiveTaskRequests, employeeCanAssignEmployeeTasks, employeeCanEditEmployeeTasks, employeeCanDeleteEmployeeTasks, employeeCanManageEmployeeTaskBoard } from '../utils/employeePermissions';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
 import {
@@ -82,7 +82,10 @@ const EmployeeTasksPage: React.FC = () => {
   const { formatNumber } = useDigits();
   const queryClient = useQueryClient();
   const isEmployee = user?.role === UserRole.Employee;
-  const canManage = user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent;
+  const canAssignTasks = employeeCanAssignEmployeeTasks(user);
+  const canEditTasks = employeeCanEditEmployeeTasks(user);
+  const canDeleteTasks = employeeCanDeleteEmployeeTasks(user);
+  const canManage = employeeCanManageEmployeeTaskBoard(user);
   const isAdmin = user?.role === UserRole.Admin;
 
   const [page, setPage] = useState(1);
@@ -151,12 +154,12 @@ const EmployeeTasksPage: React.FC = () => {
       subscriberDebtOnly,
     ],
     queryFn: async () => {
-      if (isAdmin) {
+      if (isAdmin || canManage) {
         return apiService.getEmployeeTaskSubscribers({
           page: subscriberPage,
           pageSize: subscriberDebtOnly ? 50 : 10,
           searchTerm: subscriberSearchDebounced || undefined,
-          agentId: agentId.trim() || undefined,
+          agentId: isAdmin ? agentId.trim() || undefined : undefined,
           debtOnly: subscriberDebtOnly ? true : undefined,
         });
       }
@@ -240,8 +243,8 @@ const EmployeeTasksPage: React.FC = () => {
   const employeesOptions = isAdmin ? adminEmployees : myEmployees;
 
   const { data: tasksResponse, isLoading, refetch } = useQuery({
-    queryKey: ['employee-tasks', isEmployee ? 'my' : 'agent', taskQueryParams],
-    queryFn: () => (isEmployee ? apiService.getMyEmployeeTasks(taskQueryParams) : apiService.getAgentEmployeeTasks(taskQueryParams)),
+    queryKey: ['employee-tasks', canManage ? 'agent' : 'my', taskQueryParams],
+    queryFn: () => (canManage ? apiService.getAgentEmployeeTasks(taskQueryParams) : apiService.getMyEmployeeTasks(taskQueryParams)),
     enabled: !!user && (isEmployee || canManage) && (!isAdmin || !!taskQueryParams.agentId),
   });
 
@@ -663,7 +666,7 @@ const EmployeeTasksPage: React.FC = () => {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">مهام الموظفين</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isEmployee ? 'مهامي الشخصية' : 'إدارة مهام الموظفين'}
+            {canManage ? 'إدارة مهام الموظفين' : 'مهامي الشخصية'}
           </p>
         </div>
         {isEmployee && employeeCanReceiveTaskRequests(user) && (
@@ -689,7 +692,7 @@ const EmployeeTasksPage: React.FC = () => {
             {pushReady ? 'الإشعارات مفعّلة' : pushBusy ? 'جاري التفعيل...' : 'تفعيل إشعارات المهام'}
           </button>
         )}
-        {canManage && (
+        {canAssignTasks && (
           <button
             type="button"
             onClick={() => {
@@ -770,7 +773,7 @@ const EmployeeTasksPage: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {isEmployee ? (
+        {!canManage ? (
           <div className="p-4 space-y-3">
             {isLoading ? (
               <div className="px-3 py-6 text-center text-gray-500 dark:text-gray-400">
@@ -968,69 +971,69 @@ const EmployeeTasksPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {canManage && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setShowDetailsModal(true);
-                                }}
-                                className="px-2.5 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1"
-                              >
-                                عرض التفاصيل
-                              </button>
-                              <button
-                                type="button"
-                                disabled={task.status !== EmployeeTaskStatus.Pending}
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setSubscriberSearch('');
-                                  setSubscriberSearchDebounced('');
-                                  setSubscriberPage(1);
-                                  setSubscriberOptions([]);
-                                  setCreateForm({
-                                    employeeUserId: task.employeeUserId || '',
-                                    taskType: task.taskType,
-                                    subscriberId: task.subscriberId || '',
-                                    maintenanceType:
-                                      task.maintenanceType ?? SubscriberMaintenanceKind.CableCut,
-                                    amountReceived: task.amountReceived ?? undefined,
-                                    taskTitle: task.taskTitle || '',
-                                    note: task.note || '',
-                                  });
-                                  setAmountReceptionSubscriberIds(task.subscriberId ? [task.subscriberId] : []);
-                                  setShowEditModal(true);
-                                }}
-                                className="px-2.5 py-1.5 text-xs rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={
-                                  task.status !== EmployeeTaskStatus.Pending
-                                    ? 'يمكن التعديل فقط عندما تكون المهمة معلّقة.'
-                                    : undefined
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setShowDetailsModal(true);
+                            }}
+                            className="px-2.5 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center gap-1"
+                          >
+                            عرض التفاصيل
+                          </button>
+                          {canEditTasks && (
+                            <button
+                              type="button"
+                              disabled={task.status !== EmployeeTaskStatus.Pending}
+                              onClick={() => {
+                                setSelectedTask(task);
+                                setSubscriberSearch('');
+                                setSubscriberSearchDebounced('');
+                                setSubscriberPage(1);
+                                setSubscriberOptions([]);
+                                setCreateForm({
+                                  employeeUserId: task.employeeUserId || '',
+                                  taskType: task.taskType,
+                                  subscriberId: task.subscriberId || '',
+                                  maintenanceType:
+                                    task.maintenanceType ?? SubscriberMaintenanceKind.CableCut,
+                                  amountReceived: task.amountReceived ?? undefined,
+                                  taskTitle: task.taskTitle || '',
+                                  note: task.note || '',
+                                });
+                                setAmountReceptionSubscriberIds(task.subscriberId ? [task.subscriberId] : []);
+                                setShowEditModal(true);
+                              }}
+                              className="px-2.5 py-1.5 text-xs rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={
+                                task.status !== EmployeeTaskStatus.Pending
+                                  ? 'يمكن التعديل فقط عندما تكون المهمة معلّقة.'
+                                  : undefined
+                              }
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              تعديل
+                            </button>
+                          )}
+                          {canDeleteTasks && (
+                            <button
+                              type="button"
+                              disabled={task.status !== EmployeeTaskStatus.Pending}
+                              onClick={() => {
+                                if (window.confirm('هل أنت متأكد من حذف هذه المهمة؟')) {
+                                  deleteMutation.mutate(task.id);
                                 }
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                                تعديل
-                              </button>
-                              <button
-                                type="button"
-                                disabled={task.status !== EmployeeTaskStatus.Pending}
-                                onClick={() => {
-                                  if (window.confirm('هل أنت متأكد من حذف هذه المهمة؟')) {
-                                    deleteMutation.mutate(task.id);
-                                  }
-                                }}
-                                className="px-2.5 py-1.5 text-xs rounded-md bg-red-600 hover:bg-red-700 text-white inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={
-                                  task.status !== EmployeeTaskStatus.Pending
-                                    ? 'يمكن الحذف فقط عندما تكون المهمة معلّقة.'
-                                    : undefined
-                                }
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                حذف
-                              </button>
-                            </>
+                              }}
+                              className="px-2.5 py-1.5 text-xs rounded-md bg-red-600 hover:bg-red-700 text-white inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={
+                                task.status !== EmployeeTaskStatus.Pending
+                                  ? 'يمكن الحذف فقط عندما تكون المهمة معلّقة.'
+                                  : undefined
+                              }
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              حذف
+                            </button>
                           )}
                         </div>
                       </td>

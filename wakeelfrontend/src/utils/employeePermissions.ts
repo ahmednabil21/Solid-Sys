@@ -276,14 +276,22 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
       if (action === 'sell' || action === 'return') return !!user.canDisburseMaterial;
       return !!user.canManageMaterialsAndSales;
     case 'EmployeeManagement':
-      if (action === 'view') return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
+      if (action === 'view') {
+        return !!(
+          user.canManageEmployeeTasks ||
+          user.canManageMaterialsAndSales ||
+          user.canReceiveTaskRequests
+        );
+      }
       if (
         action === 'receiveTask' ||
         action === 'receiveTaskRequests' ||
-        action === 'canReceiveTaskRequests' ||
-        ['addTask', 'editTask', 'deleteTask'].includes(action)
+        action === 'canReceiveTaskRequests'
       ) {
         return !!user.canReceiveTaskRequests;
+      }
+      if (['addTask', 'editTask', 'deleteTask'].includes(action)) {
+        return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
       }
       if (['viewSalarySheets', 'addSalary', 'advance', 'deduction'].includes(action)) {
         return !!user.canAccessExpensesAndSalarySheet;
@@ -359,6 +367,39 @@ export function employeeHasAnySubscriberAccess(user: User | null | undefined): b
 export function employeeCanAccessDashboard(user: User | null | undefined): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
   return employeeCanAccessAdminPath(user, '/admin/dashboard');
+}
+
+export function employeeCanAssignEmployeeTasks(user: User | null | undefined): boolean {
+  if (!user || user.role !== UserRole.Employee) return true;
+  if (usesPagePermissions(user)) {
+    return hasPageAction(user, 'EmployeeManagement', 'addTask');
+  }
+  return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
+}
+
+export function employeeCanEditEmployeeTasks(user: User | null | undefined): boolean {
+  if (!user || user.role !== UserRole.Employee) return true;
+  if (usesPagePermissions(user)) {
+    return hasPageAction(user, 'EmployeeManagement', 'editTask');
+  }
+  return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
+}
+
+export function employeeCanDeleteEmployeeTasks(user: User | null | undefined): boolean {
+  if (!user || user.role !== UserRole.Employee) return true;
+  if (usesPagePermissions(user)) {
+    return hasPageAction(user, 'EmployeeManagement', 'deleteTask');
+  }
+  return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
+}
+
+export function employeeCanManageEmployeeTaskBoard(user: User | null | undefined): boolean {
+  if (!user || user.role !== UserRole.Employee) return true;
+  return (
+    employeeCanAssignEmployeeTasks(user) ||
+    employeeCanEditEmployeeTasks(user) ||
+    employeeCanDeleteEmployeeTasks(user)
+  );
 }
 
 export function employeeCanAccessEmployeeTasks(user: User | null | undefined): boolean {
