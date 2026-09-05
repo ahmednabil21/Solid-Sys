@@ -600,7 +600,7 @@ const OfficeExpensesPage: React.FC = () => {
             سحب صرفيات من ربح المنطقة الشهري
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            اختر المنطقة (يُلغى اختيار الرسيلر) ثم السنة والشهر ومصدر الصرف. المبلغ من مجموع totalProfit ولا يغيّر سجل الحسابات.
+            اختر المنطقة (يُلغى اختيار الرسيلر) ثم السنة والشهر. الربح الكلي من totalPaid للحسابات الشهرية المعزولة، ووارد كاش/ماستر من تقرير الحسابات. لا يغيّر سجل الحسابات.
           </p>
         </div>
 
@@ -709,14 +709,14 @@ const OfficeExpensesPage: React.FC = () => {
                     isAmount
                   />
                   <StatCard
-                    title="الربح كاش"
+                    title="وارد كاش"
                     value={profitSummary?.cashProfit ?? 0}
                     icon={Coins}
                     color="green"
                     isAmount
                   />
                   <StatCard
-                    title="الربح ماستر كارد"
+                    title="وارد ماستر"
                     value={profitSummary?.masterProfit ?? 0}
                     icon={CreditCard}
                     color="purple"
