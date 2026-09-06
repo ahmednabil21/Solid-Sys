@@ -373,8 +373,6 @@ const OfficeExpensesPage: React.FC = () => {
     return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
   };
 
-  };
-
   if (error) {
     return (
       <div className="p-6">
