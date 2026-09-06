@@ -77,10 +77,16 @@ function yearOptions(currentYear: number): number[] {
 }
 
 const OfficeExpensesPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
   const { formatNumber, formatDate } = useDigits();
   const queryClient = useQueryClient();
   const isAdmin = user?.role === UserRole.Admin;
+  const canDecideExpenseWithdrawal = hasAnyRole([
+    UserRole.Admin,
+    UserRole.Agent,
+    UserRole.SubAgent,
+    UserRole.MainAgent,
+  ]);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -334,6 +340,25 @@ const OfficeExpensesPage: React.FC = () => {
     },
     onError: (err: unknown) => {
       showError('تعذر إنشاء طلب الصرف', ApiService.showError(err));
+    },
+  });
+
+  const decideWithdrawalMutation = useMutation({
+    mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
+      apiService.decideExpenseWithdrawalRequest(
+        id,
+        approve,
+        isAdmin ? effectiveAgentId || undefined : undefined
+      ),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['expense-withdrawal-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-profit-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-withdrawal-context'] });
+      queryClient.invalidateQueries({ queryKey: ['receiptHandoverContext'] });
+      showSuccess(result.alreadyDecided ? 'تم سابقاً' : 'تم تنفيذ القرار', result.message);
+    },
+    onError: (err: unknown) => {
+      showError('تعذر تنفيذ القرار', ApiService.showError(err));
     },
   });
 
@@ -899,18 +924,19 @@ const OfficeExpensesPage: React.FC = () => {
                 <th>ملاحظات</th>
                 <th>بواسطة</th>
                 <th>حالة الطلب</th>
+                {canDecideExpenseWithdrawal && <th>الإجراء</th>}
               </tr>
             </thead>
             <tbody>
               {withdrawalsLoading ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-gray-500">
+                  <td colSpan={canDecideExpenseWithdrawal ? 11 : 10} className="py-10 text-center text-gray-500">
                     جاري تحميل طلبات الصرف...
                   </td>
                 </tr>
               ) : withdrawalRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={canDecideExpenseWithdrawal ? 11 : 10} className="py-10 text-center text-gray-500 dark:text-gray-400">
                     لا توجد طلبات صرف.
                   </td>
                 </tr>
@@ -965,6 +991,38 @@ const OfficeExpensesPage: React.FC = () => {
                           </p>
                         )}
                     </td>
+                    {canDecideExpenseWithdrawal && (
+                      <td>
+                        {Number(request.status) === ExpenseWithdrawalStatus.Pending ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={decideWithdrawalMutation.isPending}
+                              onClick={() =>
+                                decideWithdrawalMutation.mutate({ id: request.id, approve: true })
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              قبول
+                            </button>
+                            <button
+                              type="button"
+                              disabled={decideWithdrawalMutation.isPending}
+                              onClick={() =>
+                                decideWithdrawalMutation.mutate({ id: request.id, approve: false })
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              رفض
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

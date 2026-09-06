@@ -3018,6 +3018,29 @@ class ApiService {
     return response.data;
   }
 
+  async decideExpenseWithdrawalRequest(
+    id: string,
+    approve: boolean,
+    agentId?: string
+  ): Promise<{ success: boolean; message: string; alreadyDecided?: boolean }> {
+    const params: Record<string, string> = {};
+    if (agentId) params.agentId = agentId;
+    const response = await this.api.post<{
+      success?: boolean;
+      Success?: boolean;
+      message?: string;
+      Message?: string;
+      alreadyDecided?: boolean;
+      AlreadyDecided?: boolean;
+    }>(`/OfficeExpenses/withdrawal-requests/${id}/decide`, { approve }, { params });
+    const d = response.data;
+    return {
+      success: d.success ?? d.Success ?? true,
+      message: d.message ?? d.Message ?? '',
+      alreadyDecided: d.alreadyDecided ?? d.AlreadyDecided ?? false,
+    };
+  }
+
   // --- كشف الرواتب (Salary Sheet) ---
   private salarySheetParams(options?: { agentId?: string; fromDate?: string; toDate?: string }): Record<string, string> {
     const params: Record<string, string> = {};
