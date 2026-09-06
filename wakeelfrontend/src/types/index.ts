@@ -2190,6 +2190,8 @@ export interface PaginatedResponse<T> {
   totalPages: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  /** مجموع قيمة مبلغ الصرف لكل السجلات المطابقة (كل الصفحات) */
+  totalAmount?: number;
 }
 
 /** استجابة GET /api/Debts أو /api/Debts/overdue-unpaid — تحتوي إجمالي الديون المطابقة للاستعلام (كل الصفحات) */
@@ -2605,6 +2607,7 @@ export interface PaginatedResponse<T> {
   hasPreviousPage: boolean;
   totalCount: number;
   pageNumber: number;
+  totalAmount?: number;
 }
 
 export interface PaginationParams {

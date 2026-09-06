@@ -2998,10 +2998,21 @@ class ApiService {
     resellerId?: string;
     fromDate?: string;
     toDate?: string;
+    year?: number;
+    month?: number;
   }): Promise<PaginatedResponse<ExpenseWithdrawalRequest>> {
-    const response: AxiosResponse<PaginatedResponse<ExpenseWithdrawalRequest>> =
-      await this.api.get('/OfficeExpenses/withdrawal-requests', { params });
-    return response.data;
+    const response: AxiosResponse<PaginatedResponse<ExpenseWithdrawalRequest> & {
+      totalAmount?: number;
+      TotalAmount?: number;
+    }> = await this.api.get('/OfficeExpenses/withdrawal-requests', { params });
+    const raw = response.data as PaginatedResponse<ExpenseWithdrawalRequest> & {
+      totalAmount?: number;
+      TotalAmount?: number;
+    };
+    return {
+      ...raw,
+      totalAmount: Number(raw.totalAmount ?? raw.TotalAmount ?? 0),
+    };
   }
 
   async createExpenseWithdrawalRequest(
@@ -3038,6 +3049,26 @@ class ApiService {
       success: d.success ?? d.Success ?? true,
       message: d.message ?? d.Message ?? '',
       alreadyDecided: d.alreadyDecided ?? d.AlreadyDecided ?? false,
+    };
+  }
+
+  async deleteExpenseWithdrawalRequest(
+    id: string,
+    reason: string,
+    agentId?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const params: Record<string, string> = {};
+    if (agentId) params.agentId = agentId;
+    const response = await this.api.post<{
+      success?: boolean;
+      Success?: boolean;
+      message?: string;
+      Message?: string;
+    }>(`/OfficeExpenses/withdrawal-requests/${id}/delete`, { reason }, { params });
+    const d = response.data;
+    return {
+      success: d.success ?? d.Success ?? true,
+      message: d.message ?? d.Message ?? '',
     };
   }
 
