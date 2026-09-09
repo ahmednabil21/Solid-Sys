@@ -2608,7 +2608,7 @@ class ApiService {
       // Transform the data to match the expected API format
       const payload = {
         subscriberId: renewalData.subscriberId,
-        newProfileId: renewalData.newProfileId,
+        newProfileId: renewalData.pinCardId ? null : renewalData.newProfileId,
         paymentStatus: renewalData.paymentStatus,
         overrideSalePrice: renewalData.overrideSalePrice ?? null,
         amountPaid: renewalData.amountPaid ?? null,
@@ -2644,7 +2644,6 @@ class ApiService {
         renewalDate: renewalData.renewalDate ? `${renewalData.renewalDate}T00:00:00` : null,
         newExpirationDate: renewalData.newExpirationDate ? `${renewalData.newExpirationDate}T00:00:00` : null,
         pinCardId: renewalData.pinCardId || null,
-        newProfileId: renewalData.pinCardId ? null : renewalData.newProfileId,
       };
       
       const response: AxiosResponse<any> = await this.api.post('/renewals', payload);

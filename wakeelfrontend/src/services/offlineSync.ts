@@ -293,7 +293,7 @@ export async function fetchDashboardWithCache(
 export function buildCreateRenewalPayload(renewalData: RenewalData): Record<string, unknown> {
   return {
     subscriberId: renewalData.subscriberId,
-    newProfileId: renewalData.newProfileId,
+    newProfileId: renewalData.pinCardId ? null : renewalData.newProfileId,
     paymentStatus: renewalData.paymentStatus,
     overrideSalePrice: renewalData.overrideSalePrice ?? null,
     amountPaid: renewalData.amountPaid ?? null,
@@ -326,7 +326,6 @@ export function buildCreateRenewalPayload(renewalData: RenewalData): Record<stri
     renewalDate: renewalData.renewalDate ? `${renewalData.renewalDate}T00:00:00` : null,
     newExpirationDate: renewalData.newExpirationDate ? `${renewalData.newExpirationDate}T00:00:00` : null,
     pinCardId: renewalData.pinCardId || null,
-    newProfileId: renewalData.pinCardId ? null : renewalData.newProfileId,
   };
 }
 
