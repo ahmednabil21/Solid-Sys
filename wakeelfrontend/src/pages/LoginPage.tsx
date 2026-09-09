@@ -6,6 +6,8 @@ import { Eye, EyeOff, User, Lock, AlertTriangle, RefreshCw } from 'lucide-react'
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { apiService, ApiService } from '../services/api';
 import { showSuccess } from '../utils/notifications';
+import brandLogo from '../images/solid-links-logo.png';
+import loginBackground from '../images/login-background.png';
 
 // const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || '0x4AAAAAACh0LGLTfAOqhxi6';
 
@@ -37,9 +39,6 @@ const LoginPage: React.FC = () => {
 
   const MAX_LOGIN_ATTEMPTS = 4;
   const BLOCK_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
-  const publicUrl = process.env.PUBLIC_URL || '';
-  const loginBackgroundUrl = `${publicUrl}/image.png`;
-  const brandLogoUrl = `${publicUrl}/solid-links-logo.png`;
 
   // استدعاء رسالة النظام عند فتح صفحة تسجيل الدخول (حسب المواصفات)
   useEffect(() => {
@@ -179,7 +178,7 @@ const LoginPage: React.FC = () => {
       dir="rtl"
       className="relative min-h-screen flex items-center justify-center p-4 sm:p-6"
       style={{
-        backgroundImage: `linear-gradient(135deg, rgba(1, 106, 170, 0.72), rgba(3, 151, 217, 0.55)), url(${loginBackgroundUrl})`,
+        backgroundImage: `linear-gradient(135deg, rgba(1, 106, 170, 0.72), rgba(3, 151, 217, 0.55)), url(${loginBackground})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -189,8 +188,8 @@ const LoginPage: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-2xl border border-white/80 p-6 sm:p-8">
           <div className="text-center mb-6 sm:mb-8">
             <img
-              src={brandLogoUrl}
-              alt="Solid Links"
+              src={brandLogo}
+              alt=""
               className="mx-auto mb-4 h-28 sm:h-36 w-auto max-w-full object-contain"
             />
             <p className="text-sm sm:text-base text-gray-600">تسجيل الدخول إلى حسابك</p>

@@ -39,6 +39,7 @@ import {
   Zap,
   Wrench,
 } from 'lucide-react';
+import brandLogo from '../images/solid-links-logo.png';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -475,7 +476,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
             <>
               <div className="flex items-center gap-2 min-w-0">
                 <img
-                  src={`${process.env.PUBLIC_URL || ''}/solid-links-logo.png`}
+                  src={brandLogo}
                   alt="Solid Links"
                   className="h-9 w-auto object-contain"
                 />
@@ -495,7 +496,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
               {!isCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
                   <img
-                    src={`${process.env.PUBLIC_URL || ''}/solid-links-logo.png`}
+                    src={brandLogo}
                     alt="Solid Links"
                     className="h-9 sm:h-10 w-auto object-contain"
                   />
