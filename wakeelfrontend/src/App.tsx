@@ -13,6 +13,7 @@ import { FeatureGuard } from './components/FeatureGuard';
 import Layout from './components/Layout';
 import NotificationContainer from './components/NotificationContainer';
 import OfflineIndicator from './components/OfflineIndicator';
+import DocumentTitle from './components/DocumentTitle';
 import { useAuth } from './contexts/AuthContext';
 import { TenantPlanType, UserRole } from './types';
 import {
@@ -149,6 +150,7 @@ function App() {
             <OfflineProvider>
             <VipThemeClassManager />
             <Router basename="/wakeel">
+            <DocumentTitle />
             <div className="App min-h-screen font-sans antialiased">
               <SpeedInsights />
               <OfflineIndicator />
