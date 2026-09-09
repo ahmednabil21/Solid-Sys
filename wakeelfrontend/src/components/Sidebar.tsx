@@ -213,6 +213,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       hiddenWhenFeature: 'hide_subscription_pages',
     },
     {
+      name: 'كروت الشحن PIN',
+      path: '/admin/pin-cards',
+      icon: CreditCard,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent],
+      hiddenWhenFeature: 'hide_subscription_pages',
+    },
+    {
       name: 'المواد والمبيعات',
       path: '/admin/materials',
       icon: Store,

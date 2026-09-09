@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasPageAction } from '../utils/employeePermissions';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ProfileTypeAdd, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ProfileTypeAdd, ServiceFees, PinCardUnused, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
 import QRCode from 'qrcode';
  
 import EditSubscriberModal from '../components/EditSubscriberModal';
@@ -549,12 +549,13 @@ const SubscribersPage: React.FC = () => {
   /** واصل = المبلغ كامل؛ غير واصل = إدخال المبلغ الواصل يدوياً */
   const [renewalAmountFullyReceived, setRenewalAmountFullyReceived] = useState(true);
   const RENEWAL_MODAL_STEPS = [
-    { id: 1, label: 'اختيار الباقة' },
+    { id: 1, label: 'باقة أو PIN' },
     { id: 2, label: 'نوع التفعيل' },
     { id: 3, label: 'نوع الدفع' },
     { id: 4, label: 'تفعيل' },
   ] as const;
   const [renewalModalStep, setRenewalModalStep] = useState<number>(1);
+  const [renewalSource, setRenewalSource] = useState<'package' | 'pin'>('package');
   const [renewalActivationTypeChosen, setRenewalActivationTypeChosen] = useState(false);
   const [renewalPaymentTypeChosen, setRenewalPaymentTypeChosen] = useState(false);
   const [showRenewalConfirmModal, setShowRenewalConfirmModal] = useState(false);
@@ -954,6 +955,17 @@ const SubscribersPage: React.FC = () => {
     enabled: !!isAgentOrSubAgentOrEmployee || !!canSyncSas,
     retry: false,
   });
+  const pinCardsAgentId = user?.role === UserRole.Admin ? myAgent?.id : undefined;
+  const { data: unusedPinCards = [] } = useQuery<PinCardUnused[]>({
+    queryKey: ['unused-pin-cards', pinCardsAgentId ?? 'self'],
+    queryFn: () => apiService.getUnusedPinCards(4, pinCardsAgentId),
+    enabled: showRenewalModal && renewalSource === 'pin' && (user?.role !== UserRole.Admin || !!pinCardsAgentId),
+  });
+  const { data: pinPricing } = useQuery({
+    queryKey: ['pin-card-pricing', 'renewal-wizard', pinCardsAgentId ?? 'self'],
+    queryFn: () => apiService.getPinCardPricing(pinCardsAgentId),
+    enabled: showRenewalModal && renewalSource === 'pin' && (user?.role !== UserRole.Admin || !!pinCardsAgentId),
+  });
   const { data: myResellers = [] } = useQuery<AgentReseller[]>({
     queryKey: ['myResellers'],
     queryFn: () => apiService.getMyResellers(),
@@ -1117,6 +1129,7 @@ const SubscribersPage: React.FC = () => {
     () => profilesList.find((p) => p.id === renewalData.newProfileId) ?? null,
     [profilesList, renewalData.newProfileId],
   );
+  const selectedPinCard = unusedPinCards.find((card) => card.id === renewalData.pinCardId) ?? null;
   const isRenewalProfileCustom = selectedRenewalProfile?.typeAdd === ProfileTypeAdd.ProfileCustom;
   const isRenewalExtensionProfile = selectedRenewalProfile?.packageType === ProfilePackageType.Extension;
   const renewalActivationChannel = renewalData.activationChannel ?? RenewalActivationChannel.Normal;
@@ -1144,10 +1157,13 @@ const SubscribersPage: React.FC = () => {
   );
 
   const renewalSubscriptionPrice = React.useMemo(() => {
+    if (renewalData.pinCardId) {
+      return renewalData.overrideSalePrice || pinPricing?.subscriberCost || 0;
+    }
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
     if (!selectedProfile || selectedProfile.packageType === ProfilePackageType.Extension) return 0;
     return renewalData.overrideSalePrice || selectedProfile.salePrice || 0;
-  }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice]);
+  }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice, renewalData.pinCardId, pinPricing?.subscriberCost]);
 
   const ftthMultiPeriodBilling = !!(ftthCompareSyncContext && ftthSyncPeriods.length > 1);
 
@@ -1193,6 +1209,7 @@ const SubscribersPage: React.FC = () => {
   }, [showRenewalModal, activationServiceFeesList]);
 
   useEffect(() => {
+    if (renewalSource === 'pin' || renewalData.pinCardId) return;
     if (renewalInfo && !renewalData.newProfileId) {
       const currentProfile = renewalInfo.availableProfiles?.find(p => p.name === renewalInfo.currentProfile.name);
       if (currentProfile) {
@@ -1209,7 +1226,7 @@ const SubscribersPage: React.FC = () => {
         }));
       }
     }
-  }, [renewalInfo, renewalData.newProfileId]);
+  }, [renewalInfo, renewalData.newProfileId, renewalData.pinCardId, renewalSource]);
 
   useEffect(() => {
     if (!showRenewalModal) {
@@ -1219,6 +1236,7 @@ const SubscribersPage: React.FC = () => {
       setFtthCompareSyncContext(null);
       setFtthSyncPeriods([]);
       setRenewalModalStep(1);
+      setRenewalSource('package');
       setRenewalActivationTypeChosen(false);
       setRenewalPaymentTypeChosen(false);
       setShowRenewalConfirmModal(false);
@@ -1226,6 +1244,7 @@ const SubscribersPage: React.FC = () => {
     } else {
       setRenewalAmountFullyReceived(true);
       setRenewalModalStep(1);
+      setRenewalSource('package');
       setRenewalActivationTypeChosen(false);
       setRenewalPaymentTypeChosen(false);
       setShowRenewalConfirmModal(false);
@@ -1234,6 +1253,7 @@ const SubscribersPage: React.FC = () => {
   }, [showRenewalModal]);
 
   useEffect(() => {
+    if (renewalSource === 'pin' || renewalData.pinCardId) return;
     if (!ftthCompareSyncContext || !renewalInfo?.availableProfiles?.length || renewalData.newProfileId) return;
     const pkg = (ftthCompareSyncContext.row.packageName ?? '').trim().toLowerCase();
     if (!pkg) return;
@@ -1253,7 +1273,7 @@ const SubscribersPage: React.FC = () => {
       debtDueDate: '',
       paymentStatus: PaymentStatus.Paid,
     }));
-  }, [ftthCompareSyncContext, renewalInfo?.availableProfiles, renewalData.newProfileId]);
+  }, [ftthCompareSyncContext, renewalInfo?.availableProfiles, renewalData.newProfileId, renewalData.pinCardId, renewalSource]);
 
   useEffect(() => {
     if (!showRenewalModal || !ftthMultiPeriodBilling || activationServiceFeesList.length === 0) return;
@@ -1771,8 +1791,11 @@ const SubscribersPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['debts'] });
     queryClient.invalidateQueries({ queryKey: ['subscribers-dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['unused-pin-cards'] });
+    queryClient.invalidateQueries({ queryKey: ['pin-card-activations'] });
     setShowRenewalModal(false);
     setRenewalViaSasTab(false);
+    setRenewalSource('package');
     setSelectedIds([]);
 
     const normalizedReceipt = {
@@ -1824,7 +1847,7 @@ const SubscribersPage: React.FC = () => {
       const row = ftthCompareSyncContext.row;
       const username = (row.username ?? '').trim();
       if (!username) throw new Error('اسم المستخدم فارغ.');
-      if (!baseRenewal.newProfileId) throw new Error('يرجى اختيار الباقة.');
+      if (!baseRenewal.newProfileId && !baseRenewal.pinCardId) throw new Error('يرجى اختيار باقة أو كرت شحن.');
 
       const periods =
         ftthSyncPeriods.length > 0
@@ -1853,7 +1876,7 @@ const SubscribersPage: React.FC = () => {
           lastName,
           phoneNumber: '',
           secruptionId: customerId,
-          profileId: baseRenewal.newProfileId,
+          profileId: baseRenewal.newProfileId || pinPricing?.profileId || '',
           activationDate: periods[0]!.renewalDate!,
           expirationDate: periods[periods.length - 1]!.newExpirationDate!,
           subscriptionType: SubscriptionType.Paid,
@@ -1865,10 +1888,12 @@ const SubscribersPage: React.FC = () => {
 
       let lastReceipt: any = null;
       const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === baseRenewal.newProfileId);
-      const salePrice = selectedProfile?.packageType === ProfilePackageType.Extension
-        ? 0
-        : baseRenewal.overrideSalePrice || selectedProfile?.salePrice || 0;
-      const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+      const salePrice = baseRenewal.pinCardId
+        ? (pinPricing?.subscriberCost ?? baseRenewal.overrideSalePrice ?? 0)
+        : selectedProfile?.packageType === ProfilePackageType.Extension
+          ? 0
+          : baseRenewal.overrideSalePrice || selectedProfile?.salePrice || 0;
+      const isExtension = !baseRenewal.pinCardId && selectedProfile?.packageType === ProfilePackageType.Extension;
 
       for (let i = 0; i < periods.length; i += 1) {
         const period = periods[i]!;
@@ -2316,10 +2341,11 @@ const SubscribersPage: React.FC = () => {
 
   const handleRenewalFullyPaidToggle = (fullyReceived: boolean) => {
     setRenewalAmountFullyReceived(fullyReceived);
+    const pinSale = renewalData.pinCardId ? (pinPricing?.subscriberCost ?? 0) : null;
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
-    if (!selectedProfile) return;
-    const salePrice = selectedProfile.salePrice || 0;
-    const isExtension = selectedProfile.packageType === ProfilePackageType.Extension;
+    if (pinSale == null && !selectedProfile) return;
+    const salePrice = pinSale ?? selectedProfile?.salePrice || 0;
+    const isExtension = !renewalData.pinCardId && selectedProfile?.packageType === ProfilePackageType.Extension;
     setRenewalData((prev) => ({
       ...prev,
       ...applyRenewalAmountsForProfile(salePrice, isExtension, fullyReceived),
@@ -2330,7 +2356,9 @@ const SubscribersPage: React.FC = () => {
     setRenewalActivationTypeChosen(true);
     setRenewalPaymentTypeChosen(channel === RenewalActivationChannel.CustomerWallet);
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
-    const salePrice = selectedProfile?.salePrice || 0;
+    const salePrice = renewalData.pinCardId
+      ? (pinPricing?.subscriberCost ?? 0)
+      : selectedProfile?.salePrice || 0;
     if (channel === RenewalActivationChannel.CustomerWallet) {
       setRenewalAmountFullyReceived(true);
       setRenewalData((prev) => ({
@@ -2357,8 +2385,10 @@ const SubscribersPage: React.FC = () => {
   const applyDeferredActivationPayment = () => {
     setRenewalPaymentTypeChosen(true);
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
-    if (!selectedProfile) return;
-    const salePrice = selectedProfile.salePrice || 0;
+    const salePrice = renewalData.pinCardId
+      ? (pinPricing?.subscriberCost ?? 0)
+      : selectedProfile?.salePrice || 0;
+    if (!renewalData.pinCardId && !selectedProfile) return;
     setRenewalAmountFullyReceived(false);
     setRenewalData((prev) => ({
       ...prev,
@@ -2401,6 +2431,7 @@ const SubscribersPage: React.FC = () => {
         }
 
         if (name === 'newProfileId') {
+          updated.pinCardId = undefined;
           const rawId = String(newValue ?? '');
           renewalProfileIdForAmountSyncRef.current = rawId;
           if (!rawId) {
@@ -2484,7 +2515,7 @@ const SubscribersPage: React.FC = () => {
   const canProceedRenewalModalStep = (): boolean => {
     switch (renewalModalStep) {
       case 1:
-        return !!renewalData.newProfileId;
+        return renewalSource === 'pin' ? !!renewalData.pinCardId : !!renewalData.newProfileId;
       case 2:
         return renewalActivationTypeChosen;
       case 3:
@@ -2496,7 +2527,12 @@ const SubscribersPage: React.FC = () => {
 
   const handleRenewalModalNext = () => {
     if (!canProceedRenewalModalStep()) {
-      if (renewalModalStep === 1) showError('اختيار الباقة', 'يرجى اختيار الباقة أولاً.');
+      if (renewalModalStep === 1) {
+        showError(
+          renewalSource === 'pin' ? 'اختيار الكرت' : 'اختيار الباقة',
+          renewalSource === 'pin' ? 'يرجى اختيار كرت شحن أولاً.' : 'يرجى اختيار الباقة أولاً.'
+        );
+      }
       else if (renewalModalStep === 2) showError('نوع التفعيل', 'يرجى اختيار نوع التفعيل أولاً.');
       else if (renewalModalStep === 3) showError('نوع الدفع', 'يرجى اختيار نوع الدفع أولاً.');
       return;
@@ -2519,10 +2555,11 @@ const SubscribersPage: React.FC = () => {
   };
 
   const buildEnhancedRenewalData = (): RenewalData | null => {
+    const isPinActivation = !!renewalData.pinCardId;
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
-    if (!selectedProfile) return null;
+    if (!isPinActivation && !selectedProfile) return null;
 
-    const isExtension = selectedProfile.packageType === ProfilePackageType.Extension;
+    const isExtension = !isPinActivation && selectedProfile?.packageType === ProfilePackageType.Extension;
     const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
     const isCustomerWallet =
       (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
@@ -2537,9 +2574,12 @@ const SubscribersPage: React.FC = () => {
       };
     });
     const firstServiceFee = serviceFeesItems[0];
+    const pinSale = pinPricing?.subscriberCost ?? 0;
 
     return {
       ...renewalData,
+      newProfileId: isPinActivation ? '' : renewalData.newProfileId,
+      pinCardId: isPinActivation ? renewalData.pinCardId : undefined,
       notes: '',
       paymentStatus: isExtension
         ? PaymentStatus.Paid
@@ -2550,13 +2590,13 @@ const SubscribersPage: React.FC = () => {
             : renewalAmountFullyReceived
               ? PaymentStatus.Paid
               : renewalData.paymentStatus,
-      overrideSalePrice: isExtension ? 0 : renewalData.overrideSalePrice || selectedProfile.salePrice || 0,
+      overrideSalePrice: isExtension ? 0 : isPinActivation ? pinSale : renewalData.overrideSalePrice || selectedProfile?.salePrice || 0,
       amountPaid: isExtension || isDeferred || isCustomerWallet ? 0 : renewalData.amountPaid,
       remainingAmount: isExtension || isCustomerWallet ? 0 : renewalData.remainingAmount,
       debtDescription: isExtension || isCustomerWallet ? '' : renewalData.debtDescription,
       debtDueDate: isExtension || isCustomerWallet ? '' : renewalData.debtDueDate,
       currentExpirationDate: renewalInfo?.expirationDate,
-      renewalPeriod: selectedProfile.renewalPeriod || 30,
+      renewalPeriod: isPinActivation ? 30 : selectedProfile?.renewalPeriod || 30,
       serviceFeesItems: serviceFeesItems.length > 0 ? serviceFeesItems : undefined,
       serviceFeesId: firstServiceFee?.serviceFeesId,
       serviceFeesPrice: firstServiceFee?.serviceFeesPrice,
@@ -2602,7 +2642,7 @@ const SubscribersPage: React.FC = () => {
 
     const enhancedRenewalData = buildEnhancedRenewalData();
     if (!enhancedRenewalData) {
-      showError('تفعيل المشترك', 'يرجى اختيار الباقة.');
+      showError('تفعيل المشترك', 'يرجى اختيار باقة أو كرت شحن.');
       return;
     }
 
@@ -4483,7 +4523,81 @@ const SubscribersPage: React.FC = () => {
 
               {renewalModalStep === 1 && (
               <div className="space-y-4">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 1 — اختيار الباقة</h3>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 1 — باقة أو كرت شحن</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRenewalSource('package');
+                      setRenewalData((prev) => ({ ...prev, pinCardId: undefined }));
+                    }}
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold ${
+                      renewalSource === 'package'
+                        ? 'border-primary-600 bg-primary-600 text-white'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    باقة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRenewalSource('pin');
+                      setRenewalData((prev) => ({ ...prev, newProfileId: '', pinCardId: undefined }));
+                      resetRenewalLaterStepChoices();
+                    }}
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold ${
+                      renewalSource === 'pin'
+                        ? 'border-primary-600 bg-primary-600 text-white'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    كرت شحن PIN
+                  </button>
+                </div>
+
+                {renewalSource === 'pin' ? (
+                  <div className="space-y-3">
+                    {!pinPricing && (
+                      <p className="text-sm text-amber-700 dark:text-amber-300">لم يُحفظ تسعير كروت الشحن بعد.</p>
+                    )}
+                    {unusedPinCards.length === 0 ? (
+                      <p className="text-sm text-gray-500">لا توجد كروت غير مستخدمة.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {unusedPinCards.map((card) => (
+                          <button
+                            key={card.id}
+                            type="button"
+                            onClick={() => {
+                              const sale = pinPricing?.subscriberCost ?? 0;
+                              setRenewalAmountFullyReceived(true);
+                              setRenewalData((prev) => ({
+                                ...prev,
+                                pinCardId: card.id,
+                                newProfileId: '',
+                                overrideSalePrice: sale,
+                                ...applyRenewalAmountsForProfile(sale, false, true),
+                              }));
+                              resetRenewalLaterStepChoices();
+                            }}
+                            className={`rounded-xl border-2 px-4 py-3 text-right ${
+                              renewalData.pinCardId === card.id
+                                ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                : 'border-gray-200 dark:border-gray-600'
+                            }`}
+                          >
+                            <span className="block font-mono font-bold text-gray-900 dark:text-white">{card.pin}</span>
+                            <span className="block text-xs text-gray-500 mt-1">
+                              {card.series} — SN {card.serialNumber}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                <>
                 <div className={customProfilesForRenewal.length > 0 ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : ''}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -4568,10 +4682,12 @@ const SubscribersPage: React.FC = () => {
                     باقة تمديد — سيتم تخطي مرحلتي نوع التفعيل ونوع الدفع والانتقال مباشرة إلى مرحلة التفعيل.
                   </p>
                 )}
+                </>
+                )}
               </div>
               )}
 
-              {renewalModalStep === 2 && !renewalSkipsActivationTypeStep && renewalData.newProfileId && (
+              {renewalModalStep === 2 && !renewalSkipsActivationTypeStep && (renewalData.newProfileId || renewalData.pinCardId) && (
               <div className="space-y-4">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 2 — نوع التفعيل</h3>
                 <div>
@@ -4611,7 +4727,7 @@ const SubscribersPage: React.FC = () => {
               </div>
               )}
 
-              {renewalModalStep === 3 && !renewalSkipsPaymentStep && renewalData.newProfileId && (
+              {renewalModalStep === 3 && !renewalSkipsPaymentStep && (renewalData.newProfileId || renewalData.pinCardId) && (
               <div className="space-y-4">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 3 — نوع الدفع</h3>
                 {(() => {
@@ -4630,7 +4746,9 @@ const SubscribersPage: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setRenewalPaymentTypeChosen(true);
-                            const salePrice = selectedProfile?.salePrice || 0;
+                            const salePrice = renewalData.pinCardId
+                              ? (pinPricing?.subscriberCost ?? 0)
+                              : selectedProfile?.salePrice || 0;
                             setRenewalData((prev) => ({
                               ...prev,
                               activationChannel: RenewalActivationChannel.Normal,
@@ -4651,7 +4769,9 @@ const SubscribersPage: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setRenewalPaymentTypeChosen(true);
-                            const salePrice = selectedProfile?.salePrice || 0;
+                            const salePrice = renewalData.pinCardId
+                              ? (pinPricing?.subscriberCost ?? 0)
+                              : selectedProfile?.salePrice || 0;
                             setRenewalData((prev) => ({
                               ...prev,
                               activationChannel: RenewalActivationChannel.Normal,
@@ -4690,7 +4810,10 @@ const SubscribersPage: React.FC = () => {
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">المرحلة 4 — تفعيل</h3>
               <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/60 dark:bg-primary-950/20 px-4 py-3 text-sm space-y-1">
                 <p className="font-semibold text-gray-900 dark:text-white">ملخص الاختيارات</p>
-                <p><span className="text-gray-500 dark:text-gray-400">الباقة:</span> {selectedRenewalProfile?.name ?? '—'}</p>
+                <p>
+                  <span className="text-gray-500 dark:text-gray-400">{renewalData.pinCardId ? 'PIN:' : 'الباقة:'}</span>{' '}
+                  {renewalData.pinCardId ? (selectedPinCard?.pin ?? '—') : (selectedRenewalProfile?.name ?? '—')}
+                </p>
                 <p>
                   <span className="text-gray-500 dark:text-gray-400">نوع التفعيل:</span>{' '}
                   {isRenewalExtensionProfile
@@ -5401,8 +5524,10 @@ const SubscribersPage: React.FC = () => {
                   </span>
                 </p>
                 <p>
-                  <span className="text-gray-500 dark:text-gray-400">الباقة:</span>{' '}
-                  <span className="font-medium text-gray-900 dark:text-white">{selectedRenewalProfile?.name ?? '—'}</span>
+                  <span className="text-gray-500 dark:text-gray-400">{pendingRenewalSubmit.pinCardId ? 'PIN:' : 'الباقة:'}</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {pendingRenewalSubmit.pinCardId ? (selectedPinCard?.pin ?? '—') : (selectedRenewalProfile?.name ?? '—')}
+                  </span>
                 </p>
                 <p>
                   <span className="text-gray-500 dark:text-gray-400">نوع التفعيل:</span>{' '}

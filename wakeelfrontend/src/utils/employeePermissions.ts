@@ -143,6 +143,13 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
       u.canAccessExpensesAndSalarySheet !== false || u.canAccessSubscriberDashboard !== false,
   },
   {
+    pathPrefix: '/admin/pin-cards',
+    page: 'Packages',
+    viewAction: 'view',
+    legacyCheck: (u) =>
+      u.canAccessExpensesAndSalarySheet !== false || u.canAccessSubscriberDashboard !== false,
+  },
+  {
     pathPrefix: '/admin/materials',
     page: 'MaterialsAndSales',
     viewAction: 'view',

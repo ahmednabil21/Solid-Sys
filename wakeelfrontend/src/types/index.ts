@@ -2503,6 +2503,8 @@ export interface RenewalData {
   renewalDate?: string;
   /** تاريخ انتهاء الاشتراك من المصدر الخارجي */
   newExpirationDate?: string;
+  /** مسار كرت الشحن — حصري مع newProfileId */
+  pinCardId?: string;
 }
 
 export interface RenewalServiceFeeLineItem {
@@ -2594,6 +2596,50 @@ export interface ExcelImportResponse {
   importDate?: string;
   activationsCreated?: number;
   skippedCount?: number;
+}
+
+export interface PinCardPricing {
+  id: string;
+  profileId: string;
+  profileName: string;
+  agentCost: number;
+  subscriberCost: number;
+}
+
+export interface PinCardPricingUpdateRequest {
+  profileId: string;
+  agentCost: number;
+  subscriberCost: number;
+}
+
+export interface PinCardUnused {
+  id: string;
+  series: string;
+  serialNumber: string;
+  pin: string;
+  value: number;
+  expirationDate: string;
+}
+
+export interface PinCardActivation {
+  id: string;
+  series: string;
+  serialNumber: string;
+  pin: string;
+  value: number;
+  usedAt: string;
+  subscriberId?: string;
+  subscriberName: string;
+  receiptNumber: string;
+  renewalId?: string;
+}
+
+export interface PinCardImportResult {
+  totalRecords: number;
+  successCount: number;
+  errorCount: number;
+  skippedCount: number;
+  errors?: { row: number; message: string }[];
 }
 
 // Pagination Types

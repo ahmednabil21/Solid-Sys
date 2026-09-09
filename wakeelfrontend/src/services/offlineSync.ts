@@ -325,6 +325,8 @@ export function buildCreateRenewalPayload(renewalData: RenewalData): Record<stri
     activationChannel: renewalData.activationChannel ?? RenewalActivationChannel.Normal,
     renewalDate: renewalData.renewalDate ? `${renewalData.renewalDate}T00:00:00` : null,
     newExpirationDate: renewalData.newExpirationDate ? `${renewalData.newExpirationDate}T00:00:00` : null,
+    pinCardId: renewalData.pinCardId || null,
+    newProfileId: renewalData.pinCardId ? null : renewalData.newProfileId,
   };
 }
 

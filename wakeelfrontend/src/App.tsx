@@ -31,6 +31,7 @@ const SubscribersPage = lazy(() => import('./pages/SubscribersPage'));
 const SubscriberDetailsPage = lazy(() => import('./pages/SubscriberDetailsPage'));
 const SubscriberInfoPage = lazy(() => import('./pages/SubscriberInfoPage'));
 const PackagesPage = lazy(() => import('./pages/PackagesPage'));
+const PinCardsPage = lazy(() => import('./pages/PinCardsPage'));
 const AgentsPage = lazy(() => import('./pages/AgentsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -215,6 +216,13 @@ function App() {
                         <EmployeePageGuard path="/admin/packages">
                           <PackagesPage />
                         </EmployeePageGuard>
+                      </FeatureGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="pin-cards" element={
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent]}>
+                      <FeatureGuard hiddenWhenFeature="hide_subscription_pages" fallback={<Navigate to="/admin/subscribers" replace />}>
+                        <PinCardsPage />
                       </FeatureGuard>
                     </ProtectedRoute>
                   } />

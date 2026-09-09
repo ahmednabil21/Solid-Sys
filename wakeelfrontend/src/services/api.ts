@@ -69,6 +69,11 @@ import {
   AgentSubscriptionCheck,
   ExcelImportAgent,
   ExcelImportResponse,
+  PinCardPricing,
+  PinCardPricingUpdateRequest,
+  PinCardUnused,
+  PinCardActivation,
+  PinCardImportResult,
   ActivityLogItem,
   ActivityType,
   ActivityTypeOption,
@@ -2638,6 +2643,8 @@ class ApiService {
         activationChannel: renewalData.activationChannel ?? RenewalActivationChannel.Normal,
         renewalDate: renewalData.renewalDate ? `${renewalData.renewalDate}T00:00:00` : null,
         newExpirationDate: renewalData.newExpirationDate ? `${renewalData.newExpirationDate}T00:00:00` : null,
+        pinCardId: renewalData.pinCardId || null,
+        newProfileId: renewalData.pinCardId ? null : renewalData.newProfileId,
       };
       
       const response: AxiosResponse<any> = await this.api.post('/renewals', payload);
@@ -3681,6 +3688,54 @@ class ApiService {
         'Content-Type': 'multipart/form-data',
       },
       timeout: 600000,
+    });
+    return response.data;
+  }
+
+  async getPinCardPricing(agentId?: string): Promise<PinCardPricing | null> {
+    try {
+      const response = await this.api.get<PinCardPricing>('/PinCards/pricing', {
+        params: agentId ? { agentId } : undefined,
+      });
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }
+  }
+
+  async savePinCardPricing(data: PinCardPricingUpdateRequest, agentId?: string): Promise<PinCardPricing> {
+    const response = await this.api.put<PinCardPricing>('/PinCards/pricing', data, {
+      params: agentId ? { agentId } : undefined,
+    });
+    return response.data;
+  }
+
+  async importPinCardsFromExcel(file: File, agentId?: string): Promise<PinCardImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<PinCardImportResult>('/PinCards/import', formData, {
+      params: agentId ? { agentId } : undefined,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 600000,
+    });
+    return response.data;
+  }
+
+  async getUnusedPinCards(take = 4, agentId?: string): Promise<PinCardUnused[]> {
+    const response = await this.api.get<PinCardUnused[]>('/PinCards/unused', {
+      params: { take, ...(agentId ? { agentId } : {}) },
+    });
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
+  async getPinCardActivations(params?: {
+    agentId?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedResponse<PinCardActivation>> {
+    const response = await this.api.get<PaginatedResponse<PinCardActivation>>('/PinCards/activations', {
+      params,
     });
     return response.data;
   }
