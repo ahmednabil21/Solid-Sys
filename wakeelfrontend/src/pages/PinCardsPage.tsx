@@ -19,7 +19,7 @@ const PinCardsPage: React.FC = () => {
   const [agentCost, setAgentCost] = useState(0);
   const [subscriberCost, setSubscriberCost] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(STANDARD_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
 
   const { data: agentsResponse } = useQuery({
     queryKey: ['agents', 1, 100],
