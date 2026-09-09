@@ -2344,7 +2344,7 @@ const SubscribersPage: React.FC = () => {
     const pinSale = renewalData.pinCardId ? (pinPricing?.subscriberCost ?? 0) : null;
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
     if (pinSale == null && !selectedProfile) return;
-    const salePrice = pinSale ?? selectedProfile?.salePrice || 0;
+    const salePrice = pinSale ?? (selectedProfile?.salePrice || 0);
     const isExtension = !renewalData.pinCardId && selectedProfile?.packageType === ProfilePackageType.Extension;
     setRenewalData((prev) => ({
       ...prev,
