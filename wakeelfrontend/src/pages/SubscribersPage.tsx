@@ -4576,7 +4576,6 @@ const SubscribersPage: React.FC = () => {
                                 ...prev,
                                 pinCardId: card.id,
                                 newProfileId: '',
-                                overrideSalePrice: sale,
                                 ...applyRenewalAmountsForProfile(sale, false, true),
                               }));
                               resetRenewalLaterStepChoices();
