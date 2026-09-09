@@ -16,16 +16,13 @@ import { Clock } from 'lucide-react';
 import {
   LayoutDashboard,
   Users,
-  Package,
   UserCheck,
   UserCog,
   UserPlus,
   BarChart3,
   CalendarDays,
-  CalendarClock,
   CreditCard,
   FileSpreadsheet,
-  Receipt,
   Settings,
   Sun,
   Moon,
@@ -40,10 +37,7 @@ import {
   Wallet,
   Building2,
   Zap,
-  CircleDollarSign,
   Wrench,
-  History,
-  ArrowLeftRight,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -102,22 +96,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
   }, [user]);
 
 
+  type SidebarMenuChild = {
+    name: string;
+    path: string;
+    employeeRequiresTaskPermission?: boolean;
+    /** للموظف: يُعرض فقط عند canAccessExpensesAndSalarySheet */
+    employeeRequiresExpenseAccess?: boolean;
+    /** إن وُجد: يُعرض فقط لهذه الأدوار */
+    roles?: UserRole[];
+    /** يتطلب canAccessInvoices وخطة Standard */
+    requiresInvoiceAccess?: boolean;
+    /** يتطلب canAccessAccounts للموظف */
+    requiresAccountsAccess?: boolean;
+    hiddenWhenFeature?: string;
+  };
+
   type SidebarMenuItem = {
     name: string;
     path: string;
     icon: React.ComponentType<{ className?: string }>;
     roles: UserRole[];
-    children?: Array<{
-      name: string;
-      path: string;
-      employeeRequiresTaskPermission?: boolean;
-      /** للموظف: يُعرض فقط عند canAccessExpensesAndSalarySheet */
-      employeeRequiresExpenseAccess?: boolean;
-      /** إن وُجد: يُعرض فقط لهذه الأدوار */
-      roles?: UserRole[];
-      /** يتطلب canAccessInvoices وخطة Standard */
-      requiresInvoiceAccess?: boolean;
-    }>;
+    children?: SidebarMenuChild[];
     requiredFeature?: string;
     hiddenWhenFeature?: string;
     /** يتطلب canAccessInvoices وخطة Standard (لعنصر رئيسي بدون أبناء) */
@@ -131,93 +130,66 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       name: 'لوحة التحكم',
       path: '/admin/dashboard',
       icon: LayoutDashboard,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee, UserRole.Subscriber, UserRole.MainAgent]
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee, UserRole.Subscriber, UserRole.MainAgent],
     },
     {
       name: 'المكاتب الفرعية',
       path: '/admin/main-agent/sub-agents',
       icon: Building2,
-      roles: [UserRole.MainAgent]
+      roles: [UserRole.MainAgent],
     },
     {
       name: 'المشتركين',
       path: '/admin/main-agent/sub-agents/subscribers',
       icon: Users,
-      roles: [UserRole.MainAgent]
+      roles: [UserRole.MainAgent],
     },
     {
       name: 'التفعيلات',
       path: '/admin/main-agent/sub-agents/renewals',
       icon: Zap,
-      roles: [UserRole.MainAgent]
+      roles: [UserRole.MainAgent],
     },
     {
       name: 'الديون',
       path: '/admin/main-agent/sub-agents/debts',
       icon: CreditCard,
-      roles: [UserRole.MainAgent]
+      roles: [UserRole.MainAgent],
     },
     {
       name: 'الحسابات',
       path: '/admin/main-agent/sub-agents/daily-account',
       icon: BarChart3,
-      roles: [UserRole.MainAgent]
+      roles: [UserRole.MainAgent],
     },
     {
-      name: 'المشتركين',
+      name: 'إدارة المشتركين والخدمات',
       path: '/admin/subscribers',
       icon: Users,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+      children: [
+        { name: 'المشتركين', path: '/admin/subscribers' },
+        { name: 'التفعيلات', path: '/admin/receipts' },
+        { name: 'الديون', path: '/admin/debts' },
+        {
+          name: 'كروت الشحن PIN',
+          path: '/admin/pin-cards',
+          roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent],
+          hiddenWhenFeature: 'hide_subscription_pages',
+        },
+        {
+          name: 'الباقات',
+          path: '/admin/packages',
+          hiddenWhenFeature: 'hide_subscription_pages',
+        },
+      ],
     },
     {
-      name: 'طلبات الصيانة',
+      name: 'الصيانة والطلبات',
       path: '/admin/maintenance-requests',
       icon: Wrench,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'التفعيلات',
-      path: '/admin/receipts',
-      icon: Zap,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'الديون',
-      path: '/admin/debts',
-      icon: CreditCard,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]
-    },
-    {
-      name: 'الحسابات',
-      path: '/admin/reports',
-      icon: BarChart3,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'التقارير الشهرية',
-      path: '/admin/monthly-reports',
-      icon: CalendarDays,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'حسابات شهرية معزولة',
-      path: '/admin/isolated-monthly-accounts',
-      icon: CalendarClock,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'الباقات',
-      path: '/admin/packages',
-      icon: Package,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-      hiddenWhenFeature: 'hide_subscription_pages',
-    },
-    {
-      name: 'كروت الشحن PIN',
-      path: '/admin/pin-cards',
-      icon: CreditCard,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent],
-      hiddenWhenFeature: 'hide_subscription_pages',
+      children: [{ name: 'طلبات الصيانة', path: '/admin/maintenance-requests' }],
     },
     {
       name: 'المواد والمبيعات',
@@ -228,6 +200,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         { name: 'إدارة المواد', path: '/admin/materials' },
         { name: 'شاشة البيع', path: '/admin/materials/disbursed' },
         { name: 'سجل المبيعات', path: '/admin/materials/sales-history' },
+      ],
+    },
+    {
+      name: 'المالية والحسابات',
+      path: '/admin/reports',
+      icon: Wallet,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+      children: [
+        { name: 'الحسابات', path: '/admin/reports' },
+        { name: 'المصاريف العامة', path: '/admin/expenses/office' },
+        { name: 'الرصيد', path: '/admin/balance' },
+        { name: 'سجل الحركات', path: '/admin/activity-log' },
+        {
+          name: 'الاستلام والتسليم',
+          path: '/admin/receipt-handover',
+          requiresAccountsAccess: true,
+        },
+        {
+          name: 'فواتير العملاء',
+          path: '/admin/customer-invoices',
+          roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent],
+          requiresInvoiceAccess: true,
+        },
       ],
     },
     {
@@ -246,72 +241,50 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       ],
     },
     {
-      name: 'المصاريف العامة',
-      path: '/admin/expenses/office',
-      icon: Wallet,
+      name: 'التقارير',
+      path: '/admin/monthly-reports',
+      icon: CalendarDays,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'الرصيد',
-      path: '/admin/balance',
-      icon: CircleDollarSign,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'سجل الحركات',
-      path: '/admin/activity-log',
-      icon: History,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
-    {
-      name: 'الاستلام والتسليم',
-      path: '/admin/receipt-handover',
-      icon: ArrowLeftRight,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-      requiresAccountsAccess: true,
-    },
-    {
-      name: 'فواتير العملاء',
-      path: '/admin/customer-invoices',
-      icon: Receipt,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent],
-      requiresInvoiceAccess: true,
+      children: [
+        { name: 'التقارير الشهرية', path: '/admin/monthly-reports' },
+        { name: 'حسابات شهرية معزولة', path: '/admin/isolated-monthly-accounts' },
+      ],
     },
     {
       name: 'الإعدادات',
       path: '/admin/settings',
       icon: Settings,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.MainAgent, UserRole.Employee]
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.MainAgent, UserRole.Employee],
     },
     {
       name: 'الوكلاء',
       path: '/admin/agents',
       icon: UserCheck,
-      roles: [UserRole.Admin]
+      roles: [UserRole.Admin],
     },
     {
       name: 'المستخدمين',
       path: '/admin/users',
       icon: UserCog,
-      roles: [UserRole.Admin]
+      roles: [UserRole.Admin],
     },
     {
       name: 'رسالة النظام',
       path: '/admin/system-message',
       icon: MessageSquare,
-      roles: [UserRole.Admin]
+      roles: [UserRole.Admin],
     },
     {
       name: 'الاستيراد',
       path: '/admin/excel-import',
       icon: FileSpreadsheet,
-      roles: [UserRole.Admin]
+      roles: [UserRole.Admin],
     },
     {
       name: 'الرسيلرات',
       path: '/admin/resellers',
       icon: Store,
-      roles: [UserRole.Admin]
+      roles: [UserRole.Admin],
     },
   ];
 
@@ -377,33 +350,87 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     return item;
   });
 
-  const filteredMenuItems = normalizedMenuItems.filter((item) => {
-    if (!hasAnyRole(item.roles)) return false;
-    if (user?.role === UserRole.Employee && usesPagePermissions(user) && !canAccessAdminPath(item.path)) {
+  const canShowMenuChild = (child: SidebarMenuChild): boolean => {
+    if (user?.role === UserRole.Employee && usesPagePermissions(user) && !canAccessAdminPath(child.path)) {
       return false;
     }
-    if (!globalAccess && item.requiredFeature && !hasFeature(item.requiredFeature)) return false;
-    if (!globalAccess && item.hiddenWhenFeature && hasFeature(item.hiddenWhenFeature)) return false;
-    if (user?.role === UserRole.Employee && !usesPagePermissions(user) && item.path === '/admin/dashboard' && !user.canAccessSubscriberDashboard) return false;
-    if (user?.role === UserRole.Employee && usesPagePermissions(user) && item.path === '/admin/dashboard' && !employeeCanAccessDashboard(user)) return false;
-    if (user?.role === UserRole.Employee && item.path === '/admin/employees/tasks' && !employeeCanAccessEmployeeTasks(user)) return false;
-    if (user?.role === UserRole.Employee && !usesPagePermissions(user) && item.path === '/admin/employees/tasks' && !user?.canReceiveTaskRequests) return false;
-    if (isRestrictedEmployeeLegacy && restrictedEmployeeHiddenPaths.includes(item.path)) return false;
+    if (child.path === '/admin/employees' && user?.role === UserRole.Employee) {
+      return false;
+    }
     if (
-      item.requiresInvoiceAccess &&
+      child.employeeRequiresTaskPermission &&
+      user?.role === UserRole.Employee &&
+      !employeeCanAccessEmployeeTasks(user)
+    ) {
+      return false;
+    }
+    if (
+      child.employeeRequiresExpenseAccess &&
+      user?.role === UserRole.Employee &&
+      !employeeCanAccessExpenseFeatures(user)
+    ) {
+      return false;
+    }
+    if (child.roles && !child.roles.includes(user?.role as UserRole)) {
+      return false;
+    }
+    if (
+      child.requiresInvoiceAccess &&
       (user?.canAccessInvoices === false || user?.tenantPlanType === TenantPlanType.Vip)
     ) {
       return false;
     }
     if (
-      item.requiresAccountsAccess &&
+      child.requiresAccountsAccess &&
       user?.role === UserRole.Employee &&
       user?.canAccessAccounts === false
     ) {
       return false;
     }
+    if (!globalAccess && child.hiddenWhenFeature && hasFeature(child.hiddenWhenFeature)) {
+      return false;
+    }
+    if (isRestrictedEmployeeLegacy && restrictedEmployeeHiddenPaths.includes(child.path)) {
+      return false;
+    }
     return true;
-  });
+  };
+
+  const filteredMenuItems = normalizedMenuItems
+    .map((item) => {
+      if (!item.children?.length) return item;
+      return { ...item, children: item.children.filter(canShowMenuChild) };
+    })
+    .filter((item) => {
+      if (!hasAnyRole(item.roles)) return false;
+      if (item.children) {
+        return item.children.length > 0;
+      }
+      if (user?.role === UserRole.Employee && usesPagePermissions(user) && !canAccessAdminPath(item.path)) {
+        return false;
+      }
+      if (!globalAccess && item.requiredFeature && !hasFeature(item.requiredFeature)) return false;
+      if (!globalAccess && item.hiddenWhenFeature && hasFeature(item.hiddenWhenFeature)) return false;
+      if (user?.role === UserRole.Employee && !usesPagePermissions(user) && item.path === '/admin/dashboard' && !user.canAccessSubscriberDashboard) return false;
+      if (user?.role === UserRole.Employee && usesPagePermissions(user) && item.path === '/admin/dashboard' && !employeeCanAccessDashboard(user)) return false;
+      if (user?.role === UserRole.Employee && item.path === '/admin/employees/tasks' && !employeeCanAccessEmployeeTasks(user)) return false;
+      if (user?.role === UserRole.Employee && !usesPagePermissions(user) && item.path === '/admin/employees/tasks' && !user?.canReceiveTaskRequests) return false;
+      if (isRestrictedEmployeeLegacy && restrictedEmployeeHiddenPaths.includes(item.path)) return false;
+      if (
+        item.requiresInvoiceAccess &&
+        (user?.canAccessInvoices === false || user?.tenantPlanType === TenantPlanType.Vip)
+      ) {
+        return false;
+      }
+      if (
+        item.requiresAccountsAccess &&
+        user?.role === UserRole.Employee &&
+        user?.canAccessAccounts === false
+      ) {
+        return false;
+      }
+      return true;
+    });
 
   // إذا كان الموظف يمتلك فقط صلاحية استلام المهام (بدون أي صلاحيات مشتركين):
   // نعرض له صفحة المهام فقط في الـ sidebar.
@@ -446,7 +473,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         <div className="sidebar-header flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           {isMobileOverlay ? (
             <>
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">نظام الوكيل</h1>
+              <div className="flex items-center gap-2 min-w-0">
+                <img
+                  src={`${process.env.PUBLIC_URL || ''}/solid-links-logo.png`}
+                  alt="Solid Links"
+                  className="h-9 w-auto object-contain"
+                />
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">Solid Links</h1>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
@@ -459,9 +493,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
           ) : (
             <>
               {!isCollapsed && (
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
-                  نظام الوكيل
-                </h1>
+                <div className="flex items-center gap-2 min-w-0">
+                  <img
+                    src={`${process.env.PUBLIC_URL || ''}/solid-links-logo.png`}
+                    alt="Solid Links"
+                    className="h-9 sm:h-10 w-auto object-contain"
+                  />
+                  <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">
+                    Solid Links
+                  </h1>
+                </div>
               )}
               <button
                 type="button"
@@ -532,62 +573,44 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
                     {(!isCollapsed || isMobileOverlay) && (
-                      <span className="text-sm font-medium flex-1 text-right">{item.name}</span>
+                      <span className="text-sm font-medium flex-1 text-right flex items-center gap-2">
+                        {item.name}
+                        {item.children?.some((c) => c.path === '/admin/maintenance-requests') &&
+                          maintenanceNotify?.hasUnread &&
+                          maintenanceNotify.pendingCount > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
+                          )}
+                      </span>
                     )}
                     {isExpanded ? <ChevronUp className="h-5 w-5 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 flex-shrink-0" />}
                   </button>
-                  {isExpanded && item.children!
-                    .filter((child) => {
-                      if (user?.role === UserRole.Employee && usesPagePermissions(user) && !canAccessAdminPath(child.path)) {
-                        return false;
-                      }
-                      if (child.path === '/admin/employees' && user?.role === UserRole.Employee) {
-                        return false;
-                      }
-                      if (
-                        child.employeeRequiresTaskPermission &&
-                        user?.role === UserRole.Employee &&
-                        !employeeCanAccessEmployeeTasks(user)
-                      ) {
-                        return false;
-                      }
-                      if (
-                        child.employeeRequiresExpenseAccess &&
-                        user?.role === UserRole.Employee &&
-                        !employeeCanAccessExpenseFeatures(user)
-                      ) {
-                        return false;
-                      }
-                      if (child.roles && !child.roles.includes(user?.role as UserRole)) {
-                        return false;
-                      }
-                      if (
-                        child.requiresInvoiceAccess &&
-                        (user?.canAccessInvoices === false || user?.tenantPlanType === TenantPlanType.Vip)
-                      ) {
-                        return false;
-                      }
-                      return true;
-                    })
-                    .map((child) => {
-                    const isActive = location.pathname === child.path;
-                    return (
-                      <Link
-                        key={child.path}
-                        to={child.path}
-                        onClick={onClose}
-                        className={`sidebar-menu-child flex items-center gap-2 sm:gap-3 px-3 sm:px-3 py-2 sm:py-2 rounded-lg transition-colors touch-manipulation min-h-[40px] me-4 border-e-2 ${
-                          isActive
-                            ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border-primary-500'
-                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border-transparent'
-                        }`}
-                      >
-                        {(!isCollapsed || isMobileOverlay) && (
-                          <span className="text-sm font-medium flex-1 text-right">{child.name}</span>
-                        )}
-                      </Link>
-                    );
-                  })}
+                  {isExpanded &&
+                    item.children!.map((child) => {
+                      const isActive = location.pathname === child.path;
+                      return (
+                        <Link
+                          key={child.path}
+                          to={child.path}
+                          onClick={onClose}
+                          className={`sidebar-menu-child flex items-center gap-2 sm:gap-3 px-3 sm:px-3 py-2 sm:py-2 rounded-lg transition-colors touch-manipulation min-h-[40px] me-4 border-e-2 ${
+                            isActive
+                              ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border-primary-500'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border-transparent'
+                          }`}
+                        >
+                          {(!isCollapsed || isMobileOverlay) && (
+                            <span className="text-sm font-medium flex-1 text-right flex items-center gap-2">
+                              {child.name}
+                              {child.path === '/admin/maintenance-requests' &&
+                                maintenanceNotify?.hasUnread &&
+                                maintenanceNotify.pendingCount > 0 && (
+                                  <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
+                                )}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
                 </div>
               );
             }
