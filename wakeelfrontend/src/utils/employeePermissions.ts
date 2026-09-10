@@ -13,7 +13,8 @@ export type DashboardPageKey =
   | 'GeneralExpenses'
   | 'Balance'
   | 'CustomerInvoices'
-  | 'Settings';
+  | 'Settings'
+  | 'CallCenter';
 
 export const RECEIVE_TASK_ACTIONS = [
   'receiveTask',
@@ -102,6 +103,12 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
   {
     pathPrefix: '/admin/maintenance-requests',
     page: 'MaintenanceRequests',
+    viewAction: 'view',
+    legacyCheck: () => true,
+  },
+  {
+    pathPrefix: '/admin/call-center',
+    page: 'CallCenter',
     viewAction: 'view',
     legacyCheck: () => true,
   },
@@ -267,6 +274,8 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
       return false;
     case 'MaintenanceRequests':
       return action === 'view' || action === 'accept';
+    case 'CallCenter':
+      return action === 'view' || action === 'add';
     case 'Activations':
       if (action === 'view' || action === 'print') return !!user.canAccessInvoices;
       if (action === 'delete') return !!user.canAccessAccounts;
@@ -322,6 +331,7 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
     Dashboard: ['view'],
     Subscribers: ['view', 'add', 'edit', 'delete', 'activate', 'details', 'sync'],
     MaintenanceRequests: ['view', 'accept'],
+    CallCenter: ['view', 'add'],
     Activations: ['view', 'print', 'delete'],
     Debts: ['view', 'add', 'edit', 'delete', 'pay'],
     Accounts: ['view', 'delete'],
@@ -439,11 +449,17 @@ export function employeeCanReceiveTaskRequests(user: User | null | undefined): b
   return !!user.canReceiveTaskRequests;
 }
 
+export function employeeCanAccessCallCenter(user: User | null | undefined): boolean {
+  if (!user || user.role !== UserRole.Employee) return true;
+  return employeeCanAccessAdminPath(user, '/admin/call-center');
+}
+
 export function employeeShowOnlyTasksInSidebar(user: User | null | undefined): boolean {
   if (!user || user.role !== UserRole.Employee) return false;
   return (
     employeeCanAccessEmployeeTasks(user) &&
     !employeeHasAnySubscriberAccess(user) &&
-    !employeeCanAccessExpenseFeatures(user)
+    !employeeCanAccessExpenseFeatures(user) &&
+    !employeeCanAccessCallCenter(user)
   );
 }

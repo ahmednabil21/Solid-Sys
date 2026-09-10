@@ -2642,6 +2642,73 @@ export interface PinCardImportResult {
   errors?: { row: number; message: string }[];
 }
 
+/** أنواع تكت مركز الاتصال */
+export enum CallContactType {
+  SubscriptionActivation = 1,
+  MaintenanceRequest = 2,
+  Inquiry = 3,
+  NewSubscription = 4,
+  Payment = 5,
+}
+
+export interface CallTypeCounts {
+  subscriptionActivation: number;
+  maintenanceRequest: number;
+  inquiry: number;
+  newSubscription: number;
+  payment: number;
+}
+
+export interface CallCenterStatistics {
+  todayCallsCount: number;
+  totalCallsCount: number;
+  allTimeTypes: CallTypeCounts;
+  todayTypes: CallTypeCounts;
+}
+
+export interface CallTicket {
+  id: string;
+  ticketNumber: string;
+  subscriberId: string;
+  subscriberDisplayName: string;
+  subscriberUsername?: string | null;
+  subscriberPhone?: string | null;
+  subscriberCallCount: number;
+  callType: CallContactType;
+  callTypeLabel: string;
+  description: string;
+  createdByUserId: string;
+  createdByUserName: string;
+  createdAt: string;
+}
+
+export interface CallTicketCreateRequest {
+  subscriberId: string;
+  callType: CallContactType;
+  description: string;
+}
+
+export interface CallCenterPageResponse extends PaginatedResponse<CallTicket> {
+  statistics: CallCenterStatistics;
+}
+
+export interface CallCenterSubscriberOption {
+  id: string;
+  username?: string | null;
+  displayName: string;
+  phoneNumber?: string | null;
+  callsCount?: number;
+}
+
+export interface CallCenterSubscriberStat {
+  subscriberId: string;
+  displayName: string;
+  username: string;
+  phoneNumber?: string | null;
+  callsCount: number;
+  lastCallAt?: string | null;
+}
+
 // Pagination Types
 export interface PaginatedResponse<T> {
   data: T[];

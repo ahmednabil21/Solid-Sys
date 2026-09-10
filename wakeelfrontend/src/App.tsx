@@ -62,6 +62,7 @@ const MainAgentSubAgentDebtsPage = lazy(() => import('./pages/MainAgentSubAgentD
 const MainAgentSubAgentDailyAccountPage = lazy(() => import('./pages/MainAgentSubAgentDailyAccountPage'));
 const CustomerInvoicesPage = lazy(() => import('./pages/CustomerInvoicesPage'));
 const SubscriberMaintenanceRequestsPage = lazy(() => import('./pages/SubscriberMaintenanceRequestsPage'));
+const CallCenterPage = lazy(() => import('./pages/CallCenterPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +80,7 @@ function AdminIndexRedirect() {
       if (canAccessAdminPath('/admin/dashboard')) return <Navigate to="/admin/dashboard" replace />;
       if (canAccessAdminPath('/admin/subscribers')) return <Navigate to="/admin/subscribers" replace />;
       if (canAccessAdminPath('/admin/maintenance-requests')) return <Navigate to="/admin/maintenance-requests" replace />;
+      if (canAccessAdminPath('/admin/call-center')) return <Navigate to="/admin/call-center" replace />;
       if (canAccessAdminPath('/admin/employees/tasks')) return <Navigate to="/admin/employees/tasks" replace />;
       return <Navigate to="/admin/subscribers" replace />;
     }
@@ -206,6 +208,13 @@ function App() {
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
                       <EmployeePageGuard path="/admin/maintenance-requests">
                         <SubscriberMaintenanceRequestsPage />
+                      </EmployeePageGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="call-center" element={
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/call-center">
+                        <CallCenterPage />
                       </EmployeePageGuard>
                     </ProtectedRoute>
                   } />

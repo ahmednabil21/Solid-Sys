@@ -74,6 +74,12 @@ import {
   PinCardUnused,
   PinCardActivation,
   PinCardImportResult,
+  CallTicket,
+  CallTicketCreateRequest,
+  CallCenterPageResponse,
+  CallCenterSubscriberOption,
+  CallCenterSubscriberStat,
+  CallContactType,
   ActivityLogItem,
   ActivityType,
   ActivityTypeOption,
@@ -4799,6 +4805,81 @@ class ApiService {
     const response = await this.api.get<{ status: string; balance?: string | null }>('/sas/live-balance', {
       headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
       params: { _t: Date.now() },
+    });
+    return response.data;
+  }
+
+  async getCallCenterTickets(params?: {
+    page?: number;
+    pageSize?: number;
+    searchTerm?: string;
+    callType?: CallContactType;
+    fromDate?: string;
+    toDate?: string;
+    subscriberId?: string;
+    agentId?: string;
+  }): Promise<CallCenterPageResponse> {
+    const queryParams: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    };
+    if (params?.searchTerm?.trim()) queryParams.searchTerm = params.searchTerm.trim();
+    if (params?.callType != null) queryParams.callType = params.callType;
+    if (params?.fromDate?.trim()) queryParams.fromDate = params.fromDate.trim();
+    if (params?.toDate?.trim()) queryParams.toDate = params.toDate.trim();
+    if (params?.subscriberId?.trim()) queryParams.subscriberId = params.subscriberId.trim();
+    if (params?.agentId?.trim()) queryParams.agentId = params.agentId.trim();
+
+    const response = await this.api.get<CallCenterPageResponse>('/CallCenter', { params: queryParams });
+    return response.data;
+  }
+
+  async getCallCenterSubscriberStats(params?: {
+    page?: number;
+    pageSize?: number;
+    searchTerm?: string;
+    agentId?: string;
+  }): Promise<PaginatedResponse<CallCenterSubscriberStat>> {
+    const queryParams: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    };
+    if (params?.searchTerm?.trim()) queryParams.searchTerm = params.searchTerm.trim();
+    if (params?.agentId?.trim()) queryParams.agentId = params.agentId.trim();
+
+    const response = await this.api.get<PaginatedResponse<CallCenterSubscriberStat>>(
+      '/CallCenter/subscriber-stats',
+      { params: queryParams }
+    );
+    return response.data;
+  }
+
+  async searchCallCenterSubscribers(params?: {
+    page?: number;
+    pageSize?: number;
+    searchTerm?: string;
+    agentId?: string;
+  }): Promise<PaginatedResponse<CallCenterSubscriberOption>> {
+    const queryParams: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    };
+    if (params?.searchTerm?.trim()) queryParams.searchTerm = params.searchTerm.trim();
+    if (params?.agentId?.trim()) queryParams.agentId = params.agentId.trim();
+
+    const response = await this.api.get<PaginatedResponse<CallCenterSubscriberOption>>(
+      '/CallCenter/subscribers',
+      { params: queryParams }
+    );
+    return response.data;
+  }
+
+  async createCallTicket(
+    data: CallTicketCreateRequest,
+    agentId?: string
+  ): Promise<CallTicket> {
+    const response = await this.api.post<CallTicket>('/CallCenter', data, {
+      params: agentId?.trim() ? { agentId: agentId.trim() } : undefined,
     });
     return response.data;
   }

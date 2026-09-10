@@ -457,7 +457,7 @@ const OfficeExpensesPage: React.FC = () => {
             سحب صرفيات من ربح المنطقة الشهري
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            اختر المنطقة (يُلغى اختيار الرسيلر) ثم السنة والشهر. الربح الكلي من totalPaid للحسابات الشهرية المعزولة، ووارد كاش/ماستر من تقرير الحسابات. لا يغيّر سجل الحسابات.
+            اختر المنطقة (يُلغى اختيار الرسيلر) ثم السنة والشهر. الربح الكلي = وارد كاش + وارد ماستر حسب شهر التفعيل (تسديد دين في شهر لاحق يبقى في شهر التفعيل). المتبقي بعد الصرف = المتبقي كاش + المتبقي ماستر. لا يغيّر سجل الحسابات.
           </p>
         </div>
 
@@ -621,7 +621,7 @@ const OfficeExpensesPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
                   <div>
                     <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                      المتبقي للسحب — {selectedRegion?.name}
+                      المتبقي للسحب (كاش + ماستر) — {selectedRegion?.name}
                       {currentSelectedReseller ? ` — ${currentSelectedReseller.name}` : ' (كل المنطقة)'}
                       {` — ${filterMonth.toString().padStart(2, '0')}/${filterYear}`}
                     </p>
