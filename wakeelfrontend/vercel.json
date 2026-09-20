@@ -47,6 +47,10 @@
       "destination": "/wakeel.mobileconfig"
     },
     {
+      "source": "/wakeel/iosappsolid.mobileconfig",
+      "destination": "/iosappsolid.mobileconfig"
+    },
+    {
       "source": "/wakeel/:path*",
       "destination": "/index.html"
     },

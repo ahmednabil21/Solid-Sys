@@ -1,7 +1,7 @@
 {
-  "installCommand": "npm install --prefix wakeelfrontend",
-  "buildCommand": "npm run build --prefix wakeelfrontend",
-  "outputDirectory": "wakeelfrontend/build",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
   "redirects": [
     {
       "source": "/",
@@ -45,6 +45,10 @@
     {
       "source": "/wakeel/wakeel.mobileconfig",
       "destination": "/wakeel.mobileconfig"
+    },
+    {
+      "source": "/wakeel/iosappsolid.mobileconfig",
+      "destination": "/iosappsolid.mobileconfig"
     },
     {
       "source": "/wakeel/:path*",

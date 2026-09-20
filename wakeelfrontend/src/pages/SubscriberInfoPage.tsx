@@ -11,10 +11,14 @@ import {
   ShieldCheck,
   Sparkles,
   MessageCircle,
+  CheckCircle2,
+  Settings2,
 } from 'lucide-react';
 import brandLogo from '../images/solid-links-logo.png';
 
-const ANDROID_APK_URL = `${process.env.PUBLIC_URL || ''}/downloads/solid-links-subscriber.apk`;
+const PUBLIC = process.env.PUBLIC_URL || '';
+const ANDROID_APK_URL = `${PUBLIC}/downloads/solid-links-subscriber.apk`;
+const IOS_PROFILE_URL = `${PUBLIC}/downloads/solid-links-subscriber.mobileconfig`;
 
 const FEATURES = [
   {
@@ -49,10 +53,36 @@ const FEATURES = [
   },
 ];
 
+const IOS_STEPS = [
+  {
+    title: 'افتح الرابط من Safari',
+    text: 'استخدم متصفح Safari على الآيفون (ليس Chrome) ثم اضغط زر «تثبيت للآيفون».',
+  },
+  {
+    title: 'اسمح بالتحميل',
+    text: 'عند ظهور رسالة السماح بتحميل ملف الإعدادات، اضغط «سماح» ثم انتظر اكتمال التحميل.',
+  },
+  {
+    title: 'افتح ملف التعريف',
+    text: 'من الإشعارات أو من الإعدادات → عام → VPN وإدارة الجهاز / الملفات الشخصية، افتح الملف الذي تم تنزيله.',
+  },
+  {
+    title: 'ثبّت الملف الشخصي',
+    text: 'اضغط «تثبيت»، أدخل رمز القفل إن طُلب منك، ثم أكّد التثبيت مرة أخرى.',
+  },
+  {
+    title: 'الثقة بالتطبيق (مهم)',
+    text: 'اذهب إلى: الإعدادات → عام → إدارة الجهاز / VPN وإدارة الجهاز → مطور التطبيق، ثم اضغط «ثقة» لتفعيل التطبيق.',
+  },
+  {
+    title: 'افتح التطبيق من الشاشة الرئيسية',
+    text: 'بعد الثقة سيظهر أيقونة Solid Links على الشاشة الرئيسية — افتحه وسجّل الدخول.',
+  },
+];
+
 const SubscriberInfoPage: React.FC = () => {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#F3F7FB] text-slate-900" dir="rtl">
-      {/* Atmosphere */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#D9EFFA_0%,_#F3F7FB_55%,_#EEF4F9_100%)]" />
         <div className="absolute -top-24 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#0397D9]/[0.12] blur-3xl" />
@@ -76,7 +106,6 @@ const SubscriberInfoPage: React.FC = () => {
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-5 pb-16 sm:px-8">
-        {/* Hero */}
         <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#05A8E8] via-[#0397D9] to-[#016AAA] px-6 py-12 text-white shadow-2xl shadow-sky-900/20 sm:px-12 sm:py-16">
           <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
           <div className="absolute -bottom-20 left-10 h-64 w-64 rounded-full bg-cyan-200/20 blur-3xl" />
@@ -85,7 +114,7 @@ const SubscriberInfoPage: React.FC = () => {
             <div>
               <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" />
-                التحديث الجديد متاح الآن
+                متوفر للأندرويد والآيفون
               </div>
               <h1 className="text-3xl font-black leading-[1.25] tracking-tight sm:text-5xl">
                 Solid Links
@@ -107,18 +136,16 @@ const SubscriberInfoPage: React.FC = () => {
                   <Download className="h-5 w-5" />
                   تحميل للأندرويد (APK)
                 </a>
-                <button
-                  type="button"
-                  disabled
-                  title="قريباً — بانتظار ملف الآيفون"
-                  className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-white/35 bg-white/10 px-5 py-3.5 text-sm font-black text-white/80 backdrop-blur"
+                <a
+                  href={IOS_PROFILE_URL}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/40 bg-white/15 px-5 py-3.5 text-sm font-black text-white backdrop-blur transition hover:bg-white/25"
                 >
                   <Apple className="h-5 w-5" />
-                  آيفون — قريباً
-                </button>
+                  تثبيت للآيفون
+                </a>
               </div>
               <p className="mt-3 text-xs font-semibold text-sky-100/80">
-                نسخة الأندرويد جاهزة للتحميل مباشرة. نسخة الآيفون تُضاف فور استلام الملف.
+                للآيفون: افتح الصفحة من Safari واتبع خطوات التثبيت بالأسفل.
               </p>
             </div>
 
@@ -145,14 +172,66 @@ const SubscriberInfoPage: React.FC = () => {
                 </div>
                 <div className="mt-6 flex items-center justify-center gap-2 text-[11px] font-bold text-slate-400">
                   <Smartphone className="h-3.5 w-3.5" />
-                  Android · iOS قريباً
+                  Android · iPhone
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Features */}
+        {/* iOS install guide */}
+        <section id="ios-install" className="mt-14 scroll-mt-6">
+          <div className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#E8F5FC] px-3 py-1 text-xs font-bold text-[#016AAA]">
+                <Apple className="h-3.5 w-3.5" />
+                دليل تثبيت الآيفون
+              </div>
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                خطوات تثبيت التطبيق على iPhone
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-500">
+                التثبيت يتم عبر ملف إعدادات (mobileconfig). نفّذ الخطوات بالترتيب من جهاز الآيفون.
+              </p>
+            </div>
+            <a
+              href={IOS_PROFILE_URL}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#0397D9] px-4 py-2.5 text-sm font-black text-white shadow-md shadow-sky-600/20 hover:bg-[#016AAA]"
+            >
+              <Download className="h-4 w-4" />
+              تحميل ملف الآيفون
+            </a>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {IOS_STEPS.map((step, index) => (
+              <article
+                key={step.title}
+                className="flex gap-4 rounded-3xl border border-[#E6EEF5] bg-white/95 p-5 shadow-sm"
+              >
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0397D9] text-sm font-black text-white">
+                  {index + 1}
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">{step.title}</h3>
+                  <p className="mt-1.5 text-sm font-semibold leading-6 text-slate-500">{step.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-5 flex gap-3 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-7 text-amber-900">
+            <Settings2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            <div>
+              <p className="font-black">ملاحظة مهمة</p>
+              <p className="mt-1">
+                إذا ظهر التطبيق ولم يفتح، غالباً تحتاج تفعيل «الثقة» من الإعدادات → عام → إدارة الجهاز.
+                كما يُفضّل التثبيت عبر Safari وليس من داخل تطبيقات أخرى.
+              </p>
+            </div>
+          </div>
+        </section>
+
         <section className="mt-14">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
@@ -179,13 +258,12 @@ const SubscriberInfoPage: React.FC = () => {
           </div>
         </section>
 
-        {/* CTA strip */}
         <section className="mt-14 overflow-hidden rounded-[2rem] border border-[#E6EEF5] bg-white px-6 py-8 sm:px-10">
           <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
             <div>
               <h3 className="text-xl font-black text-slate-900">حمّل التطبيق وابدأ الآن</h3>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                للأندرويد متوفر مباشرة. الآيفون قريباً بعد تجهيز ملف التثبيت.
+                أندرويد عبر APK · آيفون عبر ملف الإعدادات مع خطوات التثبيت أعلاه.
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -197,11 +275,18 @@ const SubscriberInfoPage: React.FC = () => {
                 <Download className="h-4 w-4" />
                 Android APK
               </a>
-              <span className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-400">
+              <a
+                href={IOS_PROFILE_URL}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white hover:bg-slate-800"
+              >
                 <Apple className="h-4 w-4" />
-                iOS قريباً
-              </span>
+                iPhone
+              </a>
             </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-700">
+            <CheckCircle2 className="h-4 w-4" />
+            ملف الآيفون جاهز للتثبيت الآن
           </div>
         </section>
 
