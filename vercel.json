@@ -1,4 +1,7 @@
 {
+  "installCommand": "npm install --prefix wakeelfrontend",
+  "buildCommand": "npm run build --prefix wakeelfrontend",
+  "outputDirectory": "wakeelfrontend/build",
   "redirects": [
     {
       "source": "/",
@@ -22,6 +25,14 @@
     {
       "source": "/wakeel/logo512.png",
       "destination": "/logo512.png"
+    },
+    {
+      "source": "/wakeel/solid-links-logo.png",
+      "destination": "/solid-links-logo.png"
+    },
+    {
+      "source": "/wakeel/image.png",
+      "destination": "/image.png"
     },
     {
       "source": "/wakeel/manifest.json",

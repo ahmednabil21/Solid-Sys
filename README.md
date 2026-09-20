@@ -48,5 +48,7 @@ REACT_APP_API_URL=https://api-solid.execute-iq.com/wakeel/api
 
 عند ربط `ahmednabil21/Solid-Sys` في Vercel:
 
-- **Root Directory:** اتركه فارغاً (`.`) — ملف `vercel.json` في الجذر يوجّه البناء إلى `wakeelfrontend/`
+- **Root Directory:** اتركه فارغاً (`.`)
+- **Install Command / Build Command / Output:** يُؤخذ من `vercel.json` في الجذر (`wakeelfrontend/`)
+- في لوحة Vercel: امسح أي Build Command مخصّص مثل `react-scripts build` إن وُجد (Override) حتى لا يتجاوز `vercel.json`
 - **Environment Variable:** `REACT_APP_API_URL` = `https://api-solid.execute-iq.com/wakeel/api`
