@@ -308,7 +308,7 @@ const SubscriberInfoPage: React.FC = () => {
   const handleLogout = () => {
     setIsLoggedIn(false);
     setFullName('');
-    setUsername('');
+    setPhoneNumber('');
     setSession(null);
     setActiveTab('profile');
     setRenewalsPage(1);

@@ -26,7 +26,7 @@ const AppChatConversationsPage: React.FC = () => {
 
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(STANDARD_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
@@ -98,21 +98,21 @@ const AppChatConversationsPage: React.FC = () => {
     mutationFn: () => apiService.replyAppChat(selectedId!, reply.trim(), agentId),
     onSuccess: () => {
       setReply('');
-      showSuccess('تم إرسال الرد');
+      showSuccess('تم الإرسال', 'تم إرسال الرد');
       queryClient.invalidateQueries({ queryKey: ['app-chat-list'] });
       queryClient.invalidateQueries({ queryKey: ['app-chat-detail', selectedId] });
     },
-    onError: (e: any) => showError(e?.response?.data?.message || 'فشل إرسال الرد'),
+    onError: (e: any) => showError('خطأ', e?.response?.data?.message || 'فشل إرسال الرد'),
   });
 
   const closeMutation = useMutation({
     mutationFn: () => apiService.closeAppChat(selectedId!, agentId),
     onSuccess: () => {
-      showSuccess('تم إغلاق المحادثة');
+      showSuccess('تم الإغلاق', 'تم إغلاق المحادثة');
       queryClient.invalidateQueries({ queryKey: ['app-chat-list'] });
       queryClient.invalidateQueries({ queryKey: ['app-chat-detail', selectedId] });
     },
-    onError: (e: any) => showError(e?.response?.data?.message || 'فشل إغلاق المحادثة'),
+    onError: (e: any) => showError('خطأ', e?.response?.data?.message || 'فشل إغلاق المحادثة'),
   });
 
   return (
@@ -134,7 +134,7 @@ const AppChatConversationsPage: React.FC = () => {
           >
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.businessName || a.fullName || a.username}
+                {a.companyName || a.fullName || a.username}
               </option>
             ))}
           </select>
@@ -248,7 +248,7 @@ const AppChatConversationsPage: React.FC = () => {
               hasNextPage={!!listQuery.data?.hasNextPage}
               hasPreviousPage={!!listQuery.data?.hasPreviousPage}
               onPageChange={setPage}
-              pageSizeOptions={STANDARD_PAGE_SIZE_OPTIONS}
+              pageSizeOptions={[...STANDARD_PAGE_SIZE_OPTIONS]}
               onPageSizeChange={(s) => {
                 setPageSize(s);
                 setPage(1);
