@@ -12,6 +12,10 @@
       "destination": "/static/:path*"
     },
     {
+      "source": "/wakeel/downloads/:path*",
+      "destination": "/downloads/:path*"
+    },
+    {
       "source": "/wakeel/logo192.png",
       "destination": "/logo192.png"
     },
@@ -49,7 +53,19 @@
           "value": "application/x-apple-aspen-config"
         }
       ]
+    },
+    {
+      "source": "/(.*).apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        }
+      ]
     }
   ]
 }
-

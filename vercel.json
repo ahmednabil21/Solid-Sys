@@ -1,7 +1,4 @@
 {
-  "installCommand": "npm ci --prefix wakeelfrontend",
-  "buildCommand": "npm run build --prefix wakeelfrontend",
-  "outputDirectory": "wakeelfrontend/build",
   "redirects": [
     {
       "source": "/",
@@ -13,6 +10,10 @@
     {
       "source": "/wakeel/static/:path*",
       "destination": "/static/:path*"
+    },
+    {
+      "source": "/wakeel/downloads/:path*",
+      "destination": "/downloads/:path*"
     },
     {
       "source": "/wakeel/logo192.png",
@@ -50,6 +51,19 @@
         {
           "key": "Content-Type",
           "value": "application/x-apple-aspen-config"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
         }
       ]
     }

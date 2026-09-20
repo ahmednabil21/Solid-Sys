@@ -8,7 +8,7 @@ const PAGE_TITLES: Array<{ match: string | RegExp; title: string }> = [
   { match: '/login', title: 'تسجيل الدخول' },
   { match: '/register-agent', title: 'تسجيل وكيل' },
   { match: '/system-pricing', title: 'أسعار النظام' },
-  { match: '/subscriber-info', title: 'معلومات المشترك' },
+  { match: '/subscriber-info', title: 'تحميل تطبيق المشترك' },
 
   { match: '/admin/main-agent/sub-agents/subscribers', title: 'المشتركين' },
   { match: '/admin/main-agent/sub-agents/renewals', title: 'التفعيلات' },
