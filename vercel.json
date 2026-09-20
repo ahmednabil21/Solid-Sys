@@ -1,7 +1,7 @@
 {
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
+  "installCommand": "npm --prefix ./wakeelfrontend install --no-fund --no-audit",
+  "buildCommand": "npm --prefix ./wakeelfrontend run build",
+  "outputDirectory": "wakeelfrontend/build",
   "redirects": [
     {
       "source": "/",

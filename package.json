@@ -1,0 +1,13 @@
+{
+  "name": "solid-sys",
+  "private": true,
+  "description": "Solid Links — frontend lives in wakeelfrontend/",
+  "scripts": {
+    "postinstall": "npm --prefix ./wakeelfrontend install --no-fund --no-audit",
+    "build": "npm --prefix ./wakeelfrontend run build",
+    "start": "npm --prefix ./wakeelfrontend start"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
