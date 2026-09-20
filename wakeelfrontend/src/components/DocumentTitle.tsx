@@ -26,6 +26,7 @@ const PAGE_TITLES: Array<{ match: string | RegExp; title: string }> = [
   { match: '/admin/packages', title: 'الباقات' },
   { match: '/admin/maintenance-requests', title: 'طلبات الصيانة' },
   { match: '/admin/call-center', title: 'مركز الاتصال' },
+  { match: '/admin/app-chats', title: 'محادثات التطبيق' },
 
   { match: '/admin/materials/sales-history', title: 'سجل المبيعات' },
   { match: '/admin/materials/disbursed', title: 'شاشة البيع' },

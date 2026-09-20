@@ -14,7 +14,8 @@ export type DashboardPageKey =
   | 'Balance'
   | 'CustomerInvoices'
   | 'Settings'
-  | 'CallCenter';
+  | 'CallCenter'
+  | 'AppChats';
 
 export const RECEIVE_TASK_ACTIONS = [
   'receiveTask',
@@ -109,6 +110,12 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
   {
     pathPrefix: '/admin/call-center',
     page: 'CallCenter',
+    viewAction: 'view',
+    legacyCheck: () => true,
+  },
+  {
+    pathPrefix: '/admin/app-chats',
+    page: 'AppChats',
     viewAction: 'view',
     legacyCheck: () => true,
   },
@@ -276,6 +283,8 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
       return action === 'view' || action === 'accept';
     case 'CallCenter':
       return action === 'view' || action === 'add';
+    case 'AppChats':
+      return action === 'view' || action === 'reply';
     case 'Activations':
       if (action === 'view' || action === 'print') return !!user.canAccessInvoices;
       if (action === 'delete') return !!user.canAccessAccounts;
@@ -332,6 +341,7 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
     Subscribers: ['view', 'add', 'edit', 'delete', 'activate', 'details', 'sync'],
     MaintenanceRequests: ['view', 'accept'],
     CallCenter: ['view', 'add'],
+    AppChats: ['view', 'reply'],
     Activations: ['view', 'print', 'delete'],
     Debts: ['view', 'add', 'edit', 'delete', 'pay'],
     Accounts: ['view', 'delete'],

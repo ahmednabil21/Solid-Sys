@@ -211,7 +211,7 @@ const SubscriberInfoPage: React.FC = () => {
   const { formatDate, formatNumber } = useDigits();
   const storedSession = readStoredSession();
   const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [session, setSession] = useState<SubscriberAppLoginResponse | null>(storedSession);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(storedSession && localStorage.getItem(SUBSCRIBER_TOKEN_KEY)));
   const [activeTab, setActiveTab] = useState<AppTab>('profile');
@@ -226,8 +226,8 @@ const SubscriberInfoPage: React.FC = () => {
   const [maintenanceError, setMaintenanceError] = useState('');
 
   const loginMutation = useMutation({
-    mutationFn: ({ name, user }: { name: string; user: string }) =>
-      apiService.subscriberAppLogin(name, user),
+    mutationFn: ({ name, phone }: { name: string; phone: string }) =>
+      apiService.subscriberAppLogin(name, phone),
     onSuccess: (data) => {
       localStorage.setItem(SUBSCRIBER_TOKEN_KEY, data.token);
       localStorage.setItem(SUBSCRIBER_SESSION_KEY, JSON.stringify(data));
@@ -300,8 +300,8 @@ const SubscriberInfoPage: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (fullName.trim() && username.trim()) {
-      loginMutation.mutate({ name: fullName.trim(), user: username.trim() });
+    if (fullName.trim() && phoneNumber.trim()) {
+      loginMutation.mutate({ name: fullName.trim(), phone: phoneNumber.trim() });
     }
   };
 
@@ -358,17 +358,18 @@ const SubscriberInfoPage: React.FC = () => {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="الاسم الكامل"
+                placeholder="الاسم الثلاثي"
                 required
                 className="w-full py-3.5 px-4 rounded-xl text-base text-right outline-none border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#2962FF] focus:ring-2 focus:ring-[#2962FF]/20 placeholder:text-slate-400"
               />
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="اسم المستخدم"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="رقم هاتف المشترك"
                 required
-                className="w-full py-3.5 px-4 rounded-xl text-base text-right outline-none border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#2962FF] focus:ring-2 focus:ring-[#2962FF]/20 placeholder:text-slate-400"
+                dir="ltr"
+                className="w-full py-3.5 px-4 rounded-xl text-base text-left outline-none border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#2962FF] focus:ring-2 focus:ring-[#2962FF]/20 placeholder:text-slate-400"
               />
               <button
                 type="submit"

@@ -84,7 +84,7 @@ export interface SubscriberInfo {
 /** طلب تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login */
 export interface SubscriberAppLoginRequest {
   fullName: string;
-  username: string;
+  phoneNumber: string;
 }
 
 /** استجابة تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login */
@@ -111,6 +111,7 @@ export interface SubscriberAppMeResponse {
   salePrice?: number;
   regionName?: string;
   agentResellerName?: string;
+  agentPhone?: string;
   paymentOptions?: PaymentOption[];
   announcements?: AgentAnnouncementDto[];
 }
@@ -122,6 +123,8 @@ export interface SubscriberAppRenewalDto {
   finalPrice: number;
   amountPaid: number;
   remainingAmount: number;
+  /** سعر الباقة + الأجور */
+  totalPrice?: number;
   renewalDate: string;
   newExpirationDate: string;
   newProfileName?: string;
@@ -2707,6 +2710,47 @@ export interface CallCenterSubscriberStat {
   phoneNumber?: string | null;
   callsCount: number;
   lastCallAt?: string | null;
+}
+
+/** محادثات تطبيق المشترك */
+export enum AppChatSenderType {
+  Subscriber = 1,
+  Bot = 2,
+  Admin = 3,
+}
+
+export enum AppChatConversationStatus {
+  Open = 1,
+  WaitingHuman = 2,
+  Closed = 3,
+}
+
+export interface AppChatMessage {
+  id: string;
+  senderType: AppChatSenderType;
+  senderTypeLabel: string;
+  body: string;
+  faqKey?: string | null;
+  adminName?: string | null;
+  createdAt: string;
+}
+
+export interface AppChatConversation {
+  id: string;
+  subscriberId: string;
+  subscriberName: string;
+  subscriberUsername?: string | null;
+  subscriberPhone?: string | null;
+  agentId: string;
+  status: AppChatConversationStatus;
+  statusLabel: string;
+  needsHuman: boolean;
+  hasUnreadByAdmin: boolean;
+  hasUnreadBySubscriber: boolean;
+  lastMessagePreview?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages?: AppChatMessage[];
 }
 
 // Pagination Types

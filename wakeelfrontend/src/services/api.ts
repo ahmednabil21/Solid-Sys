@@ -2347,8 +2347,8 @@ class ApiService {
   }
 
   /** تسجيل دخول تطبيق المشترك — POST /SubscriberApp/login */
-  async subscriberAppLogin(fullName: string, username: string): Promise<SubscriberAppLoginResponse> {
-    const body = { fullName, username };
+  async subscriberAppLogin(fullName: string, phoneNumber: string): Promise<SubscriberAppLoginResponse> {
+    const body = { fullName, phoneNumber };
     const opts = { skipAuthRedirect: true as const, useSubscriberAuth: false as const };
     try {
       const response = await this.api.post<SubscriberAppLoginResponse>('/SubscriberApp/login', body, opts);
@@ -2424,6 +2424,7 @@ class ApiService {
       })(),
       regionName: str('regionName', 'RegionName'),
       agentResellerName: str('agentResellerName', 'AgentResellerName'),
+      agentPhone: str('agentPhone', 'AgentPhone'),
       paymentOptions: Array.isArray(po) ? (po as SubscriberAppMeResponse['paymentOptions']) : undefined,
       announcements: Array.isArray(ann) ? (ann as SubscriberAppMeResponse['announcements']) : undefined,
     };
@@ -2475,6 +2476,14 @@ class ApiService {
       finalPrice: num('finalPrice', 'FinalPrice'),
       amountPaid: num('amountPaid', 'AmountPaid'),
       remainingAmount: num('remainingAmount', 'RemainingAmount'),
+      totalPrice: (() => {
+        const v = r.totalPrice ?? r.TotalPrice;
+        if (v != null && v !== '') {
+          const n = Number(v);
+          if (Number.isFinite(n)) return n;
+        }
+        return num('finalPrice', 'FinalPrice') + serviceFeesPrice;
+      })(),
       renewalDate: str('renewalDate', 'RenewalDate') ?? '',
       newExpirationDate: str('newExpirationDate', 'NewExpirationDate') ?? '',
       newProfileName: str('newProfileName', 'NewProfileName'),
@@ -4881,6 +4890,66 @@ class ApiService {
     const response = await this.api.post<CallTicket>('/CallCenter', data, {
       params: agentId?.trim() ? { agentId: agentId.trim() } : undefined,
     });
+    return response.data;
+  }
+
+  async getAppChatConversations(params?: {
+    page?: number;
+    pageSize?: number;
+    searchTerm?: string;
+    agentId?: string;
+    unreadOnly?: boolean;
+    needsHumanOnly?: boolean;
+    status?: number;
+  }): Promise<PaginatedResponse<import('../types').AppChatConversation>> {
+    const queryParams: Record<string, string | number | boolean> = {};
+    if (params?.page) queryParams.page = params.page;
+    if (params?.pageSize) queryParams.pageSize = params.pageSize;
+    if (params?.searchTerm) queryParams.searchTerm = params.searchTerm;
+    if (params?.agentId) queryParams.agentId = params.agentId;
+    if (params?.unreadOnly != null) queryParams.unreadOnly = params.unreadOnly;
+    if (params?.needsHumanOnly != null) queryParams.needsHumanOnly = params.needsHumanOnly;
+    if (params?.status != null) queryParams.status = params.status;
+    const response = await this.api.get<PaginatedResponse<import('../types').AppChatConversation>>(
+      '/AppChat',
+      { params: queryParams }
+    );
+    return response.data;
+  }
+
+  async getAppChatConversation(
+    id: string,
+    agentId?: string
+  ): Promise<import('../types').AppChatConversation> {
+    const response = await this.api.get<import('../types').AppChatConversation>(
+      `/AppChat/${encodeURIComponent(id)}`,
+      { params: agentId?.trim() ? { agentId: agentId.trim() } : undefined }
+    );
+    return response.data;
+  }
+
+  async replyAppChat(
+    id: string,
+    text: string,
+    agentId?: string
+  ): Promise<import('../types').AppChatConversation> {
+    const response = await this.api.post<import('../types').AppChatConversation>(
+      `/AppChat/${encodeURIComponent(id)}/messages`,
+      { text },
+      { params: agentId?.trim() ? { agentId: agentId.trim() } : undefined }
+    );
+    return response.data;
+  }
+
+  async closeAppChat(
+    id: string,
+    agentId?: string
+  ): Promise<import('../types').AppChatConversation> {
+    const response = await this.api.post<import('../types').AppChatConversation>(
+      `/AppChat/${encodeURIComponent(id)}/close`,
+      {},
+      { params: agentId?.trim() ? { agentId: agentId.trim() } : undefined }
+    );
     return response.data;
   }
 

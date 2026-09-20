@@ -63,6 +63,7 @@ const MainAgentSubAgentDailyAccountPage = lazy(() => import('./pages/MainAgentSu
 const CustomerInvoicesPage = lazy(() => import('./pages/CustomerInvoicesPage'));
 const SubscriberMaintenanceRequestsPage = lazy(() => import('./pages/SubscriberMaintenanceRequestsPage'));
 const CallCenterPage = lazy(() => import('./pages/CallCenterPage'));
+const AppChatConversationsPage = lazy(() => import('./pages/AppChatConversationsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -215,6 +216,13 @@ function App() {
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
                       <EmployeePageGuard path="/admin/call-center">
                         <CallCenterPage />
+                      </EmployeePageGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="app-chats" element={
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/app-chats">
+                        <AppChatConversationsPage />
                       </EmployeePageGuard>
                     </ProtectedRoute>
                   } />

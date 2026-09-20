@@ -39,6 +39,7 @@ import {
   Zap,
   Wrench,
   Headphones,
+  MessageCircle,
 } from 'lucide-react';
 import brandLogo from '../images/solid-links-logo.png';
 
@@ -197,6 +198,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       name: 'مركز الاتصال',
       path: '/admin/call-center',
       icon: Headphones,
+      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+    },
+    {
+      name: 'محادثات التطبيق',
+      path: '/admin/app-chats',
+      icon: MessageCircle,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
     },
     {
