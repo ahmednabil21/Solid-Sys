@@ -4,6 +4,7 @@ import { MessageCircle, Search, Send, XCircle } from 'lucide-react';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
 import { useDigits } from '../contexts/DigitsContext';
+import { useAppChatNotifications } from '../contexts/AppChatNotificationsContext';
 import { apiService } from '../services/api';
 import {
   AppChatConversation,
@@ -17,12 +18,29 @@ import { STANDARD_PAGE_SIZE_OPTIONS } from '../constants/pagination';
 
 const AGENT_KEY = 'wakeel_app_chat_agentId';
 
+function resolveAppChatImageUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  try {
+    const origin = new URL(apiService.getBaseURL()).origin;
+    return origin + (path.startsWith('/') ? path : `/${path}`);
+  } catch {
+    return path;
+  }
+}
+
 const AppChatConversationsPage: React.FC = () => {
   const { user } = useAuth();
   const { formatDate } = useDigits();
   const queryClient = useQueryClient();
+  const { markAsRead, refreshUnreadCount } = useAppChatNotifications();
   const isAdmin = user?.role === UserRole.Admin;
   const canReply = !user || user.role !== UserRole.Employee || hasPageAction(user, 'AppChats', 'reply');
+
+  useEffect(() => {
+    markAsRead();
+    refreshUnreadCount();
+  }, [markAsRead, refreshUnreadCount]);
 
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [page, setPage] = useState(1);
@@ -310,7 +328,23 @@ const AppChatConversationsPage: React.FC = () => {
                           {m.senderTypeLabel}
                           {m.adminName ? ` · ${m.adminName}` : ''}
                         </div>
-                        <div className="whitespace-pre-wrap leading-relaxed">{m.body}</div>
+                        {m.imageUrl && (
+                          <a
+                            href={resolveAppChatImageUrl(m.imageUrl) ?? m.imageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mb-2 block overflow-hidden rounded-xl"
+                          >
+                            <img
+                              src={resolveAppChatImageUrl(m.imageUrl) ?? m.imageUrl}
+                              alt="صورة من المشترك"
+                              className="max-h-64 w-full object-contain bg-black/5"
+                            />
+                          </a>
+                        )}
+                        {m.body && m.body !== '📷 صورة' && (
+                          <div className="whitespace-pre-wrap leading-relaxed">{m.body}</div>
+                        )}
                         <div className="mt-1 text-[10px] opacity-70">
                           {formatDate(m.createdAt)}
                         </div>

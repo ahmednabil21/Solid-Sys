@@ -12,6 +12,7 @@ import {
   usesPagePermissions,
 } from '../utils/employeePermissions';
 import { useMaintenanceNotificationsOptional } from '../contexts/MaintenanceNotificationsContext';
+import { useAppChatNotificationsOptional } from '../contexts/AppChatNotificationsContext';
 import { Clock } from 'lucide-react';
 import {
   LayoutDashboard,
@@ -53,6 +54,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClose, isMobileOverlay }) => {
   const { user, logout, hasAnyRole, hasFeature, globalAccess, canAccessAdminPath } = useAuth();
   const maintenanceNotify = useMaintenanceNotificationsOptional();
+  const appChatNotify = useAppChatNotificationsOptional();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [expandedByPath, setExpandedByPath] = useState<Record<string, boolean>>({});
@@ -649,6 +651,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                     {item.path === '/admin/maintenance-requests' &&
                       maintenanceNotify?.hasUnread &&
                       maintenanceNotify.pendingCount > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
+                      )}
+                    {item.path === '/admin/app-chats' &&
+                      appChatNotify?.hasUnread &&
+                      appChatNotify.unreadCount > 0 && (
                         <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
                       )}
                   </span>

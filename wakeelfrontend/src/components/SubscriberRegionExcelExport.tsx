@@ -100,7 +100,7 @@ const SubscriberRegionExcelExport: React.FC<Props> = ({
 
           <p className="text-sm text-gray-600 dark:text-gray-400">
             سيتم تنزيل ملف Excel يحتوي على المشتركين الموجودين في النظام للمنطقة والرسيلر المحددين، بالأعمدة:
-            معرف الاشتراك، المشترك، اسم المستخدم، منطقة المشترك.
+            معرف الاشتراك، المشترك، اسم المستخدم، رقم هاتف المشترك، منطقة المشترك.
           </p>
 
           <div className="flex gap-2 pt-2">

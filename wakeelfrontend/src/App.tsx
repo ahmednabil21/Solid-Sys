@@ -8,6 +8,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { DigitsProvider } from './contexts/DigitsContext';
 import { ConfirmationProvider } from './contexts/ConfirmationContext';
 import { MaintenanceNotificationsProvider } from './contexts/MaintenanceNotificationsContext';
+import { AppChatNotificationsProvider } from './contexts/AppChatNotificationsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureGuard } from './components/FeatureGuard';
 import Layout from './components/Layout';
@@ -181,7 +182,9 @@ function App() {
                 <Route path="/admin" element={
                   <ProtectedRoute>
                     <MaintenanceNotificationsProvider>
-                      <Layout />
+                      <AppChatNotificationsProvider>
+                        <Layout />
+                      </AppChatNotificationsProvider>
                     </MaintenanceNotificationsProvider>
                   </ProtectedRoute>
                 }>

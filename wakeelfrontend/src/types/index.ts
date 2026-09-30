@@ -2731,6 +2731,8 @@ export interface AppChatMessage {
   senderTypeLabel: string;
   body: string;
   faqKey?: string | null;
+  /** مسار عام للصورة (مثل /wakeel/uploads/app-chat/...) — يُحذف عند إغلاق المحادثة */
+  imageUrl?: string | null;
   adminName?: string | null;
   createdAt: string;
 }
