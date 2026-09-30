@@ -54,7 +54,7 @@ const PAGE_TITLES: Array<{ match: string | RegExp; title: string }> = [
   { match: '/admin/excel-import', title: 'الاستيراد' },
   { match: '/admin/resellers', title: 'الرسيلرات' },
 
-  { match: '/', title: 'الصفحة الرئيسية' },
+  { match: '/', title: 'تسجيل الدخول' },
 ];
 
 function resolvePageTitle(pathname: string): string {

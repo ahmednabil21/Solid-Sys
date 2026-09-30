@@ -5,7 +5,17 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/wakeel/",
+      "destination": "/wakeel/login",
+      "permanent": false
+    },
+    {
+      "source": "/wakeel",
+      "destination": "/wakeel/login",
+      "permanent": false
+    },
+    {
+      "source": "/wakeel/",
+      "destination": "/wakeel/login",
       "permanent": false
     }
   ],

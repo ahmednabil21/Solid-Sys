@@ -131,12 +131,12 @@ const SystemPricingPage: React.FC = () => {
               </h1>
             </div>
             <Link
-              to="/"
+              to="/login"
               className="inline-flex items-center gap-2 border border-primary-600 text-primary-700 dark:text-primary-400 dark:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-4 py-2 rounded-lg transition-colors"
               style={{ fontFamily: 'Cairo, sans-serif' }}
             >
               <ArrowRight className="h-4 w-4" />
-              العودة للرئيسية
+              العودة لتسجيل الدخول
             </Link>
           </div>
         </div>

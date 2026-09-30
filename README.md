@@ -10,7 +10,7 @@ npm install
 npm start
 ```
 
-يفتح على: http://localhost:3000/wakeel
+يفتح على: http://localhost:3000/wakeel/login
 
 ## ربط الـ API
 

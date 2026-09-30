@@ -26,7 +26,6 @@ import {
 // Lazy load pages — تُحمّل فقط عند زيارة الصفحة (Code Splitting)
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const AgentRegistrationPage = lazy(() => import('./pages/AgentRegistrationPage'));
-const LandingPage = lazy(() => import('./pages/LandingPage'));
 const SystemPricingPage = lazy(() => import('./pages/SystemPricingPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const SubscribersPage = lazy(() => import('./pages/SubscribersPage'));
@@ -168,8 +167,8 @@ function App() {
                 </div>
               }>
               <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<LandingPage />} />
+                {/* Public Routes — الصفحة الرئيسية = تسجيل الدخول */}
+                <Route path="/" element={<Navigate to="/login" replace />} />
                 <Route path="/system-pricing" element={<SystemPricingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register-agent" element={<AgentRegistrationPage />} />
