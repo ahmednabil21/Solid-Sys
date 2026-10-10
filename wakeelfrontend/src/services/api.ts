@@ -911,6 +911,17 @@ class ApiService {
     await this.api.put(`/Agents/me/regions/${regionId}/whatsapp-session`, data);
   }
 
+  /** ربط عدة مجمعات (مناطق) بنفس رقم واتساب — اختياري */
+  async updateSharedRegionsWhatsAppSession(data: {
+    regionIds: string[];
+    whatsAppSessionId?: string | null;
+  }): Promise<void> {
+    await this.api.put('/Agents/me/regions/whatsapp-session/shared', {
+      regionIds: data.regionIds,
+      whatsAppSessionId: data.whatsAppSessionId ?? null,
+    });
+  }
+
   async postRegionWhatsAppDevice(regionId: string): Promise<WhatsAppDeviceResponse> {
     const response = await this.api.post<WhatsAppDeviceResponse>(`/Agents/me/regions/${regionId}/whatsapp/device`);
     const d = response.data as WhatsAppDeviceResponse & { Message?: string; DeviceId?: string };

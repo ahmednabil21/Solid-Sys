@@ -785,11 +785,24 @@ function SettingsPage() {
   const [resellerFtthPartnerId, setResellerFtthPartnerId] = useState('');
   const [resellerRegionId, setResellerRegionId] = useState('');
   const [waSelectedRegionId, setWaSelectedRegionId] = useState('');
+  /** اختياري: ربط أكثر من مجمع بنفس رقم واتساب */
+  const [waLinkMultipleRegions, setWaLinkMultipleRegions] = useState(false);
+  const [waSharedRegionIds, setWaSharedRegionIds] = useState<string[]>([]);
   useEffect(() => {
     if (!waSelectedRegionId && myRegions.length > 0) {
       setWaSelectedRegionId(myRegions[0].id);
     }
   }, [myRegions, waSelectedRegionId]);
+  useEffect(() => {
+    if (!waLinkMultipleRegions) return;
+    setWaSharedRegionIds((prev) => {
+      if (prev.length > 0) {
+        const valid = prev.filter((id) => myRegions.some((r) => r.id === id));
+        if (valid.length > 0) return valid;
+      }
+      return waSelectedRegionId ? [waSelectedRegionId] : myRegions[0] ? [myRegions[0].id] : [];
+    });
+  }, [waLinkMultipleRegions, myRegions, waSelectedRegionId]);
   useEffect(() => {
     if (!templateRegionId && myRegions.length > 0) {
       setTemplateRegionId(myRegions[0].id);
@@ -801,6 +814,13 @@ function SettingsPage() {
   }, [myRegions, templateRegionId]);
 
   const waSelectedRegion = myRegions.find((r) => r.id === waSelectedRegionId) ?? null;
+  const waPairTargetRegionIds = waLinkMultipleRegions
+    ? waSharedRegionIds
+    : waSelectedRegionId
+      ? [waSelectedRegionId]
+      : [];
+  const waPairPrimaryRegionId =
+    (waPairTargetRegionIds.includes(waSelectedRegionId) ? waSelectedRegionId : waPairTargetRegionIds[0]) || '';
   // مودال إعلان مميز أثناء سحب المشتركين من SAS في الخلفية (يُعرض عند انتهاء مهلة الاتصال لمدة 5 دقائق كحد أقصى)
   const [showSasSyncPromoModal, setShowSasSyncPromoModal] = useState(false);
   useEffect(() => {
@@ -1184,6 +1204,23 @@ function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myRegions'] });
       showSuccess('تم الحفظ', 'تم حفظ معرف جلسة واتساب للمنطقة بنجاح.');
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+  const updateSharedRegionsWhatsAppSessionMutation = useMutation({
+    mutationFn: ({ regionIds, sessionId }: { regionIds: string[]; sessionId: string }) =>
+      apiService.updateSharedRegionsWhatsAppSession({
+        regionIds,
+        whatsAppSessionId: sessionId.trim(),
+      }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['myRegions'] });
+      showSuccess(
+        'تم الحفظ',
+        vars.regionIds.length > 1
+          ? `تم ربط ${vars.regionIds.length} مجمعات بنفس رقم واتساب.`
+          : 'تم حفظ معرف جلسة واتساب للمنطقة بنجاح.'
+      );
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
@@ -3901,29 +3938,112 @@ function SettingsPage() {
                 <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل البيانات...</div>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
-                    <select
-                      value={waSelectedRegionId}
-                      onChange={(e) => {
-                        setWaSelectedRegionId(e.target.value);
-                        setWaError(null);
-                        setPairCode(null);
-                        setWaStatus(null);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    >
-                      {myRegions.length === 0 ? (
-                        <option value="">— أضف منطقة أولاً —</option>
-                      ) : (
-                        myRegions.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/40">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={waLinkMultipleRegions}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          setWaLinkMultipleRegions(on);
+                          setWaError(null);
+                          setPairCode(null);
+                          setWaStatus(null);
+                          if (on && waSelectedRegionId) {
+                            setWaSharedRegionIds([waSelectedRegionId]);
+                          }
+                        }}
+                        className="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        <span className="font-medium">ربط أكثر من مجمع برقم واحد</span>
+                        <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          اختياري — يمكنك الإبقاء على رقم خاص لكل مجمع، أو اختيار عدة مجمعات وربطها بنفس الرقم.
+                        </span>
+                      </span>
+                    </label>
                   </div>
+
+                  {!waLinkMultipleRegions ? (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">المنطقة *</label>
+                      <select
+                        value={waSelectedRegionId}
+                        onChange={(e) => {
+                          setWaSelectedRegionId(e.target.value);
+                          setWaError(null);
+                          setPairCode(null);
+                          setWaStatus(null);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      >
+                        {myRegions.length === 0 ? (
+                          <option value="">— أضف منطقة أولاً —</option>
+                        ) : (
+                          myRegions.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                              {r.whatsAppSessionId?.trim() ? ` — ${r.whatsAppSessionId.trim()}` : ''}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        المجمعات المرتبطة بنفس الرقم *
+                      </label>
+                      {myRegions.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">— أضف منطقة أولاً —</p>
+                      ) : (
+                        <div className="max-h-52 overflow-y-auto rounded-md border border-gray-300 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-600">
+                          {myRegions.map((r) => {
+                            const checked = waSharedRegionIds.includes(r.id);
+                            return (
+                              <label
+                                key={r.id}
+                                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/60"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setWaSharedRegionIds((prev) => {
+                                      const next = checked
+                                        ? prev.filter((id) => id !== r.id)
+                                        : [...prev, r.id];
+                                      if (next.length > 0 && !next.includes(waSelectedRegionId)) {
+                                        setWaSelectedRegionId(next[0]);
+                                      } else if (checked && r.id === waSelectedRegionId && next.length > 0) {
+                                        setWaSelectedRegionId(next[0]);
+                                      }
+                                      return next;
+                                    });
+                                    setWaError(null);
+                                    setPairCode(null);
+                                    setWaStatus(null);
+                                  }}
+                                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                <span className="text-sm text-gray-800 dark:text-gray-200 flex-1">{r.name}</span>
+                                {r.whatsAppSessionId?.trim() && (
+                                  <span className="text-xs font-mono text-gray-500 dark:text-gray-400 truncate max-w-[9rem]">
+                                    {r.whatsAppSessionId.trim()}
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        {waSharedRegionIds.length > 1
+                          ? `سيتم ربط ${waSharedRegionIds.length} مجمعات بنفس الرقم.`
+                          : 'اختر مجمعين أو أكثر لمشاركة نفس الرقم، أو مجمعاً واحداً للربط الفردي.'}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       رقم الهاتف
@@ -3943,14 +4063,14 @@ function SettingsPage() {
                     <button
                       type="button"
                       disabled={
-                        !waSelectedRegionId ||
+                        waPairTargetRegionIds.length === 0 ||
                         !pairPhoneOverride.trim() ||
                         waPairLoading ||
                         waStatusLoading
                       }
                       onClick={async () => {
-                        if (!waSelectedRegionId) {
-                          showError('خطأ', 'اختر المنطقة أولاً.');
+                        if (waPairTargetRegionIds.length === 0 || !waPairPrimaryRegionId) {
+                          showError('خطأ', waLinkMultipleRegions ? 'اختر مجمعاً واحداً على الأقل.' : 'اختر المنطقة أولاً.');
                           return;
                         }
                         const phoneParam = normalizeWhatsAppDeviceId(pairPhoneOverride);
@@ -3966,18 +4086,32 @@ function SettingsPage() {
                         clearWaStatusPoll();
                         setWaPairLoading(true);
                         try {
-                          const currentSessionId = (waSelectedRegion?.whatsAppSessionId || '').trim();
-                          if (!currentSessionId || currentSessionId !== phoneParam) {
-                            await updateRegionWhatsAppSessionMutation.mutateAsync({
-                              regionId: waSelectedRegionId,
+                          if (waLinkMultipleRegions && waPairTargetRegionIds.length > 1) {
+                            await updateSharedRegionsWhatsAppSessionMutation.mutateAsync({
+                              regionIds: waPairTargetRegionIds,
                               sessionId: phoneParam,
                             });
+                          } else {
+                            const primaryRegion =
+                              myRegions.find((r) => r.id === waPairPrimaryRegionId) ?? waSelectedRegion;
+                            const currentSessionId = (primaryRegion?.whatsAppSessionId || '').trim();
+                            if (!currentSessionId || currentSessionId !== phoneParam) {
+                              await updateRegionWhatsAppSessionMutation.mutateAsync({
+                                regionId: waPairPrimaryRegionId,
+                                sessionId: phoneParam,
+                              });
+                            }
                           }
-                          await apiService.postRegionWhatsAppDevice(waSelectedRegionId);
-                          const res = await apiService.postRegionWhatsAppPairCode(waSelectedRegionId, phoneParam);
+                          if (waPairPrimaryRegionId !== waSelectedRegionId) {
+                            setWaSelectedRegionId(waPairPrimaryRegionId);
+                          }
+                          await apiService.postRegionWhatsAppDevice(waPairPrimaryRegionId);
+                          const res = await apiService.postRegionWhatsAppPairCode(waPairPrimaryRegionId, phoneParam);
                           setPairCode(res.pairCode || '');
                           setPairHint(
-                            'اذهب إلى واتساب > الأجهزة المرتبطة > ربط عبر رقم الهاتف > أدخل الكود'
+                            waPairTargetRegionIds.length > 1
+                              ? `تم تعيين نفس الرقم لـ ${waPairTargetRegionIds.length} مجمعات. اذهب إلى واتساب > الأجهزة المرتبطة > ربط عبر رقم الهاتف > أدخل الكود`
+                              : 'اذهب إلى واتساب > الأجهزة المرتبطة > ربط عبر رقم الهاتف > أدخل الكود'
                           );
                         } catch (e: any) {
                           const msg = mapWhatsAppBackendError(ApiService.showError(e));
@@ -4004,21 +4138,28 @@ function SettingsPage() {
                     <button
                       type="button"
                       disabled={
-                        !waSelectedRegionId ||
-                        !(waSelectedRegion?.whatsAppSessionId?.trim()) ||
+                        !waPairPrimaryRegionId ||
+                        !(
+                          myRegions.find((r) => r.id === waPairPrimaryRegionId)?.whatsAppSessionId?.trim() ||
+                          waSelectedRegion?.whatsAppSessionId?.trim()
+                        ) ||
                         waPairLoading ||
                         waStatusLoading ||
                         waCheckStatusLoading
                       }
                       onClick={async () => {
-                        if (!waSelectedRegionId) return;
+                        if (!waPairPrimaryRegionId) return;
                         setWaError(null);
                         try {
                           setWaCheckStatusLoading(true);
-                          const s = await apiService.getRegionWhatsAppStatus(waSelectedRegionId);
+                          const s = await apiService.getRegionWhatsAppStatus(waPairPrimaryRegionId);
                           setWaStatus(s);
                           if (s.isLoggedIn) {
-                            setWaSuccessInfo('واتساب مرتبط حالياً.');
+                            setWaSuccessInfo(
+                              waPairTargetRegionIds.length > 1
+                                ? `واتساب مرتبط حالياً (${waPairTargetRegionIds.length} مجمعات بنفس الرقم).`
+                                : 'واتساب مرتبط حالياً.'
+                            );
                           } else {
                             setWaSuccessInfo('واتساب غير مربوط بعد.');
                           }
@@ -4044,17 +4185,17 @@ function SettingsPage() {
                     <button
                       type="button"
                       disabled={
-                        !waSelectedRegionId ||
+                        !waPairPrimaryRegionId ||
                         !pairCode ||
                         waStatusLoading ||
                         waCheckStatusLoading
                       }
                       onClick={async () => {
-                        if (!waSelectedRegionId) return;
+                        if (!waPairPrimaryRegionId) return;
                         setWaStatus(null);
                         setWaError(null);
                         setWaSuccessInfo(null);
-                        pollRegionWhatsAppStatus(waSelectedRegionId);
+                        pollRegionWhatsAppStatus(waPairPrimaryRegionId);
                       }}
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
