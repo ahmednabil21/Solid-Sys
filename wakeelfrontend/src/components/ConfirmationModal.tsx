@@ -103,7 +103,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all duration-300 w-full max-w-md
             ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}
           `}
-          style={{ fontFamily: 'Cairo, sans-serif' }}
+          style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}
         >
           {/* Header */}
           <div className="bg-white dark:bg-gray-800 px-6 py-4">

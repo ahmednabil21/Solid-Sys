@@ -95,7 +95,7 @@ const NotificationItem: React.FC<NotificationProps> = ({ notification, onRemove 
         ${isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
         ${isLeaving ? 'translate-x-full opacity-0' : ''}
       `}
-      style={{ fontFamily: 'Cairo, sans-serif' }}
+      style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}
     >
       <div className="flex items-start">
         <div className="flex-shrink-0 mr-3">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle, Crown, Gem, Package, MessageCircle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import waklogo from '../images/waklogo.png';
+import waklogo from '../images/wakeellogo.png';
 
 const WHATSAPP_URL = 'https://api.whatsapp.com/send?phone=9647740240101';
 
@@ -126,14 +126,14 @@ const SystemPricingPage: React.FC = () => {
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
               <img src={waklogo} alt="نظام الوكيل" className="h-10 w-10 mr-3" />
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'Cairo, sans-serif' }}>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                 أسعار نظام الوكيل
               </h1>
             </div>
             <Link
               to="/login"
               className="inline-flex items-center gap-2 border border-primary-600 text-primary-700 dark:text-primary-400 dark:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-4 py-2 rounded-lg transition-colors"
-              style={{ fontFamily: 'Cairo, sans-serif' }}
+              style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}
             >
               <ArrowRight className="h-4 w-4" />
               العودة لتسجيل الدخول
@@ -145,10 +145,10 @@ const SystemPricingPage: React.FC = () => {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
               باقات نظام الوكيل
             </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
               يوفّر نظام الوكيل عدة باقات تناسب حجم عملك واحتياجك، بحيث تختار الباقة المناسبة وتبدأ بإدارة شغلك بشكل منظم واحترافي.
             </p>
           </div>
@@ -166,7 +166,7 @@ const SystemPricingPage: React.FC = () => {
                   }`}
                 >
                   {plan.badge && (
-                    <div className="absolute top-0 left-0 right-0 bg-primary-600 text-white text-center py-1.5 text-sm font-semibold rounded-t-2xl" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                    <div className="absolute top-0 left-0 right-0 bg-primary-600 text-white text-center py-1.5 text-sm font-semibold rounded-t-2xl" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                       {plan.badge}
                     </div>
                   )}
@@ -176,32 +176,32 @@ const SystemPricingPage: React.FC = () => {
                       <div className="p-3 rounded-xl bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
                         <Icon className="h-6 w-6" />
                       </div>
-                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                         {plan.title}
                       </h3>
                     </div>
 
                     <div className="mb-3">
-                      <span className="text-4xl font-bold text-primary-600" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                      <span className="text-4xl font-bold text-primary-600" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                         {plan.price}
                       </span>
-                      <span className="text-gray-600 dark:text-gray-400 mr-1" style={{ fontFamily: 'Cairo, sans-serif' }}> دينار </span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                      <span className="text-gray-600 dark:text-gray-400 mr-1" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}> دينار </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                         {plan.period}
                       </span>
                     </div>
 
-                    <p className="text-gray-600 dark:text-gray-300 mb-5" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                    <p className="text-gray-600 dark:text-gray-300 mb-5" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                       {plan.subtitle}
                     </p>
 
                     <div className="mb-6">
-                      <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                      <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                         تشمل:
                       </h4>
                       <ul className="space-y-2 max-h-72 overflow-auto pr-1">
                         {plan.features.map((feature) => (
-                          <li key={feature} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300" style={{ fontFamily: 'Cairo, sans-serif' }}>
+                          <li key={feature} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
                             <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                             <span>{feature}</span>
                           </li>
@@ -212,7 +212,7 @@ const SystemPricingPage: React.FC = () => {
                     <button
                       onClick={() => goWhatsApp(plan.title)}
                       className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3.5 rounded-xl font-semibold transition-colors inline-flex items-center justify-center gap-2"
-                      style={{ fontFamily: 'Cairo, sans-serif' }}
+                      style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}
                     >
                       <MessageCircle className="h-5 w-5" />
                       <span>اشترك الآن</span>
@@ -224,18 +224,18 @@ const SystemPricingPage: React.FC = () => {
           </div>
 
           <div className="mt-10 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
               ملاحظة مهمة
             </h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-2" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            <p className="text-gray-700 dark:text-gray-300 mb-2" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
               جميع الباقات تعمل بنظام سحابي (Cloud System) ومتوفرة على:
             </p>
-            <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
               <li>الحاسبة</li>
               <li>الأندرويد</li>
               <li>الآيفون</li>
             </ul>
-            <p className="text-gray-700 dark:text-gray-300 mt-3" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            <p className="text-gray-700 dark:text-gray-300 mt-3" style={{ fontFamily: 'IBM Plex Sans Arabic, sans-serif' }}>
               مع رابط موحد يعمل على جميع الأجهزة.
             </p>
           </div>

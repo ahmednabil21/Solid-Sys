@@ -4778,7 +4778,7 @@ function SettingsPage() {
                 <Users className="absolute inset-0 m-auto h-7 w-7 text-primary-600 dark:text-primary-400" />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 font-cairo">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 font-sans">
               جاري تحميل المشتركين
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -4918,7 +4918,7 @@ function SettingsPage() {
                   <Sparkles className="h-3.5 w-3.5" />
                   Wakeel
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 font-cairo">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 font-sans">
                   جاري حفظ المشتركين
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">

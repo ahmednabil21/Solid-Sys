@@ -6,8 +6,7 @@ import { Eye, EyeOff, User, Lock, AlertTriangle, RefreshCw } from 'lucide-react'
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { apiService, ApiService } from '../services/api';
 import { showSuccess } from '../utils/notifications';
-import brandLogo from '../images/solid-links-logo.png';
-import loginBackground from '../images/login-background.png';
+import brandLogo from '../images/wakeellogo.png';
 
 // const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || '0x4AAAAAACh0LGLTfAOqhxi6';
 
@@ -111,7 +110,7 @@ const LoginPage: React.FC = () => {
       localStorage.removeItem('loginAttempts');
       localStorage.removeItem('blockTime');
       setLoginAttempts(0);
-      showSuccess('تم تسجيل الدخول بنجاح', 'مرحباً بك في Solid Links');
+      showSuccess('تم تسجيل الدخول بنجاح', 'مرحباً بك في نظام إدارة المشتركين');
       navigate('/admin/dashboard');
     } catch (err: any) {
       const newAttempts = loginAttempts + 1;
@@ -160,44 +159,47 @@ const LoginPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-600 to-secondary-500 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <WifiLoaderComponent
           background="transparent"
           desktopSize="150px"
           mobileSize="150px"
           text="جاري تسجيل الدخول..."
-          backColor="#cce5f3"
-          frontColor="#016AAA"
+          backColor="#dbe7ff"
+          frontColor="#2763eb"
         />
       </div>
     );
   }
 
   return (
-    <div
-      dir="rtl"
-      className="relative min-h-screen flex items-center justify-center p-4 sm:p-6"
-      style={{
-        backgroundImage: `linear-gradient(135deg, rgba(1, 106, 170, 0.72), rgba(3, 151, 217, 0.55)), url(${loginBackground})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }}
-    >
-      <div className="w-full max-w-md relative z-10">
-        <div className="bg-white rounded-2xl shadow-2xl border border-white/80 p-6 sm:p-8">
-          <div className="text-center mb-6 sm:mb-8">
+    <div dir="rtl" className="min-h-screen bg-white grid grid-cols-1 lg:grid-cols-2 overflow-hidden">
+      {/* الجانب الأيمن: النص والنموذج */}
+      <div className="relative z-10 flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-14 xl:px-20">
+        <div className="w-full max-w-md mx-auto">
+          <header className="mb-8 sm:mb-10 text-right">
+            <h1 className="text-2xl sm:text-3xl lg:text-[2rem] xl:text-[2.15rem] font-extrabold leading-relaxed tracking-tight text-primary-600">
+              مرحباً بك
+              <br />
+              في نظام إدارة المشتركين
+            </h1>
+            <p className="mt-3 text-base sm:text-lg font-semibold tracking-[0.35em] text-secondary-500">
+              كــل التقنيـــــــات في مكــــــــــان واحد
+            </p>
+          </header>
+
+          {/* شعار على الموبايل */}
+          <div className="mb-8 flex justify-center lg:hidden">
             <img
               src={brandLogo}
-              alt=""
-              className="mx-auto mb-4 h-28 sm:h-36 w-auto max-w-full object-contain"
+              alt="شعار النظام"
+              className="h-40 w-40 sm:h-48 sm:w-48 rounded-2xl object-cover shadow-sm"
             />
-            <p className="text-sm sm:text-base text-gray-600">تسجيل الدخول إلى حسابك</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-2 sm:py-3 rounded-md text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-2 sm:py-3 rounded-xl text-sm">
                 <div className="flex items-start">
                   <AlertTriangle className="h-4 w-4 mt-0.5 ml-2 flex-shrink-0" />
                   <div className="whitespace-pre-line">{error}</div>
@@ -206,7 +208,7 @@ const LoginPage: React.FC = () => {
             )}
 
             {loginAttempts > 0 && !isBlocked && (
-              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 sm:px-4 py-2 sm:py-3 rounded-md text-sm">
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 sm:px-4 py-2 sm:py-3 rounded-xl text-sm">
                 <div className="flex items-center">
                   <AlertTriangle className="h-4 w-4 ml-2" />
                   <span>
@@ -217,7 +219,7 @@ const LoginPage: React.FC = () => {
             )}
 
             {isBlocked && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-2 sm:py-3 rounded-md text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-2 sm:py-3 rounded-xl text-sm">
                 <div className="flex items-center">
                   <AlertTriangle className="h-4 w-4 ml-2" />
                   <span>تم حظر تسجيل الدخول. يرجى المحاولة بعد: {formatTime(blockTimeRemaining)}</span>
@@ -226,12 +228,12 @@ const LoginPage: React.FC = () => {
             )}
 
             <div>
-              <label htmlFor="username" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                 اسم المستخدم
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   id="username"
@@ -239,19 +241,20 @@ const LoginPage: React.FC = () => {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-600 bg-white transition"
-                  placeholder="أدخل اسم المستخدم"
+                  className="block w-full pr-11 pl-4 py-3.5 text-base border-0 rounded-xl bg-[#eef2f7] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/35 transition"
+                  placeholder="اسم المستخدم"
+                  autoComplete="username"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 كلمة المرور
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   id="password"
@@ -259,18 +262,20 @@ const LoginPage: React.FC = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-600 bg-white transition"
-                  placeholder="أدخل كلمة المرور"
+                  className="block w-full pr-11 pl-11 py-3.5 text-base border-0 rounded-xl bg-[#eef2f7] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/35 transition"
+                  placeholder="كلمة المرور"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 left-0 pl-3.5 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   ) : (
-                    <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   )}
                 </button>
               </div>
@@ -291,7 +296,7 @@ const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading || isBlocked}
-              className="w-full flex justify-center items-center py-2.5 sm:py-3 px-4 border border-transparent rounded-xl shadow-md text-sm sm:text-base font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl text-base font-bold text-white bg-secondary-500 hover:bg-secondary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {isLoading ? (
                 <>
@@ -305,21 +310,29 @@ const LoginPage: React.FC = () => {
               )}
             </button>
 
-            <div className="text-center">
+            <div className="text-center pt-1">
               <button
                 type="button"
                 onClick={handleForgotPassword}
-                className="text-sm text-primary-600 hover:text-primary-700 underline focus:outline-none focus:underline"
+                className="text-sm text-primary-600 hover:text-primary-700 hover:underline focus:outline-none focus:underline"
               >
                 نسيت كلمة السر؟
               </button>
             </div>
           </form>
-
-          <div className="text-center text-xs sm:text-sm text-gray-500 mt-5 sm:mt-6">
-            <p>جميع الحقوق محفوظة لـ Solid Links 2026 ©</p>
-          </div>
         </div>
+      </div>
+
+      {/* الجانب الأيسر: الشعار الكبير */}
+      <div className="relative hidden lg:flex items-center justify-center overflow-hidden bg-white p-4 xl:p-6">
+        <img
+          src={brandLogo}
+          alt=""
+          aria-hidden="true"
+          width={720}
+          height={720}
+          className="pointer-events-none select-none h-auto w-[min(90%,42rem)] max-h-[85vh] object-contain"
+        />
       </div>
     </div>
   );

@@ -10,7 +10,7 @@
   ],
   "start_url": "/wakeel/",
   "display": "standalone",
-  "theme_color": "#016AAA",
+  "theme_color": "#2763eb",
   "background_color": "#ffffff",
   "orientation": "portrait-primary"
 }

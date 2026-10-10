@@ -14,7 +14,7 @@ import {
   CheckCircle2,
   Settings2,
 } from 'lucide-react';
-import brandLogo from '../images/solid-links-logo.png';
+import brandLogo from '../images/wakeellogo.png';
 
 const PUBLIC = process.env.PUBLIC_URL || '';
 const ANDROID_APK_URL = `${PUBLIC}/downloads/solid-links-subscriber.apk`;
@@ -84,9 +84,9 @@ const SubscriberInfoPage: React.FC = () => {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#F3F7FB] text-slate-900" dir="rtl">
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#D9EFFA_0%,_#F3F7FB_55%,_#EEF4F9_100%)]" />
-        <div className="absolute -top-24 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#0397D9]/[0.12] blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#016AAA]/[0.08] blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#d9e4fd_0%,_#F3F7FB_55%,_#eef3fe_100%)]" />
+        <div className="absolute -top-24 left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#2763eb]/[0.12] blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#66d9b3]/[0.12] blur-3xl" />
       </div>
 
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
@@ -95,18 +95,18 @@ const SubscriberInfoPage: React.FC = () => {
             <img src={brandLogo} alt="Solid Links" className="h-8 w-8 object-contain" />
           </div>
           <div>
-            <p className="text-lg font-black tracking-tight text-[#016AAA]">Solid Links</p>
+            <p className="text-lg font-black tracking-tight text-[#2763eb]">Solid Links</p>
             <p className="text-xs font-semibold text-slate-500">تطبيق المشترك</p>
           </div>
         </div>
-        <div className="hidden items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold text-[#0397D9] ring-1 ring-[#E6EEF5] sm:flex">
+        <div className="hidden items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold text-[#4078f0] ring-1 ring-[#E6EEF5] sm:flex">
           <ShieldCheck className="h-3.5 w-3.5" />
           خدمة المشتركين الملتزمين
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-5 pb-16 sm:px-8">
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#05A8E8] via-[#0397D9] to-[#016AAA] px-6 py-12 text-white shadow-2xl shadow-sky-900/20 sm:px-12 sm:py-16">
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#6693f4] via-[#2763eb] to-[#1e4fbc] px-6 py-12 text-white shadow-2xl shadow-sky-900/20 sm:px-12 sm:py-16">
           <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
           <div className="absolute -bottom-20 left-10 h-64 w-64 rounded-full bg-cyan-200/20 blur-3xl" />
 
@@ -131,7 +131,7 @@ const SubscriberInfoPage: React.FC = () => {
                 <a
                   href={ANDROID_APK_URL}
                   download="solid-links-subscriber.apk"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3.5 text-sm font-black text-[#016AAA] shadow-lg shadow-black/10 transition hover:bg-sky-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3.5 text-sm font-black text-[#2763eb] shadow-lg shadow-black/10 transition hover:bg-sky-50"
                 >
                   <Download className="h-5 w-5" />
                   تحميل للأندرويد (APK)
@@ -152,10 +152,10 @@ const SubscriberInfoPage: React.FC = () => {
             <div className="relative mx-auto w-full max-w-[280px]">
               <div className="absolute inset-0 -rotate-6 rounded-[2rem] bg-white/10" />
               <div className="relative overflow-hidden rounded-[2rem] border border-white/25 bg-white/95 p-6 text-slate-900 shadow-2xl">
-                <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-[#E8F5FC] ring-1 ring-[#E6EEF5]">
+                <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-[#eef3fe] ring-1 ring-[#E6EEF5]">
                   <img src={brandLogo} alt="" className="h-12 w-12 object-contain" />
                 </div>
-                <p className="text-center text-lg font-black text-[#016AAA]">تطبيق المشترك</p>
+                <p className="text-center text-lg font-black text-[#2763eb]">تطبيق المشترك</p>
                 <p className="mt-1 text-center text-xs font-semibold text-slate-500">
                   Solid Links Subscriber
                 </p>
@@ -165,7 +165,7 @@ const SubscriberInfoPage: React.FC = () => {
                       key={item}
                       className="flex items-center gap-2 rounded-xl bg-[#F3F7FB] px-3 py-2 text-xs font-bold text-slate-700"
                     >
-                      <span className="h-2 w-2 rounded-full bg-[#0397D9]" />
+                      <span className="h-2 w-2 rounded-full bg-[#4078f0]" />
                       {item}
                     </div>
                   ))}
@@ -183,7 +183,7 @@ const SubscriberInfoPage: React.FC = () => {
         <section id="ios-install" className="mt-14 scroll-mt-6">
           <div className="mb-8 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#E8F5FC] px-3 py-1 text-xs font-bold text-[#016AAA]">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#eef3fe] px-3 py-1 text-xs font-bold text-[#2763eb]">
                 <Apple className="h-3.5 w-3.5" />
                 دليل تثبيت الآيفون
               </div>
@@ -196,7 +196,7 @@ const SubscriberInfoPage: React.FC = () => {
             </div>
             <a
               href={IOS_PROFILE_URL}
-              className="inline-flex items-center gap-2 rounded-2xl bg-[#0397D9] px-4 py-2.5 text-sm font-black text-white shadow-md shadow-sky-600/20 hover:bg-[#016AAA]"
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#4078f0] px-4 py-2.5 text-sm font-black text-white shadow-md shadow-sky-600/20 hover:bg-[#2763eb]"
             >
               <Download className="h-4 w-4" />
               تحميل ملف الآيفون
@@ -209,7 +209,7 @@ const SubscriberInfoPage: React.FC = () => {
                 key={step.title}
                 className="flex gap-4 rounded-3xl border border-[#E6EEF5] bg-white/95 p-5 shadow-sm"
               >
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0397D9] text-sm font-black text-white">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#4078f0] text-sm font-black text-white">
                   {index + 1}
                 </div>
                 <div>
@@ -248,7 +248,7 @@ const SubscriberInfoPage: React.FC = () => {
                 key={title}
                 className="rounded-3xl border border-[#E6EEF5] bg-white/90 p-5 shadow-sm shadow-sky-900/5 transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E8F5FC] text-[#0397D9]">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef3fe] text-[#4078f0]">
                   <Icon className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-black text-slate-900">{title}</h3>
@@ -270,7 +270,7 @@ const SubscriberInfoPage: React.FC = () => {
               <a
                 href={ANDROID_APK_URL}
                 download="solid-links-subscriber.apk"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0397D9] px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-600/25 hover:bg-[#016AAA]"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#4078f0] px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-600/25 hover:bg-[#2763eb]"
               >
                 <Download className="h-4 w-4" />
                 Android APK
@@ -292,7 +292,7 @@ const SubscriberInfoPage: React.FC = () => {
 
         <footer className="mt-12 flex flex-col items-center gap-3 pb-6 text-center">
           <img src={brandLogo} alt="" className="h-10 w-10 object-contain opacity-90" />
-          <p className="text-sm font-black text-[#016AAA]">Solid Links</p>
+          <p className="text-sm font-black text-[#2763eb]">Solid Links</p>
           <p className="text-xs font-semibold text-slate-400">
             © {new Date().getFullYear()} — تطبيق المشترك
           </p>

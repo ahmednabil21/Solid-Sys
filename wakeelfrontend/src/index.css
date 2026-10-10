@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,11 +12,14 @@
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
   --sar: env(safe-area-inset-right);
+  /* ألوان العلامة التجارية */
+  --brand-blue: #2763eb;
+  --brand-teal: #66d9b3;
 }
 
 @layer base {
   html {
-    font-family: 'Cairo', ui-sans-serif, system-ui, sans-serif;
+    font-family: 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
@@ -251,35 +254,35 @@ code {
 .theme-gold [class*="bg-primary-9"] .dark\:text-primary-300,
 .theme-gold [class*="bg-primary-8"] .dark\:text-primary-300 { color: #ffffff !important; }
 
-/* ثيم VIP حديث (Agent/SubAgent/Employee ضمن VIP tenant) - أزرق احترافي */
-.theme-vip .bg-primary-50 { background-color: #eef7ff; }
-.theme-vip .bg-primary-100 { background-color: #d9ecff; }
-.theme-vip .bg-primary-200 { background-color: #b8dcff; }
-.theme-vip .bg-primary-500 { background-color: #1f7ae0; }
-.theme-vip .bg-primary-600 { background-color: #1366c6; }
-.theme-vip .bg-primary-700 { background-color: #0f4e9a; }
-.theme-vip .bg-primary-800 { background-color: #103f75; }
-.theme-vip .bg-primary-900 { background-color: #0d2f55; }
-.theme-vip .hover\:bg-primary-200:hover { background-color: #b8dcff; }
-.theme-vip .hover\:bg-primary-700:hover { background-color: #0f4e9a; }
-.theme-vip .hover\:bg-primary-800:hover { background-color: #103f75; }
-.theme-vip .text-primary-300 { color: #9accff; }
-.theme-vip .text-primary-400 { color: #5caaf2; }
-.theme-vip .text-primary-600 { color: #1366c6; }
-.theme-vip .text-primary-700 { color: #0f4e9a; }
-.theme-vip .border-primary-500 { border-color: #1f7ae0; }
-.theme-vip .focus\:ring-primary-500:focus { --tw-ring-color: #1f7ae0; }
-.theme-vip .dark\:bg-primary-900\/20 { background-color: rgb(13 47 85 / 0.2); }
-.theme-vip .dark\:bg-primary-900\/30 { background-color: rgb(13 47 85 / 0.3); }
-.theme-vip .dark\:text-primary-300 { color: #9accff; }
-.theme-vip .dark\:text-primary-400 { color: #5caaf2; }
-.dark .theme-vip .dark\:bg-primary-900\/20 { background-color: rgb(13 47 85 / 0.2); }
-.dark .theme-vip .dark\:bg-primary-900\/30 { background-color: rgb(13 47 85 / 0.3); }
-.dark .theme-vip .dark\:bg-primary-800 { background-color: #103f75; }
-.dark .theme-vip .dark\:bg-primary-900 { background-color: #0d2f55; }
-.dark .theme-vip .dark\:text-primary-300 { color: #9accff; }
-.dark .theme-vip .dark\:text-primary-400 { color: #5caaf2; }
-.dark .theme-vip .dark\:hover\:bg-primary-800:hover { background-color: #103f75; }
+/* ثيم VIP — نفس ألوان العلامة (#2763eb / #66d9b3) */
+.theme-vip .bg-primary-50 { background-color: #eef3fe; }
+.theme-vip .bg-primary-100 { background-color: #d9e4fd; }
+.theme-vip .bg-primary-200 { background-color: #b3c9fb; }
+.theme-vip .bg-primary-500 { background-color: #4078f0; }
+.theme-vip .bg-primary-600 { background-color: #2763eb; }
+.theme-vip .bg-primary-700 { background-color: #1e4fbc; }
+.theme-vip .bg-primary-800 { background-color: #163c8d; }
+.theme-vip .bg-primary-900 { background-color: #0f285e; }
+.theme-vip .hover\:bg-primary-200:hover { background-color: #b3c9fb; }
+.theme-vip .hover\:bg-primary-700:hover { background-color: #1e4fbc; }
+.theme-vip .hover\:bg-primary-800:hover { background-color: #163c8d; }
+.theme-vip .text-primary-300 { color: #8daef8; }
+.theme-vip .text-primary-400 { color: #6693f4; }
+.theme-vip .text-primary-600 { color: #2763eb; }
+.theme-vip .text-primary-700 { color: #1e4fbc; }
+.theme-vip .border-primary-500 { border-color: #4078f0; }
+.theme-vip .focus\:ring-primary-500:focus { --tw-ring-color: #4078f0; }
+.theme-vip .dark\:bg-primary-900\/20 { background-color: rgb(15 40 94 / 0.2); }
+.theme-vip .dark\:bg-primary-900\/30 { background-color: rgb(15 40 94 / 0.3); }
+.theme-vip .dark\:text-primary-300 { color: #8daef8; }
+.theme-vip .dark\:text-primary-400 { color: #6693f4; }
+.dark .theme-vip .dark\:bg-primary-900\/20 { background-color: rgb(15 40 94 / 0.2); }
+.dark .theme-vip .dark\:bg-primary-900\/30 { background-color: rgb(15 40 94 / 0.3); }
+.dark .theme-vip .dark\:bg-primary-800 { background-color: #163c8d; }
+.dark .theme-vip .dark\:bg-primary-900 { background-color: #0f285e; }
+.dark .theme-vip .dark\:text-primary-300 { color: #8daef8; }
+.dark .theme-vip .dark\:text-primary-400 { color: #6693f4; }
+.dark .theme-vip .dark\:hover\:bg-primary-800:hover { background-color: #163c8d; }
 
 /* الحفاظ على قابلية القراءة داخل الأزرار الأساسية */
 .theme-vip .text-white { color: #ffffff !important; }
@@ -294,9 +297,9 @@ code {
 
 /* Sidebar حديث للـ VIP */
 .theme-vip .sidebar-shell {
-  background: linear-gradient(180deg, #0f4e9a 0%, #103f75 55%, #0d2f55 100%);
+  background: linear-gradient(180deg, #1e4fbc 0%, #163c8d 55%, #0f285e 100%);
   border-inline-start: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 40px rgba(13, 47, 85, 0.35);
+  box-shadow: 0 12px 40px rgba(15, 40, 94, 0.35);
 }
 .theme-vip .sidebar-header,
 .theme-vip .sidebar-footer {

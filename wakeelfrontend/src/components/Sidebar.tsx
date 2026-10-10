@@ -42,7 +42,7 @@ import {
   Headphones,
   MessageCircle,
 } from 'lucide-react';
-import brandLogo from '../images/solid-links-logo.png';
+import brandLogo from '../images/wakeellogo.png';
 
 interface SidebarProps {
   isCollapsed: boolean;
