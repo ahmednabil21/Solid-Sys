@@ -17,13 +17,10 @@ import { Clock } from 'lucide-react';
 import {
   LayoutDashboard,
   Users,
-  UserCheck,
-  UserCog,
   UserPlus,
   BarChart3,
   CalendarDays,
   CreditCard,
-  FileSpreadsheet,
   Settings,
   Sun,
   Moon,
@@ -33,14 +30,12 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  MessageSquare,
   Store,
   Wallet,
   Building2,
   Zap,
   Wrench,
   Headphones,
-  MessageCircle,
 } from 'lucide-react';
 import brandLogo from '../images/wakeellogo.png';
 
@@ -131,12 +126,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
   };
 
   const menuItems: SidebarMenuItem[] = [
+    // 1. لوحة التحكم
     {
       name: 'لوحة التحكم',
       path: '/admin/dashboard',
       icon: LayoutDashboard,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee, UserRole.Subscriber, UserRole.MainAgent],
+      children: [{ name: 'لوحة التحكم الرئيسية', path: '/admin/dashboard' }],
     },
+    // وكيل رئيسي — عناصر خاصة
     {
       name: 'المكاتب الفرعية',
       path: '/admin/main-agent/sub-agents',
@@ -167,6 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       icon: BarChart3,
       roles: [UserRole.MainAgent],
     },
+    // 2. إدارة المشتركين والخدمات
     {
       name: 'إدارة المشتركين والخدمات',
       path: '/admin/subscribers',
@@ -189,6 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         },
       ],
     },
+    // 3. الصيانة والطلبات
     {
       name: 'الصيانة والطلبات',
       path: '/admin/maintenance-requests',
@@ -196,18 +196,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
       children: [{ name: 'طلبات الصيانة', path: '/admin/maintenance-requests' }],
     },
+    // 4. مركز الاتصال
     {
       name: 'مركز الاتصال',
       path: '/admin/call-center',
       icon: Headphones,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
+      children: [
+        { name: 'مركز الاتصال', path: '/admin/call-center' },
+        { name: 'محادثات التطبيق', path: '/admin/app-chats' },
+      ],
     },
-    {
-      name: 'محادثات التطبيق',
-      path: '/admin/app-chats',
-      icon: MessageCircle,
-      roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee],
-    },
+    // 5. المواد والمبيعات
     {
       name: 'المواد والمبيعات',
       path: '/admin/materials',
@@ -219,6 +219,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         { name: 'سجل المبيعات', path: '/admin/materials/sales-history' },
       ],
     },
+    // 6. المالية والحسابات
     {
       name: 'المالية والحسابات',
       path: '/admin/reports',
@@ -242,6 +243,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         },
       ],
     },
+    // 7. إدارة الموظفين
     {
       name: 'إدارة الموظفين',
       path: '/admin/employees',
@@ -257,6 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         },
       ],
     },
+    // 8. التقارير
     {
       name: 'التقارير',
       path: '/admin/monthly-reports',
@@ -267,41 +270,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         { name: 'حسابات شهرية معزولة', path: '/admin/isolated-monthly-accounts' },
       ],
     },
+    // 9. الإعدادات
     {
       name: 'الإعدادات',
       path: '/admin/settings',
       icon: Settings,
       roles: [UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.MainAgent, UserRole.Employee],
-    },
-    {
-      name: 'الوكلاء',
-      path: '/admin/agents',
-      icon: UserCheck,
-      roles: [UserRole.Admin],
-    },
-    {
-      name: 'المستخدمين',
-      path: '/admin/users',
-      icon: UserCog,
-      roles: [UserRole.Admin],
-    },
-    {
-      name: 'رسالة النظام',
-      path: '/admin/system-message',
-      icon: MessageSquare,
-      roles: [UserRole.Admin],
-    },
-    {
-      name: 'الاستيراد',
-      path: '/admin/excel-import',
-      icon: FileSpreadsheet,
-      roles: [UserRole.Admin],
-    },
-    {
-      name: 'الرسيلرات',
-      path: '/admin/resellers',
-      icon: Store,
-      roles: [UserRole.Admin],
+      children: [
+        { name: 'الإعدادات العامة', path: '/admin/settings' },
+        { name: 'الوكلاء', path: '/admin/agents', roles: [UserRole.Admin] },
+        { name: 'المستخدمين', path: '/admin/users', roles: [UserRole.Admin] },
+        { name: 'رسالة النظام', path: '/admin/system-message', roles: [UserRole.Admin] },
+        { name: 'الاستيراد', path: '/admin/excel-import', roles: [UserRole.Admin] },
+        { name: 'الرسيلرات', path: '/admin/resellers', roles: [UserRole.Admin] },
+      ],
     },
   ];
 
@@ -597,6 +579,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                           maintenanceNotify.pendingCount > 0 && (
                             <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
                           )}
+                        {item.children?.some((c) => c.path === '/admin/app-chats') &&
+                          appChatNotify?.hasUnread &&
+                          appChatNotify.unreadCount > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
+                          )}
                       </span>
                     )}
                     {isExpanded ? <ChevronUp className="h-5 w-5 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 flex-shrink-0" />}
@@ -621,6 +608,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                               {child.path === '/admin/maintenance-requests' &&
                                 maintenanceNotify?.hasUnread &&
                                 maintenanceNotify.pendingCount > 0 && (
+                                  <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
+                                )}
+                              {child.path === '/admin/app-chats' &&
+                                appChatNotify?.hasUnread &&
+                                appChatNotify.unreadCount > 0 && (
                                   <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-hidden />
                                 )}
                             </span>
